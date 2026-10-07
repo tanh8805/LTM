@@ -6,10 +6,10 @@ Nhóm 4 người làm song song trên cùng một repo. Mục tiêu của các q
 
 | Người | Vai trò | Sở hữu |
 |---|---|---|
-| **Nguoi1** | Network | `exam.common.protocol`, `exam.common.model`, `exam.server.api`, `exam.server.net`, `exam.server.session`, `exam.server.rate`, `ServerMain`, `exam.client.api`, `exam.client.net`, `StudentMain`, `TeacherMain`, `config/server.properties`, `docs/`, file build (`pom.xml`) |
+| **Nguoi1** | Network | `exam.common.protocol`, `exam.common.model`, `exam.server` (`ServerMain`, `ServerApp`, `ServerConfig`), `exam.server.api`, `exam.server.net`, `exam.server.session`, `exam.server.rate`, `exam.client.api`, `exam.client.net`, `exam.client` (`StudentClient`, `TeacherClient`, `StudentMain`, `TeacherMain`, `ClientConfig`), `source/e2e/`, `config/server.properties`, `config/client.properties`, `docs/`, file build (`pom.xml`) |
 | **Nguoi2** | Nghiệp vụ thi | `exam.server.exam`, `exam.server.db`, `schema.sql` + dữ liệu mẫu (`source/server/src/main/resources/`), `exam.client.student`, `exam.client.teacher` (trừ `teacher.monitor`) |
 | **Nguoi3** | Giám sát | `exam.server.monitor`, `exam.client.monitor`, `exam.client.teacher.monitor` |
-| **Nguoi4** | ML / Thực nghiệm | `exam.common.ml`, `exam.server.ml`, `exam.tools`, `ml-service/`, `config/ml.properties`, `data/traces/`, `statics/`, file `exam.client.api.IsolationForestScorer` |
+| **Nguoi4** | ML / Thực nghiệm | `exam.common.ml`, `exam.server.ml`, `exam.client.ml`, `exam.tools`, `ml-service/`, `config/ml.properties`, `data/traces/`, `statics/` |
 
 Mọi thư mục sở hữu khớp với `.github/CODEOWNERS`. Mỗi file Java có dòng đầu `// Owner: NguoiX`.
 Chi tiết công việc từng người, tuần và tiêu chí xong: **`WORK_SPLIT.md`**.
@@ -36,44 +36,71 @@ Chi tiết công việc từng người, tuần và tiêu chí xong: **`WORK_SPL
 Cần: Java 21, Maven 3.9+, Python 3.10+ (cho ml-service). **Chạy mọi lệnh Server/Client từ thư mục gốc repo** (để `config/` và `data/` đúng).
 
 ```bash
-# Build toàn bộ + chạy test (bắt buộc pass trước khi mở PR)
+# Build toàn bộ + chạy test (bắt buộc pass trước khi mở PR). Mất khoảng 1,5 phút vì có test mạng và end-to-end.
 cd source
 mvn -q package
 
 # Chỉ chạy test
 mvn -q test
 
-# Chỉ một module (ví dụ common)
+# Chỉ một module (ví dụ common); module khác cần thêm -am để build common trước
 mvn -q -pl common test
+mvn -q -pl client -am test
 ```
 
 Sau `mvn package`, mỗi module có `target/<module>.jar` và `target/lib/` (thư viện phụ thuộc). Chạy (từ thư mục gốc repo):
 
 ```bash
-# Server
+# Server (đọc config/server.properties và config/ml.properties)
 java -cp "source/server/target/server.jar:source/server/target/lib/*" exam.server.ServerMain
 
-# Teacher (mặc định: localhost 5000 gv01 teacher123)
+# Teacher (mặc định: host/port từ config/client.properties, gv01 teacher123)
 java -cp "source/client/target/client.jar:source/client/target/lib/*" exam.client.TeacherMain
 
-# Student (mặc định: localhost 5000 SV001 123456 CA001)
+# Student (mặc định: SV001 123456 CA001)
 java -cp "source/client/target/client.jar:source/client/target/lib/*" exam.client.StudentMain
-# Tham số: [host] [port] [maSV] [matKhau] [maCaThi], ví dụ chạy sinh viên thứ hai:
+# Tham số: [host] [port] [maSV] [matKhau] [maCaThi] [auto], ví dụ chạy sinh viên thứ hai:
 java -cp "source/client/target/client.jar:source/client/target/lib/*" exam.client.StudentMain localhost 5000 SV002 123456 CA001
 
 # ML service (Python)
 cd ml-service
 python -m venv .venv && source .venv/bin/activate    # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-uvicorn app:app
+pip install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cpu
+uvicorn app:app                                      # cổng 8000
+pip install -r requirements-dev.txt && python -m pytest   # test ml-service
+```
+
+Quy trình chạy thử bằng tay: bật Server → bật Teacher, đăng nhập `gv01` → tab **Câu hỏi** (đã có 30 câu mẫu) → tab **Đề thi** tạo đề → tab **Ca thi** tạo ca với mã `CA001` và danh sách thí sinh `SV001`, `SV002` → bật Student đăng nhập `SV001` / `CA001` → Teacher bấm **Bắt đầu ca** → sinh viên làm bài, giáo viên xem tab **Giám sát**.
+
+Chạy kịch bản end-to-end (20 bước) bằng **tiến trình thật** (ml-service + Server thật, OSHI thật):
+
+```bash
+cd source && mvn -q package -DskipTests && cd ..
+java -cp "source/e2e/target/e2e.jar:source/e2e/target/lib/*" exam.e2e.EndToEndRunner \
+     --python ml-service/.venv/bin/python --backend naive --work-dir /tmp/ltm-e2e
+# --backend naive: ml-service dùng bộ dự báo thử nghiệm (không cần tải model). --backend chronos: dùng Chronos-Bolt thật
+# (cần tải được model từ huggingface.co; nếu model chưa nạp, ml-service trả 503 và Server bỏ qua ML, kịch bản vẫn phải qua).
+```
+
+Thực nghiệm ML (Nguoi4):
+
+```bash
+java -cp "source/tools/target/tools.jar:source/tools/target/lib/*" exam.tools.Simulator --out data/traces/sim.csv
+java -cp "source/tools/target/tools.jar:source/tools/target/lib/*" exam.tools.Recorder --out data/traces/me.csv --seconds 120
+java -cp "source/tools/target/tools.jar:source/tools/target/lib/*" exam.tools.ExperimentRunner \
+     --trace data/traces/sim.csv --ml-url http://localhost:8000 --out statics/results/experiment.csv
+# Thu baseline thật từ phòng thi (giáo viên bật BASELINE rồi xuất số liệu từ Server):
+java -cp "source/tools/target/tools.jar:source/tools/target/lib/*" exam.tools.Recorder \
+     --from-server localhost 5000 gv01 teacher123 --out data/traces/baseline.csv
 ```
 
 Ghi chú:
 
 - Trên **Windows** đổi dấu `:` trong classpath thành `;` (ví dụ `"source/server/target/server.jar;source/server/target/lib/*"`).
 - Nếu log tiếng Việt bị lỗi font, thêm `-Dstdout.encoding=UTF-8` ngay sau `java`.
-- Muốn nạp lại dữ liệu mẫu: dừng Server, xóa `data/exam.db`, chạy lại Server.
-- Tài khoản mẫu: xem `docs/SPEC.md` mục 14.
+- Muốn nạp lại dữ liệu mẫu (hoặc sau khi schema đổi): dừng Server, xóa `data/exam.db`, chạy lại Server.
+- Tài khoản mẫu: giáo viên `gv01` / `teacher123`; sinh viên `SV001`…`SV010` / `123456`. Chi tiết: `docs/SPEC.md` mục 14.
+- `ml.mode` mặc định `NONE`; muốn thử ML sửa `config/ml.properties`. Muốn Chronos thật phải cho phép truy cập `huggingface.co` (hoặc đặt `LTM_ML_MODEL`).
 - Kiểm tra nhanh Server còn sống: chạy Teacher/Student và xem log `[Login] OK` và `[Heartbeat] ...` ở cửa sổ Server.
 
 ## 5. Quy tắc viết code (để vấn đáp giải thích được)
