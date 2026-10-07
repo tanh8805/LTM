@@ -1,11 +1,11 @@
 # Owner: Nguoi4
 # Python 3.10+
+#
+# Cài đặt (bản torch CPU nhỏ hơn nhiều so với bản mặc định có CUDA trên Linux):
+#   pip install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cpu
+# Windows/macOS: pip install -r requirements.txt  (torch mặc định đã là bản CPU)
 
-# --- Đang dùng (stub) ---
 fastapi
 uvicorn
-
-# --- Sẽ dùng khi cài Chronos thật (TODO Nguoi4) ---
-# Bỏ comment 2 dòng dưới khi bắt đầu cài Chronos. Gói torch khá nặng (vài trăm MB) nên chưa cài ở skeleton.
-# chronos-forecasting
-# torch --index-url https://download.pytorch.org/whl/cpu
+chronos-forecasting
+torch

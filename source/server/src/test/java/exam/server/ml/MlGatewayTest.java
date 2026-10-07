@@ -272,6 +272,33 @@ class MlGatewayTest {
     }
 
     @Test
+    void nonFiniteMetricValuesAreReplacedSoTheRequestIsStillValid() throws Exception {
+        for (int i = 0; i < 20; i++) {
+            gateway.recordMetrics("SV001", new Metrics(Double.NaN, Double.POSITIVE_INFINITY, 4, 3, 20, 40, 100, 0));
+        }
+
+        Map<String, MlResult> results = score();
+
+        assertEquals(1, receivedBodies.size());
+        assertEquals(1, results.size());
+    }
+
+    @Test
+    void badServiceUrlDoesNotLeaveTheGatewayStuck() throws Exception {
+        Properties properties = new Properties();
+        properties.setProperty("ml.service.url", "http://exa mple:80"); // URL sai
+        properties.setProperty("ml.chronos.min.points", "5");
+        MlGatewayImpl brokenGateway = new MlGatewayImpl(MlConfig.fromProperties(properties));
+        for (int i = 0; i < 20; i++) {
+            brokenGateway.recordMetrics("SV001", new Metrics(10, 5, 4, 3, 20, 40, 100, 0));
+        }
+
+        assertTrue(brokenGateway.scoreAllMachines().get(2, java.util.concurrent.TimeUnit.SECONDS).isEmpty());
+        // Lần gọi thứ hai vẫn trả về ngay (cờ không bị kẹt) chứ không phải lỗi "lần trước chưa xong"
+        assertTrue(brokenGateway.scoreAllMachines().get(2, java.util.concurrent.TimeUnit.SECONDS).isEmpty());
+    }
+
+    @Test
     void secondCallWhileFirstIsStillRunningIsSkipped() throws Exception {
         feed("SV001", 20, 10);
         delayMillis = 300;

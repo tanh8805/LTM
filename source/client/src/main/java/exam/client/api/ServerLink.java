@@ -25,6 +25,12 @@ public interface ServerLink {
 
     ConnectionStatus getStatus();
 
-    /** Đóng kết nối. */
+    /**
+     * Cắt socket hiện tại để buộc nối lại (RECONNECTING), dùng khi nghi ngờ kết nối đã chết lặng
+     * (không có FIN/RST nên TCP không tự báo lỗi). Khác close(): ServerLink vẫn tiếp tục thử nối lại.
+     */
+    void resetConnection();
+
+    /** Đóng kết nối hẳn, không thử nối lại. */
     void close();
 }

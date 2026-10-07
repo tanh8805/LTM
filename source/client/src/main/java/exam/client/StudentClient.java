@@ -77,6 +77,8 @@ public class StudentClient implements ServerLinkListener, StudentActions {
     private final ConcurrentSkipListMap<Integer, AnswerMessage> pendingAnswers = new ConcurrentSkipListMap<>();
     private final Map<Integer, Integer> answers = new ConcurrentHashMap<>();
     private volatile int lastAckedAnswerSeq = 0;
+    /** Lần cuối nhận được BẤT KỲ message nào từ Server (epoch milli giây): để phát hiện Server "im lặng". */
+    private volatile long lastServerMessageTime = System.currentTimeMillis();
 
     public StudentClient(ServerLink serverLink, MonitoringLoop monitoringLoop, RuleEngine ruleEngine,
                          String host, int port, int heartbeatIntervalMs) {
@@ -187,6 +189,7 @@ public class StudentClient implements ServerLinkListener, StudentActions {
         switch (newStatus) {
             case CONNECTED:
                 view.showStatus("Connected");
+                lastServerMessageTime = System.currentTimeMillis();
                 if (token != null) {
                     // Đây là lần nối lại sau khi mất kết nối: lấy lại phiên cũ bằng token.
                     sessionActive = false;
@@ -211,6 +214,7 @@ public class StudentClient implements ServerLinkListener, StudentActions {
 
     @Override
     public void onMessage(Message message) {
+        lastServerMessageTime = System.currentTimeMillis();
         if (message instanceof LoginOkMessage loginOk) {
             handleLoginOk(loginOk);
         } else if (message instanceof LoginFailMessage loginFail) {
@@ -346,7 +350,13 @@ public class StudentClient implements ServerLinkListener, StudentActions {
 
     private void runHeartbeatLoop() {
         while (!closed) {
-            if (sessionActive && serverLink.getStatus() == ConnectionStatus.CONNECTED) {
+            if (sessionActive && serverLink.getStatus() == ConnectionStatus.CONNECTED && serverIsSilent()) {
+                // Mạng chết lặng (không có FIN/RST): Server không trả lời HEARTBEAT nữa. Cắt socket để nối lại bằng token.
+                System.out.println("[Student] Server im lặng quá " + silenceTimeoutMs() + " ms, nối lại");
+                view.appendLog("Server không trả lời, đang nối lại...");
+                sessionActive = false;
+                serverLink.resetConnection();
+            } else if (sessionActive && serverLink.getStatus() == ConnectionStatus.CONNECTED) {
                 MonitoringLoop.Sample sample = monitoringLoop.takeSample();
                 Metrics summary = sample.metrics;
                 serverLink.send(new HeartbeatMessage(++heartbeatSeq, summary, sample.anomalyScore, sample.anomalous));
@@ -355,6 +365,15 @@ public class StudentClient implements ServerLinkListener, StudentActions {
                 return;
             }
         }
+    }
+
+    /** Server im lặng khi quá 3 chu kỳ heartbeat không gửi gì (HEARTBEAT_ACK đáng lẽ về mỗi chu kỳ). */
+    private boolean serverIsSilent() {
+        return System.currentTimeMillis() - lastServerMessageTime > silenceTimeoutMs();
+    }
+
+    private long silenceTimeoutMs() {
+        return Math.max(3000, 3L * heartbeatIntervalMs);
     }
 
     /** Ngủ một chu kỳ heartbeat, chia nhỏ để đổi chu kỳ (RULES_CONFIG) hoặc đóng ứng dụng có hiệu lực nhanh. */

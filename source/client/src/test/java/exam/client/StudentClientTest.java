@@ -512,6 +512,27 @@ class StudentClientTest {
     }
 
     @Test
+    void silentServerMakesTheClientResetTheConnection() throws Exception {
+        loginSuccessfully(); // chu kỳ heartbeat 100 ms, ngưỡng im lặng tối thiểu 3 giây
+
+        assertTrue(Wait.until(() -> link.resetCalls >= 1, 6000), "Server im lặng thì client phải tự cắt và nối lại");
+        assertTrue(view.statuses.stream().anyMatch(text -> text.contains("Disconnected")));
+    }
+
+    @Test
+    void aliveServerNeverCausesAReset() throws Exception {
+        loginSuccessfully();
+
+        // Server vẫn trả lời đều đặn
+        for (int i = 0; i < 40; i++) {
+            link.deliver(new HeartbeatAckMessage(i, System.currentTimeMillis()));
+            Thread.sleep(100);
+        }
+
+        assertEquals(0, link.resetCalls);
+    }
+
+    @Test
     void closingTheClientStopsEverything() throws Exception {
         loginSuccessfully();
         assertTrue(Wait.until(() -> !link.sentOfType(HeartbeatMessage.class).isEmpty(), 3000));

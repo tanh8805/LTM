@@ -66,6 +66,12 @@ public class MlGatewayImpl implements MlGateway {
     public void recordMetrics(String machineId, Metrics metrics) {
         double[] chronosValues = new double[Metrics.CHRONOS_DIMENSIONS];
         System.arraycopy(metrics.toVector(), 0, chronosValues, 0, Metrics.CHRONOS_DIMENSIONS);
+        for (int i = 0; i < chronosValues.length; i++) {
+            // JSON không biểu diễn được NaN/Infinity: số liệu hỏng được thay bằng 0 thay vì làm hỏng cả batch.
+            if (!Double.isFinite(chronosValues[i])) {
+                chronosValues[i] = 0;
+            }
+        }
 
         MachineHistory history = histories.computeIfAbsent(machineId, key -> new MachineHistory());
         synchronized (history) {
@@ -96,11 +102,19 @@ public class MlGatewayImpl implements MlGateway {
             return CompletableFuture.completedFuture(new HashMap<>());
         }
 
-        HttpRequest request = HttpRequest.newBuilder(URI.create(config.serviceUrl + "/score"))
-                .timeout(Duration.ofMillis(config.serviceTimeoutMs))
-                .header("Content-Type", "application/json; charset=utf-8")
-                .POST(HttpRequest.BodyPublishers.ofString(ChronosCodec.buildRequest(contextByMachine)))
-                .build();
+        HttpRequest request;
+        try {
+            request = HttpRequest.newBuilder(URI.create(config.serviceUrl + "/score"))
+                    .timeout(Duration.ofMillis(config.serviceTimeoutMs))
+                    .header("Content-Type", "application/json; charset=utf-8")
+                    .POST(HttpRequest.BodyPublishers.ofString(ChronosCodec.buildRequest(contextByMachine)))
+                    .build();
+        } catch (RuntimeException e) {
+            // Địa chỉ ml.service.url sai hoặc không dựng được JSON: bỏ qua ML nhưng KHÔNG để cờ callInFlight bị kẹt.
+            callInFlight.set(false);
+            logFailure(e);
+            return CompletableFuture.completedFuture(new HashMap<>());
+        }
 
         // sendAsync không chặn thread gọi. orTimeout bảo đảm tổng thời gian không vượt quá timeout (kể cả lúc đọc body).
         return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())

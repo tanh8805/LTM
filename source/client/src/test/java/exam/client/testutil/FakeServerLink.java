@@ -49,6 +49,14 @@ public class FakeServerLink implements ServerLink {
         return status;
     }
 
+    public int resetCalls = 0;
+
+    @Override
+    public void resetConnection() {
+        resetCalls++;
+        setStatus(ConnectionStatus.RECONNECTING);
+    }
+
     @Override
     public void close() {
         setStatus(ConnectionStatus.DISCONNECTED);

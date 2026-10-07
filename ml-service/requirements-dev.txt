@@ -1,0 +1,4 @@
+# Owner: Nguoi4
+# Thư viện để chạy test của ml-service:  pip install -r requirements.txt -r requirements-dev.txt && pytest
+pytest
+httpx

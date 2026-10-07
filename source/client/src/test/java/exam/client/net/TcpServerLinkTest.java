@@ -181,6 +181,22 @@ class TcpServerLinkTest {
     }
 
     @Test
+    void resetConnectionCutsTheSocketAndReconnects() throws Exception {
+        serverSocket = new ServerSocket(0);
+        link = createLink(100, 50);
+        link.connect("localhost", serverSocket.getLocalPort());
+        Socket first = serverSocket.accept();
+
+        link.resetConnection(); // client nghi ngờ kết nối chết lặng
+
+        assertTrue(Wait.until(() -> statuses.contains(ConnectionStatus.RECONNECTING), 3000));
+        Socket second = serverSocket.accept();
+        assertTrue(Wait.until(() -> link.getStatus() == ConnectionStatus.CONNECTED, 3000));
+        assertEquals(-1, first.getInputStream().read(), "socket cũ đã bị đóng");
+        assertTrue(second.isConnected());
+    }
+
+    @Test
     void closeDoesNotTriggerReconnect() throws Exception {
         serverSocket = new ServerSocket(0);
         link = createLink(100, 5);

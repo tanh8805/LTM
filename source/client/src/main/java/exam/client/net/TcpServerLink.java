@@ -99,6 +99,12 @@ public class TcpServerLink implements ServerLink {
     }
 
     @Override
+    public void resetConnection() {
+        // Đóng socket nhưng KHÔNG đặt closedByUser: thread đọc sẽ báo lỗi và chuyển sang RECONNECTING.
+        closeSocket();
+    }
+
+    @Override
     public void close() {
         closedByUser = true;
         changeStatus(ConnectionStatus.DISCONNECTED);
