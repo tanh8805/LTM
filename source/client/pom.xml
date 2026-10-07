@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Owner: Nguoi1 -->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>exam</groupId>
+    <artifactId>ltm-parent</artifactId>
+    <version>0.1.0</version>
+  </parent>
+
+  <!-- client: StudentMain + TeacherMain (Swing) -->
+  <artifactId>client</artifactId>
+
+  <dependencies>
+    <dependency>
+      <groupId>exam</groupId>
+      <artifactId>common</artifactId>
+    </dependency>
+    <!-- OSHI: Nguoi3 dùng để đọc CPU/RAM/process/USB/network. Skeleton chưa gọi. -->
+    <dependency>
+      <groupId>com.github.oshi</groupId>
+      <artifactId>oshi-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>

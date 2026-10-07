@@ -1,0 +1,55 @@
+# CODEOWNERS - phản ánh bảng phân công trong CONTRIBUTING.md và WORK_SPLIT.md
+#
+# TODO: Thay 4 handle giữ chỗ bên dưới bằng tài khoản GitHub thật của từng người:
+#   @REPLACE-ME-NGUOI1  ->  Nguoi1 (Network)
+#   @REPLACE-ME-NGUOI2  ->  Nguoi2 (Exam business)
+#   @REPLACE-ME-NGUOI3  ->  Nguoi3 (Monitoring)
+#   @REPLACE-ME-NGUOI4  ->  Nguoi4 (ML / Experiment)
+#
+# Quy tắc của GitHub: dòng ĐỨNG SAU thắng dòng đứng trước, nên dòng chung ở trên, dòng cụ thể ở dưới.
+
+# Mặc định (file chung, tài liệu, cấu hình build): Nguoi1
+*                                   @REPLACE-ME-NGUOI1
+
+# ---------------- common ----------------
+/source/common/src/main/java/exam/common/protocol/   @REPLACE-ME-NGUOI1
+/source/common/src/test/java/exam/common/protocol/   @REPLACE-ME-NGUOI1
+/source/common/src/main/java/exam/common/model/      @REPLACE-ME-NGUOI1
+/source/common/src/main/java/exam/common/ml/         @REPLACE-ME-NGUOI4
+
+# ---------------- server ----------------
+/source/server/src/main/java/exam/server/ServerMain.java   @REPLACE-ME-NGUOI1
+/source/server/src/main/java/exam/server/api/        @REPLACE-ME-NGUOI1
+/source/server/src/main/java/exam/server/net/        @REPLACE-ME-NGUOI1
+/source/server/src/main/java/exam/server/session/    @REPLACE-ME-NGUOI1
+/source/server/src/main/java/exam/server/rate/       @REPLACE-ME-NGUOI1
+/source/server/src/main/java/exam/server/exam/       @REPLACE-ME-NGUOI2
+/source/server/src/main/java/exam/server/db/         @REPLACE-ME-NGUOI2
+/source/server/src/main/resources/                   @REPLACE-ME-NGUOI2
+/source/server/src/test/java/exam/server/db/         @REPLACE-ME-NGUOI2
+/source/server/src/main/java/exam/server/monitor/    @REPLACE-ME-NGUOI3
+/source/server/src/main/java/exam/server/ml/         @REPLACE-ME-NGUOI4
+
+# ---------------- client ----------------
+/source/client/src/main/java/exam/client/StudentMain.java   @REPLACE-ME-NGUOI1
+/source/client/src/main/java/exam/client/TeacherMain.java   @REPLACE-ME-NGUOI1
+/source/client/src/main/java/exam/client/api/        @REPLACE-ME-NGUOI1
+# Ngoại lệ: lớp nối Isolation Forest nằm trong api nhưng thuộc Nguoi4
+/source/client/src/main/java/exam/client/api/IsolationForestScorer.java   @REPLACE-ME-NGUOI4
+/source/client/src/main/java/exam/client/net/        @REPLACE-ME-NGUOI1
+/source/client/src/main/java/exam/client/student/    @REPLACE-ME-NGUOI2
+/source/client/src/main/java/exam/client/teacher/    @REPLACE-ME-NGUOI2
+# Ngoại lệ: teacher/monitor nằm trong teacher nhưng thuộc Nguoi3
+/source/client/src/main/java/exam/client/teacher/monitor/   @REPLACE-ME-NGUOI3
+/source/client/src/main/java/exam/client/monitor/    @REPLACE-ME-NGUOI3
+
+# ---------------- tools, ml-service, dữ liệu ----------------
+/source/tools/                      @REPLACE-ME-NGUOI4
+/ml-service/                        @REPLACE-ME-NGUOI4
+/config/ml.properties               @REPLACE-ME-NGUOI4
+/config/server.properties           @REPLACE-ME-NGUOI1
+/data/traces/                       @REPLACE-ME-NGUOI4
+/statics/                           @REPLACE-ME-NGUOI4
+
+# Báo cáo: mỗi người viết phần của mình nên cả 4 cùng sở hữu
+/report/                            @REPLACE-ME-NGUOI1 @REPLACE-ME-NGUOI2 @REPLACE-ME-NGUOI3 @REPLACE-ME-NGUOI4

@@ -1,0 +1,27 @@
+# Build output
+target/
+
+# SQLite database tạo ra khi chạy Server (mỗi máy tự sinh, không commit)
+data/exam.db
+data/exam.db-journal
+data/exam.db-wal
+data/exam.db-shm
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/
+
+# Python (ml-service)
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Log, file tạm, file hệ điều hành
+*.log
+.DS_Store
+Thumbs.db
