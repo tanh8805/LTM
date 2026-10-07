@@ -29,6 +29,8 @@ public class ClientSession {
     public volatile int lastHeartbeatSeq;
     /** Giờ Server nhận HEARTBEAT gần nhất (epoch milli giây). */
     public volatile long lastHeartbeatTime;
+    /** Giờ Server phát hiện session mất kết nối (epoch milli giây). Dùng để token hết hạn sau reconnect.window. */
+    public volatile long offlineSince;
 
     public ClientSession(String token, int userId, String username, String fullName,
                          Role role, String examCode, ClientConnection connection) {

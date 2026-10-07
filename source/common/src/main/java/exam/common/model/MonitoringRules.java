@@ -16,6 +16,15 @@ public class MonitoringRules {
     /** Rule 5: mất focus quá số lần này thì cảnh báo. */
     public int focusLossThreshold = 3;
 
+    /** Chu kỳ đo số liệu ở chế độ NORMAL (giây). */
+    public int metricsIntervalSeconds = 10;
+    /** Isolation Forest học bình thường từ chính máy này trong bấy nhiêu giây đầu (mặc định 5 phút). */
+    public int ifTrainingSeconds = 300;
+    /** Threshold = max(điểm lúc học) + ifThresholdMargin. */
+    public double ifThresholdMargin = 0.05;
+    /** Số lần liên tiếp vượt threshold mới cảnh báo. */
+    public int ifConsecutiveRequired = 3;
+
     /** Bộ luật mặc định theo SPEC. */
     public static MonitoringRules createDefault() {
         MonitoringRules rules = new MonitoringRules();

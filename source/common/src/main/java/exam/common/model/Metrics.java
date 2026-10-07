@@ -5,6 +5,9 @@ package exam.common.model;
 /**
  * Vector 8 chiều đo mỗi 10 giây trên máy sinh viên.
  *
+ * kbSent và kbReceived là tốc độ trung bình KB/giây kể từ lần đo trước. Dùng tốc độ (không dùng tổng)
+ * để số liệu so sánh được dù chu kỳ đo là 10 giây (NORMAL), 2 giây (HIGH) hay 1 giây (BASELINE).
+ *
  * Thứ tự trong toVector() cố định. 6 chiều đầu là các chiều Chronos-Bolt chấm điểm
  * (server ML); 2 chiều cuối (processCount, focusLostCount) chỉ dùng cho Isolation Forest ở client.
  */

@@ -33,4 +33,7 @@ public interface SessionRegistry {
 
     /** Đánh dấu offline khi mất kết nối. Session vẫn được giữ lại để RECONNECT. */
     void markOffline(ClientSession session);
+
+    /** RECONNECT thành công: gắn connection mới vào session cũ và đánh dấu online lại. */
+    void markOnline(ClientSession session, ClientConnection newConnection);
 }

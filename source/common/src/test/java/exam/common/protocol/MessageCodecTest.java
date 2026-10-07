@@ -111,10 +111,12 @@ class MessageCodecTest {
 
     @Test
     void heartbeat() {
-        HeartbeatMessage original = new HeartbeatMessage(3, sampleMetrics());
+        HeartbeatMessage original = new HeartbeatMessage(3, sampleMetrics(), 0.62, true);
         HeartbeatMessage decoded = encodeThenDecode(original, "HEARTBEAT", HeartbeatMessage.class);
 
         assertEquals(3, decoded.seq);
+        assertEquals(0.62, decoded.anomalyScore);
+        assertTrue(decoded.anomalous);
         assertEquals(12.5, decoded.summary.kbSent);
         assertEquals(2, decoded.summary.focusLostCount);
     }
@@ -156,10 +158,14 @@ class MessageCodecTest {
     @Test
     void examStart() {
         QuestionView question = new QuestionView(11, "Thủ đô của Việt Nam?", List.of("Hà Nội", "Huế", "Đà Nẵng", "Cần Thơ"));
-        ExamStartMessage original = new ExamStartMessage(List.of(question), 9_000_000L);
+        Map<Integer, Integer> savedAnswers = new HashMap<>();
+        savedAnswers.put(11, 3);
+        ExamStartMessage original = new ExamStartMessage(List.of(question), 9_000_000L, savedAnswers, "De mau");
         ExamStartMessage decoded = encodeThenDecode(original, "EXAM_START", ExamStartMessage.class);
 
         assertEquals(9_000_000L, decoded.endTimeServer);
+        assertEquals("De mau", decoded.title);
+        assertEquals(3, decoded.answers.get(11));
         assertEquals(1, decoded.questions.size());
         assertEquals(11, decoded.questions.get(0).questionId);
         assertEquals("Thủ đô của Việt Nam?", decoded.questions.get(0).content);
@@ -234,7 +240,7 @@ class MessageCodecTest {
     @Test
     void metricsDetail() {
         MetricsDetailMessage original = new MetricsDetailMessage(
-                12, 5000L, sampleMetrics(), List.of("java", "chrome"), List.of("1.2.3.4:443"));
+                12, 5000L, sampleMetrics(), List.of("java", "chrome"), List.of("1.2.3.4:443"), 0.3, false);
         MetricsDetailMessage decoded = encodeThenDecode(original, "METRICS_DETAIL", MetricsDetailMessage.class);
 
         assertEquals(12, decoded.seq);

@@ -57,7 +57,14 @@ public class InMemorySessionRegistry implements SessionRegistry {
 
     @Override
     public void markOffline(ClientSession session) {
+        session.offlineSince = System.currentTimeMillis();
         session.online = false;
+    }
+
+    @Override
+    public void markOnline(ClientSession session, ClientConnection newConnection) {
+        session.connection = newConnection;
+        session.online = true;
     }
 
     private List<ClientSession> findOnlineByRole(Role role) {

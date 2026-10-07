@@ -2,6 +2,7 @@
 
 package exam.server.db;
 
+import exam.common.model.Role;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -24,6 +25,12 @@ import java.sql.Statement;
  */
 public class Database {
 
+    /** Tên 10 sinh viên mẫu: SV001 ... SV010. */
+    private static final String[] SAMPLE_STUDENT_NAMES = {
+            "Nguyễn Văn An", "Trần Thị Bình", "Lê Hoàng Cường", "Phạm Minh Đức", "Hoàng Thu Hà",
+            "Vũ Quang Huy", "Đặng Thị Lan", "Bùi Văn Long", "Ngô Thị Mai", "Đỗ Quốc Nam"
+    };
+
     private final String filePath;
 
     /** filePath ví dụ "data/exam.db". */
@@ -37,6 +44,8 @@ public class Database {
         try (Statement statement = connection.createStatement()) {
             // SQLite mặc định KHÔNG kiểm tra khóa ngoại, phải bật cho từng connection.
             statement.execute("PRAGMA foreign_keys = ON");
+            // Nhiều thread ghi cùng lúc: chờ tối đa 5 giây thay vì báo lỗi "database is locked" ngay.
+            statement.execute("PRAGMA busy_timeout = 5000");
         }
         return connection;
     }
@@ -46,14 +55,30 @@ public class Database {
         Path parentDirectory = Path.of(filePath).toAbsolutePath().getParent();
         Files.createDirectories(parentDirectory);
 
+        try (Connection connection = openConnection();
+             Statement statement = connection.createStatement()) {
+            // WAL: người đọc không bị chặn bởi người ghi, hợp với Server nhiều thread.
+            statement.execute("PRAGMA journal_mode = WAL");
+        }
         runSqlResource("schema.sql");
     }
 
-    /** Nạp dữ liệu mẫu nếu database còn trống (chưa có giáo viên nào). Chạy lại nhiều lần vẫn an toàn. */
+    /**
+     * Nạp dữ liệu mẫu nếu database còn trống (chưa có giáo viên nào): 1 giáo viên, 10 sinh viên, 30 câu hỏi.
+     * Chạy lại nhiều lần vẫn an toàn. Mật khẩu được băm trước khi lưu.
+     */
     public void loadSampleDataIfEmpty() throws SQLException, IOException {
         if (countRows("teachers") > 0) {
             return;
         }
+
+        UserDao userDao = new UserDao(this);
+        userDao.insertUser(Role.TEACHER, "gv01", "teacher123", "Giảng viên Mẫu");
+        for (int i = 0; i < SAMPLE_STUDENT_NAMES.length; i++) {
+            String studentCode = String.format("SV%03d", i + 1);
+            userDao.insertUser(Role.STUDENT, studentCode, "123456", SAMPLE_STUDENT_NAMES[i]);
+        }
+
         runSqlResource("sample_data.sql");
     }
 

@@ -17,6 +17,12 @@ import exam.common.model.RateMode;
  */
 public interface RateController {
 
+    /**
+     * Máy sinh viên vừa đăng nhập hoặc nối lại: gửi SET_RATE theo chế độ hiện tại
+     * (để máy mới vào giữa lúc BASELINE hoặc HIGH vẫn đúng tần suất).
+     */
+    void onMachineOnline(String machineId);
+
     /** Chế độ hiện tại của một máy. */
     RateMode getMode(String machineId);
 

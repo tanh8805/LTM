@@ -25,16 +25,37 @@ public class ClientConnection {
     private final BufferedReader reader;
     private final BufferedWriter writer;
     private final MessageCodec codec = new MessageCodec();
+    private final int maxLineLength;
 
-    public ClientConnection(Socket socket) throws IOException {
+    public ClientConnection(Socket socket, int maxLineLength) throws IOException {
         this.socket = socket;
+        this.maxLineLength = maxLineLength;
         this.reader = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
         this.writer = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8));
     }
 
-    /** Đọc một dòng (chặn đến khi có dữ liệu). Trả về null khi client đã đóng kết nối. */
+    /**
+     * Đọc một dòng (chặn đến khi có dữ liệu). Trả về null khi client đã đóng kết nối.
+     * Dòng dài hơn maxLineLength thì ném IOException: không để một client gửi dữ liệu vô hạn
+     * làm tràn bộ nhớ Server.
+     */
     public String readLine() throws IOException {
-        return reader.readLine();
+        StringBuilder line = new StringBuilder();
+        int character;
+        while ((character = reader.read()) != -1) {
+            if (character == '\n') {
+                int length = line.length();
+                if (length > 0 && line.charAt(length - 1) == '\r') {
+                    line.setLength(length - 1);
+                }
+                return line.toString();
+            }
+            line.append((char) character);
+            if (line.length() > maxLineLength) {
+                throw new IOException("Dòng message dài quá " + maxLineLength + " ký tự");
+            }
+        }
+        return null;
     }
 
     /**
@@ -64,12 +85,16 @@ public class ClientConnection {
         return String.valueOf(socket.getRemoteSocketAddress());
     }
 
+    public boolean isClosed() {
+        return socket.isClosed();
+    }
+
+    /** Đóng socket. Gọi nhiều lần vẫn an toàn. */
     public void close() {
         try {
             socket.close();
         } catch (IOException e) {
-            // TODO(Nguoi1): Add proper error handling.
-            e.printStackTrace();
+            System.out.println("[Net] Lỗi khi đóng socket " + getRemoteAddress() + ": " + e.getMessage());
         }
     }
 }

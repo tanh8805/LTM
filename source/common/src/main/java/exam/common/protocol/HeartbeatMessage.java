@@ -12,6 +12,10 @@ public class HeartbeatMessage extends Message {
     public int seq;
     /** Vector 8 chiều (chế độ NORMAL) */
     public Metrics summary;
+    /** Điểm Isolation Forest của client (0..1). 0 nếu client không chạy Isolation Forest. */
+    public double anomalyScore;
+    /** true khi Isolation Forest đã vượt threshold đủ số lần liên tiếp. */
+    public boolean anomalous;
 
     public HeartbeatMessage() {
         super(MessageType.HEARTBEAT);
@@ -21,5 +25,11 @@ public class HeartbeatMessage extends Message {
         this();
         this.seq = seq;
         this.summary = summary;
+    }
+
+    public HeartbeatMessage(int seq, Metrics summary, double anomalyScore, boolean anomalous) {
+        this(seq, summary);
+        this.anomalyScore = anomalyScore;
+        this.anomalous = anomalous;
     }
 }

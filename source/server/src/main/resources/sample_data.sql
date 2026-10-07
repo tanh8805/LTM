@@ -1,24 +1,9 @@
 -- Owner: Nguoi2
 --
--- Dữ liệu mẫu: 1 giáo viên, 10 sinh viên, 30 câu hỏi kiến thức chung.
+-- Dữ liệu mẫu: 30 câu hỏi kiến thức chung.
 -- Chỉ nạp khi bảng teachers còn trống (xem Database.loadSampleDataIfEmpty).
--- Tài khoản mẫu: xem docs/SPEC.md, mục "Dữ liệu mẫu".
--- TODO(Nguoi2): Mật khẩu đang lưu dạng chữ thường cho skeleton, đổi sang lưu hash.
+-- Tài khoản mẫu (1 giáo viên, 10 sinh viên) được nạp bằng Java vì cần băm mật khẩu: xem Database.java và docs/SPEC.md.
 -- Không viết dấu chấm phẩy bên trong nội dung câu hỏi (file được tách câu lệnh theo dấu chấm phẩy).
-
-INSERT INTO teachers (username, password, full_name) VALUES ('gv01', 'teacher123', 'Giảng viên Mẫu');
-
-INSERT INTO students (username, password, full_name) VALUES
-    ('SV001', '123456', 'Nguyễn Văn An'),
-    ('SV002', '123456', 'Trần Thị Bình'),
-    ('SV003', '123456', 'Lê Hoàng Cường'),
-    ('SV004', '123456', 'Phạm Minh Đức'),
-    ('SV005', '123456', 'Hoàng Thu Hà'),
-    ('SV006', '123456', 'Vũ Quang Huy'),
-    ('SV007', '123456', 'Đặng Thị Lan'),
-    ('SV008', '123456', 'Bùi Văn Long'),
-    ('SV009', '123456', 'Ngô Thị Mai'),
-    ('SV010', '123456', 'Đỗ Quốc Nam');
 
 INSERT INTO questions (content, option_a, option_b, option_c, option_d, correct_option) VALUES
     ('Thủ đô của Việt Nam là thành phố nào?', 'Hà Nội', 'Huế', 'Đà Nẵng', 'Cần Thơ', 0),

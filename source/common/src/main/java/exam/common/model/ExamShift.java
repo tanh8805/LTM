@@ -9,15 +9,27 @@ public class ExamShift {
     public static final String STATUS_ENDED = "ENDED";
 
     public int id;
-    /** Mã ca thi mà sinh viên nhập khi đăng nhập, ví dụ CA001. */
+    /** Mã ca thi mà sinh viên nhập khi đăng nhập (session code), ví dụ CA001. */
     public String code;
     public int examId;
-    /** Giờ bắt đầu, tính bằng epoch milli giây theo đồng hồ Server. */
+    public String examTitle;
+    /**
+     * Giờ bắt đầu (epoch milli giây, đồng hồ Server).
+     * Khi status = CREATED: giờ hẹn tự bắt đầu, 0 nghĩa là giáo viên bấm bắt đầu thủ công.
+     * Khi status = RUNNING hoặc ENDED: giờ thực tế đã bắt đầu.
+     */
     public long startTimeServer;
-    public int durationMinutes;
+    public int durationSeconds;
     /** CREATED, RUNNING hoặc ENDED. */
     public String status;
+    /** Luật giám sát của ca thi. */
+    public MonitoringRules rules;
 
     public ExamShift() {
+    }
+
+    /** Giờ hết bài (epoch milli giây, đồng hồ Server). Chỉ có ý nghĩa khi ca đã bắt đầu. */
+    public long getEndTimeServer() {
+        return startTimeServer + durationSeconds * 1000L;
     }
 }

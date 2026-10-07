@@ -3,6 +3,8 @@
 package exam.server.exam;
 
 import exam.common.model.ExamShift;
+import exam.common.model.MlMode;
+import exam.common.model.MonitoringRules;
 import exam.common.model.QuestionView;
 import exam.common.model.Role;
 import exam.common.model.UserAccount;
@@ -11,29 +13,52 @@ import exam.common.protocol.ResponseMessage;
 import exam.server.api.ExamService;
 import exam.server.api.MessageSender;
 import exam.server.api.SessionRegistry;
+import exam.server.db.AttemptDao;
+import exam.server.db.CandidateRecord;
+import exam.server.db.Database;
+import exam.server.db.ExamDao;
 import exam.server.db.QuestionDao;
+import exam.server.db.ShiftDao;
 import exam.server.db.UserDao;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
- * Nghiệp vụ thi. HIỆN CHỈ login() chạy thật (đọc SQLite); các method còn lại là STUB trả giá trị mặc định.
+ * Nghiệp vụ thi. Lớp này chỉ ghép các service nhỏ lại và đứng sau interface ExamService:
+ *
+ *   QuestionBankService  - ngân hàng câu hỏi, nhập CSV
+ *   ExamCreationService  - tạo đề (chọn tay / ngẫu nhiên)
+ *   ShiftService         - ca thi, bắt đầu/kết thúc, đồng hồ do Server điều khiển
+ *   AttemptService       - lưu đáp án, nộp bài, chấm điểm
+ *   TeacherRequestHandler - đổi REQUEST của giáo viên thành lời gọi các service trên
  */
 public class ExamServiceImpl implements ExamService {
 
     private final UserDao userDao;
-    // Các field dưới đây chưa dùng, sẽ dùng khi cài đặt các TODO bên dưới.
-    private final QuestionDao questionDao;
-    private final MessageSender messageSender;
-    private final SessionRegistry sessionRegistry;
+    private final ShiftDao shiftDao;
+    private final AttemptService attemptService;
+    private final ShiftService shiftService;
+    private final TeacherRequestHandler teacherRequestHandler;
 
-    public ExamServiceImpl(UserDao userDao, QuestionDao questionDao,
-                           MessageSender messageSender, SessionRegistry sessionRegistry) {
-        this.userDao = userDao;
-        this.questionDao = questionDao;
-        this.messageSender = messageSender;
-        this.sessionRegistry = sessionRegistry;
+    public ExamServiceImpl(Database database, MessageSender messageSender, SessionRegistry sessionRegistry,
+                           MlMode mlMode, MonitoringRules defaultRules) {
+        this.userDao = new UserDao(database);
+        this.shiftDao = new ShiftDao(database);
+        QuestionDao questionDao = new QuestionDao(database);
+        ExamDao examDao = new ExamDao(database);
+        AttemptDao attemptDao = new AttemptDao(database);
+
+        // Cùng một lock cho nộp bài và chốt bài để hai việc đó không chạy chồng lên nhau.
+        Object lock = new Object();
+        this.attemptService = new AttemptService(shiftDao, examDao, questionDao, attemptDao, lock);
+        this.shiftService = new ShiftService(shiftDao, examDao, userDao, attemptDao, attemptService,
+                messageSender, sessionRegistry, mlMode, defaultRules, lock);
+
+        QuestionBankService questionBank = new QuestionBankService(questionDao);
+        ExamCreationService examCreation = new ExamCreationService(examDao, questionDao);
+        this.teacherRequestHandler = new TeacherRequestHandler(questionBank, examCreation, shiftService, examDao, shiftDao);
     }
 
     @Override
@@ -48,51 +73,96 @@ public class ExamServiceImpl implements ExamService {
 
     @Override
     public ExamShift findShiftByCode(String examCode) {
-        // TODO(Nguoi2): Tìm ca thi trong bảng exam_shifts theo code. Tạo ExamShiftDao.
-        return null;
+        try {
+            return shiftDao.findByCode(examCode);
+        } catch (SQLException e) {
+            throw new IllegalStateException("Không đọc được ca thi", e);
+        }
+    }
+
+    @Override
+    public boolean isCandidate(int studentId, String examCode) {
+        try {
+            ExamShift shift = shiftDao.findByCode(examCode);
+            return shift != null && shiftDao.findCandidate(shift.id, studentId) != null;
+        } catch (SQLException e) {
+            throw new IllegalStateException("Không đọc được danh sách thí sinh", e);
+        }
     }
 
     @Override
     public List<QuestionView> prepareQuestionsForStudent(int studentId, String examCode) {
-        // TODO(Nguoi2): Lấy câu hỏi của đề, trộn thứ tự câu và thứ tự đáp án bằng shuffle_seed riêng của sinh viên
-        //  (lưu trong shift_students để reconnect ra cùng thứ tự). Chỉ trả QuestionView, không lộ đáp án đúng.
-        return new ArrayList<>();
+        try {
+            ExamShift shift = shiftDao.findByCode(examCode);
+            if (shift == null) {
+                return new ArrayList<>();
+            }
+            CandidateRecord candidate = shiftDao.findCandidate(shift.id, studentId);
+            if (candidate == null) {
+                return new ArrayList<>();
+            }
+            return attemptService.buildPaper(shift, candidate).toViews();
+        } catch (SQLException e) {
+            throw new IllegalStateException("Không chuẩn bị được đề thi", e);
+        }
     }
 
     @Override
     public long getEndTimeServer(String examCode) {
-        // TODO(Nguoi2): endTimeServer = start_time + duration_minutes của ca thi.
-        return 0L;
+        ExamShift shift = findShiftByCode(examCode);
+        if (shift == null || ExamShift.STATUS_CREATED.equals(shift.status)) {
+            return 0L;
+        }
+        return shift.getEndTimeServer();
+    }
+
+    @Override
+    public Map<Integer, Integer> getSavedAnswers(int studentId, String examCode) {
+        return attemptService.getSavedAnswers(studentId, examCode);
+    }
+
+    @Override
+    public boolean hasSubmitted(int studentId, String examCode) {
+        return attemptService.hasSubmitted(studentId, examCode);
+    }
+
+    @Override
+    public void onStudentOnline(int studentId, String examCode, String machineId) {
+        shiftService.onStudentOnline(studentId, examCode);
     }
 
     @Override
     public boolean saveAnswer(int studentId, String examCode, int questionId, int choice) {
-        // TODO(Nguoi2): Kiểm tra ca đang chạy và chưa hết giờ, rồi ghi vào bảng answers (ghi đè nếu chọn lại).
-        return false;
+        return attemptService.saveAnswer(studentId, examCode, questionId, choice);
     }
 
     @Override
     public int submit(int studentId, String examCode) {
-        // TODO(Nguoi2): Chấm điểm (quy đổi choice đã trộn về đáp án gốc), ghi bảng results, trả số câu đã trả lời.
-        return 0;
+        return attemptService.submit(studentId, examCode);
     }
 
     @Override
-    public ResponseMessage handleTeacherRequest(RequestMessage request) {
-        // TODO(Nguoi2): Xử lý các action của giáo viên: câu hỏi (thêm/sửa/xóa/nhập CSV), tạo đề, tạo ca thi,
-        //  bắt đầu/kết thúc ca, xem điểm. Danh sách action ghi trong docs/PROTOCOL.md khi chốt.
-        return new ResponseMessage(request.requestId, false, null, "NOT_IMPLEMENTED: " + request.action);
+    public ResponseMessage handleTeacherRequest(int teacherId, RequestMessage request) {
+        return teacherRequestHandler.handle(teacherId, request);
     }
 
     @Override
     public String exportScoresCsv(String examCode) {
-        // TODO(Nguoi2): Ghép bảng điểm từ bảng results: mỗi dòng "mã SV,họ tên,điểm".
-        return "student_code,full_name,score\n";
+        return shiftService.exportResultsCsv(examCode);
+    }
+
+    @Override
+    public void startDueShifts() {
+        shiftService.startDueShifts();
     }
 
     @Override
     public void finishExpiredExams() {
-        // TODO(Nguoi2): Tìm ca RUNNING đã hết giờ -> chấm bài của những sinh viên chưa nộp,
-        //  đổi status ENDED, gửi EXAM_END cho sinh viên (messageSender.sendToMachine).
+        shiftService.finishExpiredShifts();
+    }
+
+    @Override
+    public void sendTimeSync() {
+        shiftService.sendTimeSync();
     }
 }

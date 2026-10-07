@@ -17,6 +17,10 @@ public class MetricsDetailMessage extends Message {
     public List<String> processNames;
     /** Các địa chỉ đích đang kết nối */
     public List<String> remoteAddresses;
+    /** Điểm Isolation Forest của client (0..1). 0 nếu client không chạy Isolation Forest. */
+    public double anomalyScore;
+    /** true khi Isolation Forest đã vượt threshold đủ số lần liên tiếp. */
+    public boolean anomalous;
 
     public MetricsDetailMessage() {
         super(MessageType.METRICS_DETAIL);
@@ -29,5 +33,12 @@ public class MetricsDetailMessage extends Message {
         this.metrics = metrics;
         this.processNames = processNames;
         this.remoteAddresses = remoteAddresses;
+    }
+
+    public MetricsDetailMessage(int seq, long time, Metrics metrics, List<String> processNames,
+                                List<String> remoteAddresses, double anomalyScore, boolean anomalous) {
+        this(seq, time, metrics, processNames, remoteAddresses);
+        this.anomalyScore = anomalyScore;
+        this.anomalous = anomalous;
     }
 }

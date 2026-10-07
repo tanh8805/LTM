@@ -3,50 +3,138 @@
 package exam.server.rate;
 
 import exam.common.model.RateMode;
+import exam.common.protocol.SetRateMessage;
+import exam.server.ServerConfig;
 import exam.server.api.MessageSender;
 import exam.server.api.RateController;
-import exam.server.api.SessionRegistry;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * STUB của RateController: chưa gửi SET_RATE, mọi máy luôn ở NORMAL.
+ * Điều khiển tần suất gửi số liệu của từng máy.
  *
- * Gợi ý khi cài: giữ Map machineId -> (mode, lastSuspiciousTime). Khi đổi mode thì
- * messageSender.sendToMachine(machineId, new SetRateMessage(mode, intervalMs)).
+ *   NORMAL   : summary trong HEARTBEAT, mỗi rate.normal.interval.ms (10 giây)
+ *   HIGH     : METRICS_DETAIL mỗi rate.high.interval.ms (2 giây). Về NORMAL sau rate.high.quiet.seconds (60 giây) yên.
+ *   BASELINE : METRICS_DETAIL mỗi rate.baseline.interval.ms (1 giây), không ML. Có ưu tiên cao hơn HIGH.
+ *
+ * Mỗi lần đổi chế độ của một máy, Server gửi SET_RATE cho máy đó.
  */
 public class RateControllerImpl implements RateController {
 
-    // Các field này chưa dùng, sẽ dùng khi cài đặt các TODO bên dưới.
-    private final MessageSender messageSender;
-    private final SessionRegistry sessionRegistry;
+    /** Trạng thái của một máy. */
+    private static class MachineRate {
+        RateMode mode = RateMode.NORMAL;
+        /** Lần gần nhất máy bị nghi ngờ (epoch milli giây). */
+        long lastSuspiciousTime = 0;
+    }
 
-    public RateControllerImpl(MessageSender messageSender, SessionRegistry sessionRegistry) {
+    private final ServerConfig config;
+    private final MessageSender messageSender;
+    private final Map<String, MachineRate> machines = new ConcurrentHashMap<>();
+    /** true khi giáo viên bật BASELINE cho cả phòng (máy vào sau cũng phải BASELINE). */
+    private volatile boolean baselineForAll = false;
+
+    public RateControllerImpl(ServerConfig config, MessageSender messageSender) {
+        this.config = config;
         this.messageSender = messageSender;
-        this.sessionRegistry = sessionRegistry;
+    }
+
+    @Override
+    public void onMachineOnline(String machineId) {
+        MachineRate machine = machines.computeIfAbsent(machineId, key -> new MachineRate());
+        synchronized (machine) {
+            if (baselineForAll) {
+                machine.mode = RateMode.BASELINE;
+            }
+            // Luôn gửi chế độ hiện tại để client mới (hoặc client nối lại) đồng bộ với Server.
+            sendRate(machineId, machine.mode);
+        }
     }
 
     @Override
     public RateMode getMode(String machineId) {
-        // TODO(Nguoi1): Trả về mode hiện tại của máy (đang luôn NORMAL).
-        return RateMode.NORMAL;
+        MachineRate machine = machines.get(machineId);
+        if (machine == null) {
+            return baselineForAll ? RateMode.BASELINE : RateMode.NORMAL;
+        }
+        return machine.mode;
     }
 
     @Override
     public void raiseToHigh(String machineId) {
-        // TODO(Nguoi1): Đặt mode HIGH, ghi lại giờ nghi ngờ gần nhất, gửi SET_RATE(HIGH, 2000 ms).
+        MachineRate machine = machines.computeIfAbsent(machineId, key -> new MachineRate());
+        synchronized (machine) {
+            machine.lastSuspiciousTime = System.currentTimeMillis(); // đặt lại đồng hồ "yên"
+            if (machine.mode == RateMode.NORMAL) {
+                machine.mode = RateMode.HIGH;
+                System.out.println("[Rate] " + machineId + " NORMAL -> HIGH");
+                sendRate(machineId, RateMode.HIGH);
+            }
+            // Đang BASELINE thì giữ nguyên BASELINE; đang HIGH thì chỉ cần gia hạn như trên.
+        }
     }
 
     @Override
     public void startBaselineForAll() {
-        // TODO(Nguoi1): Đặt mọi máy online sang BASELINE, gửi SET_RATE(BASELINE, 1000 ms).
+        baselineForAll = true;
+        for (Map.Entry<String, MachineRate> entry : machines.entrySet()) {
+            MachineRate machine = entry.getValue();
+            synchronized (machine) {
+                if (machine.mode != RateMode.BASELINE) {
+                    machine.mode = RateMode.BASELINE;
+                    sendRate(entry.getKey(), RateMode.BASELINE);
+                }
+            }
+        }
+        System.out.println("[Rate] BASELINE cho cả phòng");
     }
 
     @Override
     public void stopBaselineForAll() {
-        // TODO(Nguoi1): Đưa mọi máy về NORMAL, gửi SET_RATE(NORMAL, 10000 ms).
+        baselineForAll = false;
+        for (Map.Entry<String, MachineRate> entry : machines.entrySet()) {
+            MachineRate machine = entry.getValue();
+            synchronized (machine) {
+                if (machine.mode == RateMode.BASELINE) {
+                    machine.mode = RateMode.NORMAL;
+                    sendRate(entry.getKey(), RateMode.NORMAL);
+                }
+            }
+        }
+        System.out.println("[Rate] Kết thúc BASELINE, về NORMAL");
     }
 
     @Override
     public void returnCalmMachinesToNormal() {
-        // TODO(Nguoi1): Máy HIGH nào 60 giây không bị nghi ngờ thì về NORMAL và gửi SET_RATE(NORMAL, 10000 ms).
+        long now = System.currentTimeMillis();
+        long quietMillis = config.rateHighQuietSeconds * 1000L;
+
+        for (Map.Entry<String, MachineRate> entry : machines.entrySet()) {
+            MachineRate machine = entry.getValue();
+            synchronized (machine) {
+                if (machine.mode == RateMode.HIGH && now - machine.lastSuspiciousTime >= quietMillis) {
+                    machine.mode = RateMode.NORMAL;
+                    System.out.println("[Rate] " + entry.getKey() + " HIGH -> NORMAL (yên "
+                            + config.rateHighQuietSeconds + " giây)");
+                    sendRate(entry.getKey(), RateMode.NORMAL);
+                }
+            }
+        }
+    }
+
+    private void sendRate(String machineId, RateMode mode) {
+        messageSender.sendToMachine(machineId, new SetRateMessage(mode, intervalOf(mode)));
+    }
+
+    private int intervalOf(RateMode mode) {
+        switch (mode) {
+            case HIGH:
+                return config.rateHighIntervalMs;
+            case BASELINE:
+                return config.rateBaselineIntervalMs;
+            case NORMAL:
+            default:
+                return config.rateNormalIntervalMs;
+        }
     }
 }

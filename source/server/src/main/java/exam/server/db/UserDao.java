@@ -13,6 +13,7 @@ import java.sql.SQLException;
 public class UserDao {
 
     private final Database database;
+    private final PasswordHasher passwordHasher = new PasswordHasher();
 
     public UserDao(Database database) {
         this.database = database;
@@ -24,22 +25,50 @@ public class UserDao {
         String sql;
         if (role == Role.TEACHER) {
             sql = """
-                SELECT id, username, full_name
+                SELECT id, username, full_name, password_hash
                 FROM teachers
-                WHERE username = ? AND password = ?
+                WHERE username = ?
                 """;
         } else {
             sql = """
-                SELECT id, username, full_name
+                SELECT id, username, full_name, password_hash
                 FROM students
-                WHERE username = ? AND password = ?
+                WHERE username = ?
                 """;
         }
 
         try (Connection connection = database.openConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setString(1, username);
-            statement.setString(2, password);
+
+            try (ResultSet resultSet = statement.executeQuery()) {
+                if (!resultSet.next()) {
+                    return null;
+                }
+                // Băm mật khẩu người dùng nhập rồi so với hash đã lưu (không bao giờ so chữ thường).
+                if (!passwordHasher.verify(password, resultSet.getString("password_hash"))) {
+                    return null;
+                }
+                return new UserAccount(
+                        resultSet.getInt("id"),
+                        resultSet.getString("username"),
+                        resultSet.getString("full_name"),
+                        role);
+            }
+        }
+    }
+
+    /** Tìm sinh viên theo mã sinh viên (không cần mật khẩu). Trả về null nếu không có. */
+    public UserAccount findStudentByUsername(String studentCode) throws SQLException {
+        String sql = """
+            SELECT id, username, full_name
+            FROM students
+            WHERE username = ?
+            """;
+
+        try (Connection connection = database.openConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, studentCode);
 
             try (ResultSet resultSet = statement.executeQuery()) {
                 if (!resultSet.next()) {
@@ -49,8 +78,26 @@ public class UserDao {
                         resultSet.getInt("id"),
                         resultSet.getString("username"),
                         resultSet.getString("full_name"),
-                        role);
+                        Role.STUDENT);
             }
+        }
+    }
+
+    /** Thêm một tài khoản, mật khẩu được băm trước khi lưu. */
+    public void insertUser(Role role, String username, String password, String fullName) throws SQLException {
+        String sql;
+        if (role == Role.TEACHER) {
+            sql = "INSERT INTO teachers (username, password_hash, full_name) VALUES (?, ?, ?)";
+        } else {
+            sql = "INSERT INTO students (username, password_hash, full_name) VALUES (?, ?, ?)";
+        }
+
+        try (Connection connection = database.openConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, username);
+            statement.setString(2, passwordHasher.hash(password));
+            statement.setString(3, fullName);
+            statement.executeUpdate();
         }
     }
 
@@ -70,6 +117,4 @@ public class UserDao {
             return resultSet.getInt(1);
         }
     }
-
-    // TODO(Nguoi2): Thêm findStudentsOfShift(shiftId) và importStudentsFromCsv(...) cho danh sách thí sinh CSV.
 }
