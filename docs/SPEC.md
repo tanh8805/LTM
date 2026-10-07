@@ -86,37 +86,61 @@ Chi tiết: `ARCHITECTURE.md` và `PROTOCOL.md`.
 
 Vi phạm được gửi lên Server bằng `VIOLATION`.
 
+Chi tiết cài đặt (đã chốt khi code):
+
+- Process thuộc **denylist** được báo ngay lần đầu thấy. Process **mới ngoài allowlist** chỉ được báo khi thấy ở **2 lần kiểm tra liên tiếp**,
+  để tiến trình sống chớp nhoáng (ví dụ `kworker` của Linux, tiến trình con tự thoát) không gây báo động giả.
+- Mỗi cặp (loại vi phạm, bằng chứng) chỉ được báo **một lần** trong một ca thi, để không spam Server mỗi chu kỳ.
+- Mức cảnh báo ở Server: luật 1-4 → **ĐỎ**, `FOCUS_LOSS` → **VÀNG**.
+- Nếu OSHI không đọc được một nguồn số liệu thì client ghi log và bỏ qua luật đó ở lần này, các luật khác vẫn chạy.
+
 **Client metrics:** mỗi 10 giây đo một vector 8 chiều:
 KB gửi, KB nhận, số kết nối, số địa chỉ đích khác nhau, % CPU, % RAM, số tiến trình, số lần mất focus.
+`KB gửi` và `KB nhận` là **tốc độ KB/giây** (không phải tổng) để so sánh được giữa các chế độ NORMAL / HIGH / BASELINE.
 
 ## 8. Client ML – Isolation Forest
 
-- Tự cài bằng Java, nằm ở `exam.common.ml.IsolationForest`.
-- **Học từ chính máy đó** trong **5 phút đầu** (cấu hình được: `ml.client.training.seconds`).
+- Tự cài bằng Java, nằm ở `exam.common.ml.IsolationForest` (+ `IsolationTree`): 100 cây, mẫu con tối đa 256, seed cố định 42,
+  giới hạn chiều cao `ceil(log2 ψ)`, điểm `2^(-E[h]/c(n))`. `common` không import `client`.
+- Adapter nằm ở `exam.client.ml` (`IsolationForestScorer` cài `AnomalyScorer`, `AnomalyDetector` quản lý giai đoạn học và chấm).
+- **Học từ chính máy đó** trong **5 phút đầu** (cấu hình được: `ml.client.training.seconds`, gửi xuống client qua `RULES_CONFIG`).
 - Threshold = `max(training anomaly score) + 0.05`.
 - Cảnh báo khi điểm vượt threshold **3 lần liên tiếp**.
+- Trong chế độ `BASELINE` Isolation Forest bị tắt (đúng yêu cầu "không ML").
+- Kết quả (`anomalyScore`, `anomalous`) gửi kèm `HEARTBEAT` / `METRICS_DETAIL`; Server ghép theo `ml.mode`.
+
+> **Giới hạn đã đo được:** với đúng luật trên (30 mẫu học, threshold = max + 0.05, 3 lần liên tiếp), Isolation Forest rất thận trọng:
+> precision ≈ 1.0, FPR ≈ 0 nhưng recall thấp (≈ 0.03–0.22 trên dữ liệu mô phỏng), vì điểm bão hòa quanh mức của các điểm học cực đoan.
+> Xem `statics/results/README.md`.
 
 ## 9. Server ML – Chronos-Bolt tiny
 
 - Chấm **6 metric**: KB gửi, KB nhận, số kết nối, số địa chỉ đích khác nhau, CPU, RAM. **Không** gồm số tiến trình và số lần mất focus.
 - Mỗi 10 giây: lấy 60 điểm gần nhất của **mọi máy**, gom thành **một batch**, gọi `ml-service` **một lần**, **bất đồng bộ**, timeout **3 giây**.
-- Lỗi hoặc timeout → **bỏ qua ML**, hệ thống vẫn chạy bình thường.
-- Đáng ngờ khi giá trị thật nằm ngoài khoảng **q0.1 – q0.9** đủ **3 lần liên tiếp**.
+- Lỗi hoặc timeout → **bỏ qua ML**, hệ thống vẫn chạy bình thường (ml-service chưa nạp xong model trả `503` → Server coi như lỗi, bỏ qua ML).
+- Đáng ngờ khi giá trị thật nằm ngoài khoảng **q0.1 – q0.9** đủ **3 lần liên tiếp** (`ChronosJudge`).
+- `ml-service` dùng `amazon/chronos-bolt-tiny`. Máy cần truy cập được `huggingface.co` lần đầu để tải trọng số
+  (hoặc đặt `LTM_ML_MODEL` trỏ tới thư mục model đã tải sẵn). Backend `naive` (`LTM_ML_BACKEND=naive`) chỉ để kiểm thử, không phải Chronos.
 
 ## 10. Room statistics
 
-Server tính **trung vị (median)** và **MAD** cho từng metric của cả phòng.
-Máy nào lệch quá ngưỡng → `WARNING`, lý do dạng "gấp X lần trung vị phòng".
-Server gửi `ROOM_STATS` xuống client để client so sánh điểm của mình với phòng.
+Mỗi `monitor.interval.seconds` (10 giây) Server tính **trung vị (median)** và **MAD** cho 7 metric của cả phòng
+(không gồm `focusLostCount`; chỉ tính khi phòng có ít nhất `room.min.machines` = 3 máy online) rồi gửi `ROOM_STATS` xuống sinh viên.
 
-> TODO(Nguoi3): chốt công thức và ngưỡng "lệch quá ngưỡng" (ví dụ dựa trên MAD) và ghi vào đây.
+Công thức "lệch quá ngưỡng" (`RoomStats.check`), chỉ xét lệch **lên trên** (gửi/nhận/CPU/... cao hơn phòng):
+
+1. `ratio = giá trị máy / max(median, room.min.median)`.
+2. Giá trị phải cách median hơn `room.mad.threshold` (3.5) lần `1.4826 × MAD` (bỏ qua dao động bình thường khi cả phòng vốn phân tán).
+3. `ratio ≥ room.warning.multiplier` (3.0) → `YELLOW`, lý do dạng "kbSent gấp 5.2 lần trung vị phòng"; `ratio ≥ room.critical.multiplier` (6.0) → `RED`.
+
+Mọi ngưỡng nằm trong `config/server.properties`.
 
 ## 11. Rate control
 
 | Chế độ | Hành vi |
 |---|---|
 | `NORMAL` | Summary nằm trong `HEARTBEAT`, mỗi 10 giây |
-| `HIGH` | Gửi `METRICS_DETAIL` mỗi 2 giây. Tự về `NORMAL` sau **60 giây yên** |
+| `HIGH` | Gửi `METRICS_DETAIL` mỗi 2 giây. Tự về `NORMAL` sau **60 giây yên** (không có vi phạm mới; `rate.high.quiet.seconds`) |
 | `BASELINE` | Mọi máy gửi detail mỗi 1 giây, **không ML** |
 
 Server đổi chế độ bằng `SET_RATE`.
@@ -132,13 +156,15 @@ File `config/ml.properties`, khóa `ml.mode`:
 
 | Giá trị | Ý nghĩa |
 |---|---|
-| `NONE` | Không dùng ML (mặc định ở skeleton) |
+| `NONE` | Không dùng ML (**mặc định hiện tại**) |
 | `IF` | Chỉ Isolation Forest (client) |
 | `CHRONOS` | Chỉ Chronos-Bolt (ml-service) |
 | `BOTH_OR` | Đáng ngờ nếu IF **hoặc** Chronos báo bất thường |
 | `BOTH_AND` | Đáng ngờ nếu IF **và** Chronos cùng báo bất thường |
 
-Nguoi4 chọn giá trị mặc định tốt nhất sau thực nghiệm (`exam.tools.ExperimentRunner`).
+Mặc định vẫn là `NONE` vì chưa có số liệu Chronos-Bolt thật để chọn (xem `statics/results/README.md`).
+Sau khi chạy `exam.tools.ExperimentRunner` với Chronos thật, Nguoi4 chọn giá trị tốt nhất và sửa `config/ml.properties` (`TODO(Nguoi4)` ở file đó).
+Khi đáng ngờ, Server đặt cảnh báo **VÀNG** với lý do bắt đầu bằng `ML (<mode>)` cho giáo viên.
 
 ## 14. Dữ liệu mẫu (SQLite)
 
@@ -150,23 +176,26 @@ Server tự tạo `data/exam.db` (đã `.gitignore`) và nạp dữ liệu mẫu
 | Giáo viên | `gv01` | `teacher123` | Giảng viên Mẫu |
 | Sinh viên | `SV001` … `SV010` | `123456` (chung) | SV001 = Nguyễn Văn An, SV002 = Trần Thị Bình, ... |
 
-Sinh viên đăng nhập kèm **mã ca thi**. Ở skeleton chưa có ca thi trong database và Server chưa kiểm tra mã ca,
-nên dùng tạm `CA001`. Xóa `data/exam.db` rồi chạy lại Server để nạp lại dữ liệu mẫu.
+Mật khẩu được lưu dạng hash PBKDF2 (không có chuỗi mật khẩu rõ trong database). Sinh viên đăng nhập kèm **mã ca thi**;
+Server kiểm tra ca có tồn tại, chưa kết thúc và sinh viên có trong danh sách thí sinh. Dữ liệu mẫu **không** có ca thi:
+giáo viên tạo đề và ca thi (mã ca tự sinh hoặc tự đặt, ví dụ `CA001`) trong `TeacherMain`.
+
+> Schema đã đổi so với skeleton. Nếu còn file `data/exam.db` cũ, **xóa nó** rồi chạy lại Server để tạo lại và nạp dữ liệu mẫu.
 
 File dữ liệu: `source/server/src/main/resources/schema.sql` và `sample_data.sql` (Nguoi2).
 
-## 15. Hạn chế của skeleton (phiên dựng khung này)
+## 15. Trạng thái triển khai và hạn chế đã biết
 
-Phiên này **chỉ dựng khung**. Đã chạy được: Server mở TCP + SQLite + dữ liệu mẫu; LOGIN/LOGIN_OK/LOGIN_FAIL;
-HEARTBEAT/HEARTBEAT_ACK (Server log); phát hiện client im lặng 30 giây; chuyển NOTICE của giáo viên; ml-service `/health` và `/score` giả.
+**Đã triển khai và kiểm thử:** TCP + virtual thread, đăng nhập hash, token/RECONNECT, heartbeat và timeout, ngân hàng câu hỏi + CSV,
+tạo đề (tay / ngẫu nhiên), ca thi, trộn đề riêng từng sinh viên, đồng hồ Server, tự chốt bài, chấm điểm, xuất CSV, giám sát 5 luật bằng OSHI,
+thống kê phòng median/MAD, ALERT, rate control NORMAL/HIGH/BASELINE, Isolation Forest, ml-service Chronos + fallback, `MlGateway`,
+Recorder/Simulator/ExperimentRunner, giao diện Swing Teacher/Student, kịch bản end-to-end 20 bước.
 
-**Chưa triển khai** (có `TODO(NguoiX)` tại chỗ cần làm):
+**Hạn chế đã biết (không phải lỗi chưa làm):**
 
-- Nghiệp vụ thi: ngân hàng câu hỏi, tạo đề, ca thi, trộn câu/đáp án, chấm điểm, tự chốt bài, xuất CSV.
-- `RECONNECT`, tự nối lại phía client, khôi phục bài.
-- Giám sát thật: OSHI, 5 luật, focus, `VIOLATION`, `METRICS_DETAIL`, `ROOM_STATS`, `ALERT`.
-- `RateController` thật (`SET_RATE`, về `NORMAL` sau 60 giây).
-- Isolation Forest, Chronos, `MlGateway`; `/score` chỉ trả dữ liệu giả cố định.
-- `Recorder`, `Simulator`, `ExperimentRunner`.
-- Giao diện Swing chỉ hiện trạng thái kết nối và đăng nhập.
-- Mật khẩu đang lưu dạng chữ thường trong dữ liệu mẫu (TODO(Nguoi2): đổi sang hash).
+- **Chưa chạy với trọng số Chronos-Bolt thật** (môi trường phát triển chặn `huggingface.co`). Đường ống đã kiểm thử đầy đủ với model Chronos khởi tạo ngẫu nhiên
+  và với backend `naive`; số liệu Chronos trong `statics/results/` là của backend `naive`, chỉ để kiểm thử đường ống.
+- Isolation Forest theo đúng luật của đề có recall thấp trên dữ liệu mô phỏng (mục 8).
+- `ml.mode` mặc định `NONE` cho tới khi có số liệu Chronos thật (`TODO(Nguoi4)`).
+- Đường truyền là TCP thuần (không TLS) theo quyết định thiết kế của nhóm; mật khẩu chỉ được bảo vệ ở phía lưu trữ (hash).
+- Các nhận diện GitHub `@REPLACE-ME-NGUOI1/3/4` trong `.github/CODEOWNERS` chưa điền vì chưa biết tài khoản.
