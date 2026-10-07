@@ -2,7 +2,7 @@
 #
 # TODO: Thay 4 handle giữ chỗ bên dưới bằng tài khoản GitHub thật của từng người:
 #   @REPLACE-ME-NGUOI1  ->  Nguoi1 (Network)
-#   @REPLACE-ME-NGUOI2  ->  Nguoi2 (Exam business)
+#   (Nguoi2 = @tanh8805, đã xác định qua tài khoản GitHub)
 #   @REPLACE-ME-NGUOI3  ->  Nguoi3 (Monitoring)
 #   @REPLACE-ME-NGUOI4  ->  Nguoi4 (ML / Experiment)
 #
@@ -23,10 +23,10 @@
 /source/server/src/main/java/exam/server/net/        @REPLACE-ME-NGUOI1
 /source/server/src/main/java/exam/server/session/    @REPLACE-ME-NGUOI1
 /source/server/src/main/java/exam/server/rate/       @REPLACE-ME-NGUOI1
-/source/server/src/main/java/exam/server/exam/       @REPLACE-ME-NGUOI2
-/source/server/src/main/java/exam/server/db/         @REPLACE-ME-NGUOI2
-/source/server/src/main/resources/                   @REPLACE-ME-NGUOI2
-/source/server/src/test/java/exam/server/db/         @REPLACE-ME-NGUOI2
+/source/server/src/main/java/exam/server/exam/       @tanh8805
+/source/server/src/main/java/exam/server/db/         @tanh8805
+/source/server/src/main/resources/                   @tanh8805
+/source/server/src/test/java/exam/server/db/         @tanh8805
 /source/server/src/main/java/exam/server/monitor/    @REPLACE-ME-NGUOI3
 /source/server/src/main/java/exam/server/ml/         @REPLACE-ME-NGUOI4
 
@@ -37,8 +37,8 @@
 # Ngoại lệ: lớp nối Isolation Forest nằm trong api nhưng thuộc Nguoi4
 /source/client/src/main/java/exam/client/api/IsolationForestScorer.java   @REPLACE-ME-NGUOI4
 /source/client/src/main/java/exam/client/net/        @REPLACE-ME-NGUOI1
-/source/client/src/main/java/exam/client/student/    @REPLACE-ME-NGUOI2
-/source/client/src/main/java/exam/client/teacher/    @REPLACE-ME-NGUOI2
+/source/client/src/main/java/exam/client/student/    @tanh8805
+/source/client/src/main/java/exam/client/teacher/    @tanh8805
 # Ngoại lệ: teacher/monitor nằm trong teacher nhưng thuộc Nguoi3
 /source/client/src/main/java/exam/client/teacher/monitor/   @REPLACE-ME-NGUOI3
 /source/client/src/main/java/exam/client/monitor/    @REPLACE-ME-NGUOI3
@@ -52,4 +52,4 @@
 /statics/                           @REPLACE-ME-NGUOI4
 
 # Báo cáo: mỗi người viết phần của mình nên cả 4 cùng sở hữu
-/report/                            @REPLACE-ME-NGUOI1 @REPLACE-ME-NGUOI2 @REPLACE-ME-NGUOI3 @REPLACE-ME-NGUOI4
+/report/                            @REPLACE-ME-NGUOI1 @tanh8805 @REPLACE-ME-NGUOI3 @REPLACE-ME-NGUOI4
