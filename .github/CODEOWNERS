@@ -33,10 +33,13 @@
 # ---------------- client ----------------
 /source/client/src/main/java/exam/client/StudentMain.java   @REPLACE-ME-NGUOI1
 /source/client/src/main/java/exam/client/TeacherMain.java   @REPLACE-ME-NGUOI1
+/source/client/src/main/java/exam/client/StudentClient.java @REPLACE-ME-NGUOI1
+/source/client/src/main/java/exam/client/TeacherClient.java @REPLACE-ME-NGUOI1
+/source/client/src/main/java/exam/client/ClientConfig.java  @REPLACE-ME-NGUOI1
 /source/client/src/main/java/exam/client/api/        @REPLACE-ME-NGUOI1
-# Ngoại lệ: lớp nối Isolation Forest nằm trong api nhưng thuộc Nguoi4
-/source/client/src/main/java/exam/client/api/IsolationForestScorer.java   @REPLACE-ME-NGUOI4
+# (IsolationForestScorer đã chuyển sang package exam.client.ml của Nguoi4, không còn ngoại lệ trong api)
 /source/client/src/main/java/exam/client/net/        @REPLACE-ME-NGUOI1
+/source/client/src/main/java/exam/client/ml/         @REPLACE-ME-NGUOI4
 /source/client/src/main/java/exam/client/student/    @tanh8805
 /source/client/src/main/java/exam/client/teacher/    @tanh8805
 # Ngoại lệ: teacher/monitor nằm trong teacher nhưng thuộc Nguoi3

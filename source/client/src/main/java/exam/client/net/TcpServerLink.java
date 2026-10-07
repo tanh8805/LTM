@@ -22,27 +22,53 @@ import java.util.concurrent.CopyOnWriteArrayList;
  *
  *   gửi : send(message) -> codec.encode() -> ghi một dòng
  *   nhận: một virtual thread đọc từng dòng -> codec.decode() -> gọi các listener
+ *
+ * Mất kết nối (Server tắt, mất mạng): trạng thái chuyển sang RECONNECTING và một virtual thread thử nối lại TCP
+ * cho tới khi được (mỗi lần cách nhau reconnectDelayMs, tối đa maxAttempts lần). Khi nối lại được, trạng thái về CONNECTED
+ * và listener tự gửi RECONNECT bằng token (việc đó thuộc tầng ứng dụng, không phải tầng này).
  */
 public class TcpServerLink implements ServerLink {
 
     private final MessageCodec codec = new MessageCodec();
     // CopyOnWriteArrayList: thêm listener và duyệt gọi listener từ thread khác nhau vẫn an toàn.
     private final List<ServerLinkListener> listeners = new CopyOnWriteArrayList<>();
+    private final int reconnectDelayMs;
+    private final int maxReconnectAttempts;
 
     private volatile ConnectionStatus status = ConnectionStatus.DISCONNECTED;
+    private volatile boolean closedByUser = false;
+    private String host;
+    private int port;
     private Socket socket;
-    private BufferedReader reader;
     private BufferedWriter writer;
+
+    public TcpServerLink() {
+        this(2000, 60);
+    }
+
+    public TcpServerLink(int reconnectDelayMs, int maxReconnectAttempts) {
+        this.reconnectDelayMs = reconnectDelayMs;
+        this.maxReconnectAttempts = maxReconnectAttempts;
+    }
 
     @Override
     public void connect(String host, int port) throws IOException {
-        socket = new Socket(host, port);
-        socket.setTcpNoDelay(true);
-        reader = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
-        writer = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8));
-
+        this.host = host;
+        this.port = port;
+        this.closedByUser = false;
+        openSocketAndStartReader();
         changeStatus(ConnectionStatus.CONNECTED);
-        Thread.startVirtualThread(this::readUntilDisconnected);
+    }
+
+    /** Mở socket mới và bắt đầu một virtual thread đọc từ socket đó. */
+    private synchronized void openSocketAndStartReader() throws IOException {
+        Socket newSocket = new Socket(host, port);
+        newSocket.setTcpNoDelay(true);
+        BufferedReader reader = new BufferedReader(new InputStreamReader(newSocket.getInputStream(), StandardCharsets.UTF_8));
+        writer = new BufferedWriter(new OutputStreamWriter(newSocket.getOutputStream(), StandardCharsets.UTF_8));
+        socket = newSocket;
+
+        Thread.startVirtualThread(() -> readUntilDisconnected(reader));
     }
 
     /** Gửi từ nhiều thread (heartbeat, ANSWER, VIOLATION...) nên synchronized. */
@@ -74,19 +100,23 @@ public class TcpServerLink implements ServerLink {
 
     @Override
     public void close() {
+        closedByUser = true;
         changeStatus(ConnectionStatus.DISCONNECTED);
+        closeSocket();
+    }
+
+    private synchronized void closeSocket() {
         try {
             if (socket != null) {
                 socket.close();
             }
         } catch (IOException e) {
-            // TODO(Nguoi1): Add proper error handling.
-            e.printStackTrace();
+            System.out.println("[Link] Lỗi khi đóng socket: " + e.getMessage());
         }
     }
 
     /** Chạy trên một virtual thread riêng: đọc cho tới khi Server đóng kết nối hoặc lỗi mạng. */
-    private void readUntilDisconnected() {
+    private void readUntilDisconnected(BufferedReader reader) {
         try {
             String line;
             while ((line = reader.readLine()) != null) {
@@ -94,13 +124,47 @@ public class TcpServerLink implements ServerLink {
             }
             System.out.println("[Link] Server đã đóng kết nối");
         } catch (IOException e) {
-            if (status != ConnectionStatus.DISCONNECTED) {
+            if (!closedByUser) {
                 System.out.println("[Link] Mất kết nối tới Server: " + e.getMessage());
             }
-        } finally {
-            // TODO(Nguoi1): Tự RECONNECT bằng token (trạng thái RECONNECTING) thay vì chỉ báo DISCONNECTED.
-            changeStatus(ConnectionStatus.DISCONNECTED);
         }
+        handleConnectionLost();
+    }
+
+    private void handleConnectionLost() {
+        closeSocket();
+        if (closedByUser) {
+            changeStatus(ConnectionStatus.DISCONNECTED);
+            return;
+        }
+        changeStatus(ConnectionStatus.RECONNECTING);
+        Thread.startVirtualThread(this::reconnectLoop);
+    }
+
+    /** Thử nối lại TCP cho tới khi được hoặc hết số lần thử. */
+    private void reconnectLoop() {
+        for (int attempt = 1; attempt <= maxReconnectAttempts; attempt++) {
+            try {
+                Thread.sleep(reconnectDelayMs);
+            } catch (InterruptedException e) {
+                // Có ai đó yêu cầu dừng: giữ lại cờ interrupt rồi thoát.
+                Thread.currentThread().interrupt();
+                return;
+            }
+            if (closedByUser) {
+                return;
+            }
+            try {
+                openSocketAndStartReader();
+                System.out.println("[Link] Đã nối lại TCP (lần thử " + attempt + ")");
+                changeStatus(ConnectionStatus.CONNECTED);
+                return;
+            } catch (IOException e) {
+                System.out.println("[Link] Nối lại lần " + attempt + " thất bại: " + e.getMessage());
+            }
+        }
+        System.out.println("[Link] Bỏ cuộc sau " + maxReconnectAttempts + " lần nối lại");
+        changeStatus(ConnectionStatus.DISCONNECTED);
     }
 
     private void handleLine(String line) {
