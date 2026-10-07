@@ -12,7 +12,23 @@ Hạn nộp: **31/10/2026**. Đọc kèm `CONTRIBUTING.md` (quy tắc làm việ
 | Đệm | 29/10 – 31/10 | **Đóng băng tính năng.** Viết báo cáo, slide, tập vấn đáp, nộp bài 31/10 |
 
 Quy ước: mã chức năng `N<người>-<số>` (số theo danh sách phân công). Cột **"Xong khi"** là tiêu chí kiểm chứng được; chưa đạt thì chưa tính là xong.
-Skeleton đã có sẵn: protocol + codec + 28 test, TCP server, LOGIN/HEARTBEAT chạy được, SQLite + dữ liệu mẫu, các stub và `TODO(NguoiX)` ở đúng chỗ cần làm. Dùng `grep -rn "TODO(NguoiX)" source` để xem việc của mình.
+Dùng `grep -rn "TODO(NguoiX)" source config` để xem việc còn lại của mình.
+
+## Trạng thái hiện tại
+
+Toàn bộ chức năng trong bảng dưới đây đã được cài đặt và kiểm thử trong phiên "hoàn thiện" (xem `git log`). Cột **"Xong khi"** của từng chức năng được kiểm bằng unit/integration test hoặc kịch bản end-to-end (`source/e2e`). Chỉ còn các việc sau:
+
+| Việc còn lại | Người | Vì sao chưa xong |
+|---|---|---|
+| **N4-05 / N4-14 / N4-15**: chạy Chronos-Bolt **thật**, so sánh với số liệu thật, chọn `ml.mode` mặc định (hiện `NONE`) | Nguoi4 | Môi trường phát triển chặn `huggingface.co` nên chưa tải được trọng số. Đường ống đã kiểm thử bằng model khởi tạo ngẫu nhiên và backend `naive`. Số liệu mô phỏng ở `statics/results/` chỉ có phần Isolation Forest là thật (xem `statics/results/README.md`) |
+| **Thu trace thật** bằng `Recorder` trên máy thật / baseline phòng thi | Nguoi3, Nguoi4 | Cần máy thật và thời gian đo; hiện mới có `data/traces/sim.csv` (mô phỏng) |
+| **N1-03 / N1-04 ở mức 500 client đăng nhập thật** | Nguoi1 | Đã có test 40 client đăng nhập đồng thời và 500 connection nhàn rỗi (client mới vẫn đăng nhập trong ~100 ms). Chương trình tạo tải 500 client đã đăng nhập chưa viết |
+| **Phần báo cáo (d)** và slide | cả nhóm | Chưa viết (`report/` trống) |
+| Điền `@REPLACE-ME-NGUOI1/3/4` trong `.github/CODEOWNERS` | Nguoi1, Nguoi3, Nguoi4 | Chưa biết tài khoản GitHub (không được đoán). `@tanh8805` = Nguoi2 |
+| Thử giao diện Swing trên máy Windows/macOS thật | cả nhóm | Mới kiểm tra trên Linux (Xvfb) |
+
+Thay đổi quyền sở hữu so với bản đầu: `exam.client.ml` (`IsolationForestScorer`, `AnomalyDetector`) thuộc **Nguoi4**; `StudentClient`, `TeacherClient` và module `e2e` thuộc **Nguoi1**.
+Hiểu về N3-13: "so sánh số liệu của từng máy với thống kê phòng" = công thức median/MAD ở `docs/SPEC.md` mục 10, cộng với `anomalyScore` của client gửi kèm heartbeat khi ghép ML theo `ml.mode`.
 
 ---
 
@@ -268,7 +284,7 @@ Skeleton đã có sẵn: protocol + codec + 28 test, TCP server, LOGIN/HEARTBEAT
 
 ## Đề xuất điều chỉnh khối lượng (chưa áp dụng – chờ cả nhóm quyết)
 
-Chưa đổi quyền sở hữu nào. Nhận xét sau khi dựng skeleton:
+Chưa đổi quyền sở hữu nào. Nhận xét từ lúc dựng skeleton (vẫn giữ nguyên để cả nhóm quyết):
 
 1. **Nguoi2 nặng nhất.** Gánh toàn bộ nghiệp vụ thi (15 mục) **và** hai giao diện Swing, trong đó Tuần 3 dồn nhiều (Student UI, Teacher UI, SUBMIT, chấm điểm, xuất CSV). Đề xuất: Nguoi1 nhận **Student UI phần kết nối** (nhận `EXAM_START`/`TIME_SYNC`/`EXAM_END`, gửi `ANSWER`/`SUBMIT`, hàng đợi `ANSWER` khi mất mạng) vì liên quan trực tiếp đến mạng; Nguoi2 giữ phần hiển thị.
 2. **Nguoi1 nhẹ hơn sau Tuần 1** vì skeleton đã có sẵn TCP, codec, LOGIN, HEARTBEAT. Ngoài mục 1, đề xuất Nguoi1 nhận: viết **chương trình tạo tải nhiều client giả** (phục vụ số liệu 50/500 connection, hỗ trợ đánh giá), viết phần **Testing/Evaluation** của báo cáo, và làm "người tích hợp" cuối Tuần 3.

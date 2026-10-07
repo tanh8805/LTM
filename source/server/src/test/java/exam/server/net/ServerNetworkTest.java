@@ -806,6 +806,33 @@ class ServerNetworkTest {
         assertEquals(40, successCount.get());
     }
 
+    @Test
+    void fiveHundredIdleConnectionsDoNotBlockNewClients() throws Exception {
+        startServer();
+
+        // Mỗi connection chiếm một virtual thread đang chờ readLine(); 500 cái không được làm Server chậm lại.
+        java.util.List<java.net.Socket> idleSockets = new java.util.ArrayList<>();
+        try {
+            for (int i = 0; i < 500; i++) {
+                idleSockets.add(new java.net.Socket("localhost", server.getPort()));
+            }
+
+            long start = System.currentTimeMillis();
+            try (TestClient client = new TestClient(server.getPort())) {
+                client.login("gv01", "teacher123", Role.TEACHER, null);
+                client.send(new HeartbeatMessage(1, new Metrics()));
+                assertNotNull(client.readUntil(HeartbeatAckMessage.class, 3000));
+            }
+            long elapsed = System.currentTimeMillis() - start;
+            System.out.println("[Test] Với 500 connection đang mở, client mới đăng nhập + heartbeat mất " + elapsed + " ms");
+            assertTrue(elapsed < 3000, "client mới bị chậm: " + elapsed + " ms");
+        } finally {
+            for (java.net.Socket socket : idleSockets) {
+                socket.close();
+            }
+        }
+    }
+
     private void waitUntilOffline(String machineId) throws Exception {
         long deadline = System.currentTimeMillis() + 5000;
         while (System.currentTimeMillis() < deadline) {
