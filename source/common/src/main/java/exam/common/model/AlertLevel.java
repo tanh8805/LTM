@@ -5,10 +5,12 @@ package exam.common.model;
 /**
  * Mức cảnh báo hiển thị cho giáo viên (trong message ALERT).
  *
- * YELLOW : cảnh báo nghi ngờ (WARNING) - ví dụ lệch trung vị phòng, ML báo bất thường, mất focus quá ngưỡng.
- * RED    : vi phạm rõ ràng - ví dụ mở process cấm, kết nối tới IP bị chặn, cắm USB.
+ * YELLOW : cảnh báo nghi ngờ (WARNING) - lệch trung vị phòng từ room.warning.multiplier, ML báo bất thường,
+ *          mất focus quá ngưỡng, mất kết nối.
+ * RED    : vi phạm rõ ràng - luật 1-4 (process cấm/lạ, kết nối tới IP bị chặn, USB mới, network card mới),
+ *          hoặc lệch trung vị phòng từ room.critical.multiplier.
  *
- * TODO(Nguoi3): Chốt chính xác luật nào cho YELLOW, luật nào cho RED và ghi vào docs/SPEC.md.
+ * Bảng đầy đủ: docs/SPEC.md mục 7 và 10.
  */
 public enum AlertLevel {
     YELLOW,

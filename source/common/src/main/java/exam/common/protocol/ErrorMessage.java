@@ -3,10 +3,10 @@
 package exam.common.protocol;
 
 /**
- * ERROR (Server → Client): Server báo lỗi cho client (message sai định dạng, chưa đăng nhập, chưa hỗ trợ, ...).
+ * ERROR (Server → Client): Server báo lỗi cho client (message sai định dạng, chưa đăng nhập, sai vai trò, token hỏng, ...).
  */
 public class ErrorMessage extends Message {
-    /** Ví dụ: BAD_MESSAGE, NOT_LOGGED_IN, NOT_IMPLEMENTED */
+    /** Xem bảng mã lỗi trong docs/PROTOCOL.md mục 5, ví dụ BAD_MESSAGE, NOT_LOGGED_IN, FORBIDDEN */
     public String code;
     public String message;
 

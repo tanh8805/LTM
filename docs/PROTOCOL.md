@@ -54,7 +54,7 @@ Cột "Hướng": C → S là Client gửi Server; S → C là Server gửi Clie
 | `ROOM_STATS` | S → C | `time` (long)<br>`medians` (Map<String, Double>) – tên metric -> trung vị cả phòng<br>`mads` (Map<String, Double>) – tên metric -> MAD cả phòng | Trung vị và MAD của từng metric trên cả phòng, để client tự so sánh. | `{"type":"ROOM_STATS","time":1760000180000,"medians":{"kbSent":10.0,"cpuPercent":22.0},"mads":{"kbSent":2.5,"cpuPercent":4.0}}` |
 | `ALERT` | S → C | `machineId` (String) – Mã máy = mã sinh viên<br>`level` (AlertLevel) – YELLOW hoặc RED<br>`reason` (String) – Ví dụ: kbSent gấp 5.2 lần trung vị phòng | Server báo cảnh báo của một máy cho giáo viên. | `{"type":"ALERT","machineId":"SV003","level":"YELLOW","reason":"kbSent gấp 5.2 lần trung vị phòng"}` |
 | `NOTICE` | hai chiều | `target` (String) – machineId của một máy, hoặc "ALL" cho cả phòng<br>`text` (String) | Thông báo của giáo viên. Giáo viên gửi lên Server, Server chuyển tới sinh viên. | `{"type":"NOTICE","target":"ALL","text":"Còn 5 phút nữa hết giờ"}` |
-| `ERROR` | S → C | `code` (String) – Ví dụ: BAD_MESSAGE, NOT_LOGGED_IN, NOT_IMPLEMENTED<br>`message` (String) | Server báo lỗi cho client (message sai định dạng, chưa đăng nhập, chưa hỗ trợ, ...). | `{"type":"ERROR","code":"NOT_LOGGED_IN","message":"Hãy gửi LOGIN trước"}` |
+| `ERROR` | S → C | `code` (String) – Xem bảng mã lỗi trong docs/PROTOCOL.md mục 5, ví dụ BAD_MESSAGE, NOT_LOGGED_IN, FORBIDDEN<br>`message` (String) | Server báo lỗi cho client (message sai định dạng, chưa đăng nhập, sai vai trò, token hỏng, ...). | `{"type":"ERROR","code":"NOT_LOGGED_IN","message":"Hãy gửi LOGIN trước"}` |
 
 ## 3. Kiểu dữ liệu lồng nhau
 
