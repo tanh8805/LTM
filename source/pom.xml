@@ -25,6 +25,7 @@
     <module>server</module>
     <module>client</module>
     <module>tools</module>
+    <module>e2e</module>
   </modules>
 
   <properties>
@@ -69,6 +70,11 @@
       <dependency>
         <groupId>exam</groupId>
         <artifactId>client</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>exam</groupId>
+        <artifactId>server</artifactId>
         <version>${project.version}</version>
       </dependency>
     </dependencies>
