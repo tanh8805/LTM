@@ -19,6 +19,8 @@
 
 # ---------------- server ----------------
 /source/server/src/main/java/exam/server/ServerMain.java   @REPLACE-ME-NGUOI1
+/source/server/src/main/java/exam/server/ServerApp.java    @REPLACE-ME-NGUOI1
+/source/server/src/main/java/exam/server/ServerConfig.java @REPLACE-ME-NGUOI1
 /source/server/src/main/java/exam/server/api/        @REPLACE-ME-NGUOI1
 /source/server/src/main/java/exam/server/net/        @REPLACE-ME-NGUOI1
 /source/server/src/main/java/exam/server/session/    @REPLACE-ME-NGUOI1
@@ -48,9 +50,12 @@
 
 # ---------------- tools, ml-service, dữ liệu ----------------
 /source/tools/                      @REPLACE-ME-NGUOI4
+# Kịch bản end-to-end ghép mọi mảng, do Nguoi1 (người tích hợp) giữ
+/source/e2e/                        @REPLACE-ME-NGUOI1
 /ml-service/                        @REPLACE-ME-NGUOI4
 /config/ml.properties               @REPLACE-ME-NGUOI4
 /config/server.properties           @REPLACE-ME-NGUOI1
+/config/client.properties           @REPLACE-ME-NGUOI1
 /data/traces/                       @REPLACE-ME-NGUOI4
 /statics/                           @REPLACE-ME-NGUOI4
 
