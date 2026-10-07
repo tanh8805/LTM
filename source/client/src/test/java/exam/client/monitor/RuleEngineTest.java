@@ -60,11 +60,24 @@ class RuleEngineTest {
         engine.start(rules);
         source.processes.add("notepad.exe");
 
+        // Lần đầu thấy: chưa báo (có thể là tiến trình chớp nhoáng). Lần kiểm tra thứ hai vẫn còn: báo.
+        assertTrue(engine.checkForViolations().isEmpty());
         ViolationMessage violation = onlyViolation(engine.checkForViolations());
 
         assertEquals(ViolationType.PROCESS_NOT_ALLOWED, violation.violationType);
         assertEquals("notepad.exe", violation.evidence);
         assertTrue(violation.time > 0);
+    }
+
+    @Test
+    void shortLivedNewProcessIsNotReported() {
+        engine.start(rules);
+
+        source.processes.add("kworker/0:1");
+        assertTrue(engine.checkForViolations().isEmpty());
+        source.processes.remove("kworker/0:1");
+        assertTrue(engine.checkForViolations().isEmpty());
+        assertTrue(engine.checkForViolations().isEmpty());
     }
 
     @Test
@@ -124,6 +137,7 @@ class RuleEngineTest {
         engine.start(rules);
         source.processes.add("notepad.exe");
 
+        assertTrue(engine.checkForViolations().isEmpty());
         assertEquals(1, engine.checkForViolations().size());
         assertTrue(engine.checkForViolations().isEmpty());
         assertTrue(engine.checkForViolations().isEmpty());
@@ -291,6 +305,7 @@ class RuleEngineTest {
         engine.start(rules);
         engine.onFocusLost();
         source.processes.add("notepad.exe");
+        engine.checkForViolations();
         assertEquals(1, engine.checkForViolations().size());
 
         engine.start(rules); // ca thi mới

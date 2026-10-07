@@ -19,7 +19,9 @@ import java.util.concurrent.atomic.AtomicInteger;
  * 5 luật giám sát chạy trên máy sinh viên.
  *
  *   Luật 1 Process     : lúc start() chụp danh sách process (allowlist). Process MỚI không nằm trong allowlist
- *                        -> PROCESS_NOT_ALLOWED. Process thuộc denylist (Zalo, Telegram...) -> PROCESS_DENYLIST.
+ *                        -> PROCESS_NOT_ALLOWED, nhưng chỉ khi thấy nó ở 2 lần kiểm tra liên tiếp
+ *                        (tiến trình sống chớp nhoáng như kworker của Linux hay tiến trình con tự thoát không bị báo oan).
+ *                        Process thuộc denylist (Zalo, Telegram...) -> PROCESS_DENYLIST, báo ngay lần đầu thấy.
  *   Luật 2 Domain/IP   : lúc start() resolve các domain bị chặn ra IP. Có kết nối tới IP đó -> BLOCKED_IP.
  *   Luật 3 USB         : thiết bị USB mới so với lúc start() -> USB_DEVICE.
  *   Luật 4 Network card: network card mới so với lúc start() (hotspot, VPN) -> NETWORK_CARD.
@@ -43,6 +45,8 @@ public class RuleEngineImpl implements RuleEngine {
     private final Set<String> networkCardsAtStart = new HashSet<>();
     private final Map<String, String> blockedIpToDomain = new HashMap<>();
     private final Set<String> alreadyReported = new HashSet<>();
+    // Process mới (ngoài allowlist) đã thấy ở lần kiểm tra trước; thấy lại lần này thì mới báo.
+    private Set<String> newProcessesSeenLastCheck = new HashSet<>();
 
     public RuleEngineImpl(MetricsSource metricsSource) {
         this(metricsSource, new SystemDomainResolver());
@@ -61,6 +65,7 @@ public class RuleEngineImpl implements RuleEngine {
         networkCardsAtStart.clear();
         blockedIpToDomain.clear();
         alreadyReported.clear();
+        newProcessesSeenLastCheck.clear();
         focusLostCount.set(0);
         lastReportedFocusLostCount = 0;
 
@@ -122,14 +127,19 @@ public class RuleEngineImpl implements RuleEngine {
             return;
         }
 
+        Set<String> newProcessesNow = new HashSet<>();
         for (String name : names) {
             String normalized = normalizeProcessName(name);
             if (isInList(normalized, rules.processDenylist)) {
                 addOnce(violations, ViolationType.PROCESS_DENYLIST, name);
             } else if (!processesAtStart.contains(normalized) && !isInList(normalized, rules.processAllowlist)) {
-                addOnce(violations, ViolationType.PROCESS_NOT_ALLOWED, name);
+                newProcessesNow.add(normalized);
+                if (newProcessesSeenLastCheck.contains(normalized)) {
+                    addOnce(violations, ViolationType.PROCESS_NOT_ALLOWED, name);
+                }
             }
         }
+        newProcessesSeenLastCheck = newProcessesNow;
     }
 
     /** "Zalo.exe" -> "zalo": chữ thường và bỏ đuôi .exe để so khớp giữa Windows và Linux. */
