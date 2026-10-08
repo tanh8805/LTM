@@ -72,11 +72,13 @@ class FocusWorkload(workloads.Workload):
         self.params = {"everySeconds": every_seconds, "mechanism": "Swing WindowFocusListener under Xvfb"}
         self._running = False
         self._thread = None
+        self._wake = None
         self.sent = 0
 
     def start(self):
         import threading
         self._running = True
+        self._wake = threading.Event()
 
         def loop():
             while self._running:
@@ -86,15 +88,17 @@ class FocusWorkload(workloads.Workload):
                     self.sent += 1
                 except (BrokenPipeError, ValueError):
                     return
-                time.sleep(self.every_seconds)
+                self._wake.wait(self.every_seconds)
 
         self._thread = threading.Thread(target=loop, daemon=True)
         self._thread.start()
 
     def stop(self):
         self._running = False
+        if self._wake is not None:
+            self._wake.set()
         if self._thread is not None:
-            self._thread.join(timeout=self.every_seconds + 3)
+            self._thread.join(timeout=5)
         self.params["commandsSent"] = self.sent
 
 
