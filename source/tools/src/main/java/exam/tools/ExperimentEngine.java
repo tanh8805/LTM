@@ -21,13 +21,16 @@ import java.util.TreeMap;
 /**
  * Phát lại (replay) một bộ trace qua từng chế độ ml.mode và đo precision, recall, F1, độ trễ phát hiện.
  *
- * Cách phát lại: với mỗi bước thời gian t (đồng bộ giữa các máy):
- *   Isolation Forest : mỗi máy có một AnomalyDetector riêng (học `trainSamples` mẫu đầu rồi chấm từng mẫu) -
+ * Mỗi trace là một phiên độc lập (một "máy") và có thể dài ngắn khác nhau. Cách phát lại, với mỗi bước t:
+ *   Isolation Forest : mỗi trace có một AnomalyDetector riêng (học `trainSamples` mẫu đầu rồi chấm từng mẫu) -
  *                      đúng quy trình client thật.
- *   Chronos          : tại mỗi bước, gom 60 điểm gần nhất (trước bước t) của MỌI máy thành MỘT batch gửi ml-service,
- *                      so giá trị thật ở bước t với khoảng q0.1-q0.9 (ChronosJudge, 3 lần liên tiếp) - đúng quy trình Server thật.
+ *   Chronos          : tại mỗi bước, gom `window` điểm gần nhất (trước bước t) của mọi trace còn dữ liệu thành MỘT batch
+ *                      gửi ml-service, so giá trị thật ở bước t với khoảng q0.1-q0.9 (ChronosJudge, N lần liên tiếp).
  *   Ghép theo ml.mode: MlDecision (NONE, IF, CHRONOS, BOTH_OR, BOTH_AND).
  * Chỉ các mẫu SAU giai đoạn học (t >= trainSamples) được đánh giá, để mọi chế độ so sánh công bằng.
+ *
+ * Nhãn (TraceRow.label/category) chỉ dùng để TÍNH KẾT QUẢ, không bao giờ đưa vào mô hình.
+ * Sau run(), getDetails() trả điểm và dự báo thô của từng mẫu để phân tích sâu (ScoreDump).
  */
 public class ExperimentEngine {
 
@@ -41,21 +44,52 @@ public class ExperimentEngine {
         public int chronosConsecutive = 3;
     }
 
-    /** Dữ liệu của một máy theo thứ tự thời gian. */
+    /** Dữ liệu thô của một mẫu: số liệu, nhãn (chỉ để đánh giá), điểm IF và dự báo Chronos. */
+    public static class SampleDetail {
+        public String traceId;
+        public int t;
+        public long time;
+        public int label;
+        public String category;
+        public String scenario;
+        public double[] vector;
+        public boolean ifTraining;
+        public double ifScore;
+        public double ifThreshold;
+        public int ifConsecutive;
+        public boolean ifFlag;
+        /** null nếu chưa đủ dữ liệu cho Chronos hoặc không chạy Chronos. Khóa: tên metric. */
+        public Map<String, Quantiles> chronos;
+        public int chronosWorstCount;
+        public boolean chronosFlag;
+    }
+
+    /** Dữ liệu của một trace theo thứ tự thời gian. */
     private static class MachineTrace {
         final String machineId;
         final List<TraceRow> rows = new ArrayList<>();
+        final List<SampleDetail> details = new ArrayList<>();
 
         MachineTrace(String machineId) {
             this.machineId = machineId;
         }
     }
 
+    private final List<SampleDetail> allDetails = new ArrayList<>();
+
+    public List<SampleDetail> getDetails() {
+        return allDetails;
+    }
+
     public List<ModeResult> run(List<TraceRow> rows, List<MlMode> modes, ChronosService chronos, Config config) {
+        allDetails.clear();
         Map<String, MachineTrace> traces = groupByMachine(rows);
-        int steps = shortestLength(traces);
-        if (steps <= config.trainSamples) {
-            throw new IllegalArgumentException("Trace chỉ có " + steps + " mẫu mỗi máy, cần nhiều hơn " + config.trainSamples + " (giai đoạn học)");
+        removeTooShortTraces(traces, config.trainSamples);
+        if (traces.isEmpty()) {
+            throw new IllegalArgumentException("Không có trace nào dài hơn " + config.trainSamples + " mẫu (giai đoạn học)");
+        }
+        for (MachineTrace trace : traces.values()) {
+            createDetails(trace);
         }
 
         boolean needIf = false;
@@ -66,10 +100,11 @@ public class ExperimentEngine {
         }
 
         long ifStart = System.currentTimeMillis();
-        Map<String, boolean[]> ifFlags = needIf ? computeIsolationForestFlags(traces, steps, config) : new HashMap<>();
+        if (needIf) {
+            computeIsolationForest(traces, config);
+        }
         long ifMillis = System.currentTimeMillis() - ifStart;
 
-        Map<String, boolean[]> chronosFlags = new HashMap<>();
         String chronosProblem = null;
         long chronosMillis = 0;
         if (needChronos) {
@@ -78,7 +113,7 @@ public class ExperimentEngine {
                 if (chronos == null) {
                     throw new IOException("không có ml-service");
                 }
-                chronosFlags = computeChronosFlags(traces, steps, chronos, config);
+                computeChronos(traces, chronos, config);
             } catch (IOException e) {
                 chronosProblem = "ml-service không dùng được: " + e.getMessage();
             }
@@ -94,17 +129,20 @@ public class ExperimentEngine {
                 continue;
             }
             for (MachineTrace trace : traces.values()) {
-                boolean[] ifFlag = ifFlags.getOrDefault(trace.machineId, new boolean[steps]);
-                boolean[] chronosFlag = chronosFlags.getOrDefault(trace.machineId, new boolean[steps]);
-                boolean[] flag = new boolean[steps];
-                for (int t = 0; t < steps; t++) {
-                    flag[t] = MlDecision.isSuspicious(mode, ifFlag[t], chronosFlag[t]);
+                boolean[] flag = new boolean[trace.rows.size()];
+                for (int t = 0; t < flag.length; t++) {
+                    SampleDetail detail = trace.details.get(t);
+                    flag[t] = MlDecision.isSuspicious(mode, detail.ifFlag, detail.chronosFlag);
                 }
-                evaluate(result, trace, flag, steps, config.trainSamples);
+                evaluate(result, trace, flag, flag.length, config.trainSamples);
             }
             result.elapsedMillis = (MlDecision.usesIsolationForest(mode) ? ifMillis : 0)
                     + (MlDecision.usesChronos(mode) ? chronosMillis : 0);
             results.add(result);
+        }
+
+        for (MachineTrace trace : traces.values()) {
+            allDetails.addAll(trace.details);
         }
         return results;
     }
@@ -120,51 +158,78 @@ public class ExperimentEngine {
         return traces;
     }
 
-    private int shortestLength(Map<String, MachineTrace> traces) {
-        int shortest = Integer.MAX_VALUE;
+    /** Trace không dài hơn giai đoạn học thì không có mẫu nào để đánh giá: bỏ và nói rõ. */
+    private void removeTooShortTraces(Map<String, MachineTrace> traces, int trainSamples) {
+        List<String> tooShort = new ArrayList<>();
         for (MachineTrace trace : traces.values()) {
-            shortest = Math.min(shortest, trace.rows.size());
+            if (trace.rows.size() <= trainSamples) {
+                tooShort.add(trace.machineId);
+            }
         }
-        return traces.isEmpty() ? 0 : shortest;
+        for (String machineId : tooShort) {
+            System.out.println("[Experiment] Bỏ trace " + machineId + ": chỉ " + traces.get(machineId).rows.size()
+                    + " mẫu, cần nhiều hơn " + trainSamples);
+            traces.remove(machineId);
+        }
     }
 
-    private Map<String, boolean[]> computeIsolationForestFlags(Map<String, MachineTrace> traces, int steps, Config config) {
-        Map<String, boolean[]> flags = new HashMap<>();
+    private void createDetails(MachineTrace trace) {
+        for (int t = 0; t < trace.rows.size(); t++) {
+            TraceRow row = trace.rows.get(t);
+            SampleDetail detail = new SampleDetail();
+            detail.traceId = trace.machineId;
+            detail.t = t;
+            detail.time = row.time;
+            detail.label = row.label;
+            detail.category = row.category;
+            detail.scenario = row.scenario;
+            detail.vector = row.metrics.toVector();
+            detail.ifTraining = true;
+            trace.details.add(detail);
+        }
+    }
+
+    private void computeIsolationForest(Map<String, MachineTrace> traces, Config config) {
         for (MachineTrace trace : traces.values()) {
             AnomalyDetector detector = new AnomalyDetector(new IsolationForestScorer(),
                     config.trainSamples, config.ifThresholdMargin, config.ifConsecutive);
-            boolean[] machineFlags = new boolean[steps];
-            for (int t = 0; t < steps; t++) {
-                machineFlags[t] = detector.observe(trace.rows.get(t).metrics.toVector()).anomalous;
+            for (int t = 0; t < trace.rows.size(); t++) {
+                AnomalyDetector.Result result = detector.observe(trace.details.get(t).vector);
+                SampleDetail detail = trace.details.get(t);
+                detail.ifTraining = result.phase == AnomalyDetector.Phase.TRAINING;
+                detail.ifScore = result.score;
+                detail.ifThreshold = result.threshold;
+                detail.ifConsecutive = result.consecutive;
+                detail.ifFlag = result.anomalous;
             }
-            flags.put(trace.machineId, machineFlags);
         }
-        return flags;
     }
 
-    /** Mỗi bước một batch cho mọi máy, giống Server thật. Ném IOException nếu ml-service lỗi. */
-    private Map<String, boolean[]> computeChronosFlags(Map<String, MachineTrace> traces, int steps,
-                                                      ChronosService chronos, Config config) throws IOException {
+    /** Mỗi bước một batch cho mọi trace còn dữ liệu, giống Server thật. Ném IOException nếu ml-service lỗi. */
+    private void computeChronos(Map<String, MachineTrace> traces, ChronosService chronos, Config config) throws IOException {
         ChronosJudge judge = new ChronosJudge(config.chronosConsecutive);
-        Map<String, boolean[]> flags = new HashMap<>();
-        for (String machineId : traces.keySet()) {
-            flags.put(machineId, new boolean[steps]);
+        int longest = 0;
+        for (MachineTrace trace : traces.values()) {
+            longest = Math.max(longest, trace.rows.size());
         }
 
-        for (int t = config.chronosMinPoints; t < steps; t++) {
+        for (int t = config.chronosMinPoints; t < longest; t++) {
             Map<String, Map<String, List<Double>>> batch = new LinkedHashMap<>();
             Map<String, Map<String, Double>> actualValues = new HashMap<>();
             for (MachineTrace trace : traces.values()) {
+                if (t >= trace.rows.size()) {
+                    continue;
+                }
                 Map<String, List<Double>> context = new LinkedHashMap<>();
                 Map<String, Double> actual = new HashMap<>();
                 int from = Math.max(0, t - config.window);
                 for (int metric = 0; metric < Metrics.CHRONOS_DIMENSIONS; metric++) {
                     List<Double> values = new ArrayList<>();
                     for (int i = from; i < t; i++) {
-                        values.add(trace.rows.get(i).metrics.toVector()[metric]);
+                        values.add(trace.details.get(i).vector[metric]);
                     }
                     context.put(Metrics.VECTOR_NAMES[metric], values);
-                    actual.put(Metrics.VECTOR_NAMES[metric], trace.rows.get(t).metrics.toVector()[metric]);
+                    actual.put(Metrics.VECTOR_NAMES[metric], trace.details.get(t).vector[metric]);
                 }
                 batch.put(trace.machineId, context);
                 actualValues.put(trace.machineId, actual);
@@ -177,16 +242,23 @@ public class ExperimentEngine {
                     continue;
                 }
                 MlResult verdict = judge.judge(entry.getKey(), actual, entry.getValue());
-                flags.get(entry.getKey())[t] = verdict.suspicious;
+                SampleDetail detail = traces.get(entry.getKey()).details.get(t);
+                detail.chronos = entry.getValue();
+                detail.chronosWorstCount = verdict.consecutiveOutOfRange;
+                detail.chronosFlag = verdict.suspicious;
             }
         }
-        return flags;
     }
 
-    /** Cộng dồn TP/FP/FN/TN và số đoạn gian lận được phát hiện, chỉ xét t >= trainSamples. */
+    /** Cộng dồn TP/FP/FN/TN, số đoạn bất thường được phát hiện, báo nhầm theo loại; chỉ xét t >= trainSamples. */
     static void evaluate(ModeResult result, MachineTrace trace, boolean[] flag, int steps, int trainSamples) {
+        boolean previousFalseAlarm = false;
         for (int t = trainSamples; t < steps; t++) {
-            boolean actualAnomaly = trace.rows.get(t).label == 1;
+            TraceRow row = trace.rows.get(t);
+            boolean actualAnomaly = row.label == 1;
+            boolean benign = TraceRow.CATEGORY_BENIGN.equals(row.category);
+            boolean falseAlarm = !actualAnomaly && flag[t];
+
             if (actualAnomaly && flag[t]) {
                 result.truePositives++;
             } else if (actualAnomaly) {
@@ -196,9 +268,32 @@ public class ExperimentEngine {
             } else {
                 result.trueNegatives++;
             }
+
+            if (actualAnomaly) {
+                ModeResult.ScenarioStats stats = result.scenario(row.scenario);
+                stats.samples++;
+                if (flag[t]) {
+                    stats.detectedSamples++;
+                }
+            } else if (benign) {
+                result.benignSamples++;
+                if (flag[t]) {
+                    result.falsePositivesBenign++;
+                }
+            } else {
+                result.normalSamples++;
+                if (flag[t]) {
+                    result.falsePositivesNormal++;
+                }
+            }
+
+            if (falseAlarm && !previousFalseAlarm) {
+                result.falseAlarmEpisodes++;
+            }
+            previousFalseAlarm = falseAlarm;
         }
 
-        // Từng đoạn gian lận liên tiếp: phát hiện nếu có báo ít nhất một lần trong đoạn đó.
+        // Từng đoạn bất thường liên tiếp: phát hiện nếu có báo ít nhất một lần trong đoạn đó.
         int t = trainSamples;
         while (t < steps) {
             if (trace.rows.get(t).label != 1) {
@@ -206,15 +301,19 @@ public class ExperimentEngine {
                 continue;
             }
             int start = t;
+            String scenario = trace.rows.get(t).scenario;
             while (t < steps && trace.rows.get(t).label == 1) {
                 t++;
             }
             int end = t - 1;
             result.totalWindows++;
+            result.scenario(scenario).windows++;
             for (int i = start; i <= end; i++) {
                 if (flag[i]) {
                     result.detectedWindows++;
                     result.totalDelaySamples += i - start;
+                    result.scenario(scenario).detectedWindows++;
+                    result.scenario(scenario).totalDelaySamples += i - start;
                     break;
                 }
             }

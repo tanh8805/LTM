@@ -1,0 +1,10 @@
+{
+  "description": "Chia tập dữ liệu được CỐ ĐỊNH TRƯỚC khi thu bất kỳ trace nào và trước khi chạy bất kỳ đánh giá nào. Validation chỉ dùng để chọn/hiệu chỉnh tham số; test chỉ dùng để báo cáo kết quả cuối, không bao giờ để chỉnh tham số.",
+  "defined_before_collection": true,
+  "validation": ["normal_04", "cpu_02", "network_02", "memory_02", "process_02"],
+  "test": ["normal_01", "normal_02", "normal_03", "cpu_01", "network_01", "memory_01", "process_01", "mixed_01", "application_01", "focus_01"],
+  "report_separately": {
+    "focus_01": "focusLostCount là bộ đếm tích lũy do FocusProbe (cửa sổ Swing thật dưới Xvfb) tạo ra: sau đợt mất focus, giá trị vẫn cao hơn baseline nên các mẫu sau sự kiện có phân phối khác dù nhãn là bình thường. Vì vậy không gộp vào số liệu tổng."
+  },
+  "labeling": "Nhãn không nằm trong CSV số liệu. Mẫu thuộc sự kiện nếu điểm giữa khoảng đo (time - 5s) nằm trong [startTime, endTime) của sự kiện trong <trace>.events.json. category=anomaly là kịch bản bất thường HỆ THỐNG có kiểm soát (KHÔNG phải gian lận); category=benign là hoạt động ứng dụng bình thường (không phải bất thường)."
+}

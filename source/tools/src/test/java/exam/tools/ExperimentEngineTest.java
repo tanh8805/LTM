@@ -235,7 +235,7 @@ class ExperimentEngineTest {
         List<String> lines = Files.readAllLines(out);
         assertEquals(3, lines.size());
         assertTrue(lines.get(0).startsWith("mode,precision,recall,f1,fpr"));
-        assertTrue(lines.get(1).startsWith("IF,0.8000,0.8000,0.8000,0.0222,8,2,2,88,3,3,2.00"));
+        assertTrue(lines.get(1).startsWith("IF,0.8000,0.8000,0.8000,0.0222,8,2,2,88,0,0,0,0,0,3,3,2.00"));
         assertTrue(lines.get(2).contains("boom; boom"), "dấu phẩy trong lý do không được làm hỏng CSV");
         assertTrue(table.contains("SKIPPED"));
         assertTrue(table.contains("IF"));
