@@ -1,0 +1,42 @@
+{
+  "sessionId": "network_01",
+  "plan": "network",
+  "events": [
+    {
+      "id": "network_load-1",
+      "type": "NETWORK_LOAD",
+      "category": "anomaly",
+      "startTime": 1791428325275,
+      "endTime": 1791428415275,
+      "params": {
+        "streams": 1,
+        "rateKbPerStream": 300,
+        "urls": [
+          "https://files.pythonhosted.org/packages/4a/9e/4e7a07fd0776dc2210cdacf2010be8665194d094defc10c419d7dea794cc/numpy-2.5.3-cp315-cp315t-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl",
+          "https://registry.npmjs.org/typescript/-/typescript-5.4.5.tgz",
+          "https://proxy.golang.org/golang.org/x/net/@v/v0.24.0.zip",
+          "https://pypi.org/simple/pandas/"
+        ]
+      },
+      "description": "NETWORK_LOAD; planned offset 360s, duration 90s"
+    },
+    {
+      "id": "network_load-2",
+      "type": "NETWORK_LOAD",
+      "category": "anomaly",
+      "startTime": 1791428535275,
+      "endTime": 1791428625276,
+      "params": {
+        "streams": 4,
+        "rateKbPerStream": 1000,
+        "urls": [
+          "https://files.pythonhosted.org/packages/4a/9e/4e7a07fd0776dc2210cdacf2010be8665194d094defc10c419d7dea794cc/numpy-2.5.3-cp315-cp315t-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl",
+          "https://registry.npmjs.org/typescript/-/typescript-5.4.5.tgz",
+          "https://proxy.golang.org/golang.org/x/net/@v/v0.24.0.zip",
+          "https://pypi.org/simple/pandas/"
+        ]
+      },
+      "description": "NETWORK_LOAD; planned offset 570s, duration 90s"
+    }
+  ]
+}

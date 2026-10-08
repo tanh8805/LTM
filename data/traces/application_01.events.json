@@ -1,0 +1,38 @@
+{
+  "sessionId": "application_01",
+  "plan": "application",
+  "events": [
+    {
+      "id": "application_activity-1",
+      "type": "APPLICATION_ACTIVITY",
+      "category": "benign",
+      "startTime": 1791432997330,
+      "endTime": 1791433087332,
+      "params": {
+        "tasks": [
+          "javac",
+          "tar+gzip",
+          "find",
+          "python"
+        ]
+      },
+      "description": "APPLICATION_ACTIVITY; planned offset 360s, duration 90s"
+    },
+    {
+      "id": "application_activity-2",
+      "type": "APPLICATION_ACTIVITY",
+      "category": "benign",
+      "startTime": 1791433207330,
+      "endTime": 1791433297332,
+      "params": {
+        "tasks": [
+          "javac",
+          "tar+gzip",
+          "find",
+          "python"
+        ]
+      },
+      "description": "APPLICATION_ACTIVITY; planned offset 570s, duration 90s"
+    }
+  ]
+}

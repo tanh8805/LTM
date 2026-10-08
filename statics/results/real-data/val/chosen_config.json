@@ -1,0 +1,35 @@
+{
+  "max_fpr_constraint": 0.02,
+  "objective": "max F1 subject to FPR <= max_fpr on validation",
+  "selected": {
+    "experiment_id": "V011",
+    "detector": "IF",
+    "config": {
+      "if_margin": 0.0,
+      "if_consecutive": 3,
+      "ch_consecutive": 3,
+      "ch_widen": 1.0,
+      "ch_floor_std_k": 0.0,
+      "ch_min_metrics": 1
+    },
+    "validation_f1": 0.17500000000000002,
+    "validation_result": {
+      "tp": 7,
+      "fp": 1,
+      "fn": 65,
+      "tn": 161,
+      "precision": 0.875,
+      "recall": 0.09722222222222222,
+      "f1": 0.17500000000000002,
+      "fpr": 0.006172839506172839,
+      "fp_episodes": 1,
+      "windows": 8,
+      "windows_detected": 1,
+      "avg_delay_samples": 2.0,
+      "fp_normal": 1,
+      "normal_samples": 162,
+      "fp_benign": 0,
+      "benign_samples": 0
+    }
+  }
+}

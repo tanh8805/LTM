@@ -1,0 +1,81 @@
+{
+  "sessionId": "mixed_01",
+  "plan": "mixed",
+  "events": [
+    {
+      "id": "mixed_load-1",
+      "type": "MIXED_LOAD",
+      "category": "anomaly",
+      "startTime": 1791431460020,
+      "endTime": 1791431550025,
+      "params": {
+        "parts": [
+          {
+            "CpuLoad": {
+              "cores": 1
+            }
+          },
+          {
+            "NetworkLoad": {
+              "streams": 1,
+              "rateKbPerStream": 300,
+              "urls": [
+                "https://files.pythonhosted.org/packages/4a/9e/4e7a07fd0776dc2210cdacf2010be8665194d094defc10c419d7dea794cc/numpy-2.5.3-cp315-cp315t-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl",
+                "https://registry.npmjs.org/typescript/-/typescript-5.4.5.tgz",
+                "https://proxy.golang.org/golang.org/x/net/@v/v0.24.0.zip",
+                "https://pypi.org/simple/pandas/"
+              ]
+            }
+          },
+          {
+            "ProcessChurn": {
+              "sleepingProcesses": 30,
+              "churnPerSecond": 2
+            }
+          }
+        ]
+      },
+      "description": "MIXED_LOAD; planned offset 360s, duration 90s"
+    },
+    {
+      "id": "mixed_load-2",
+      "type": "MIXED_LOAD",
+      "category": "anomaly",
+      "startTime": 1791431670020,
+      "endTime": 1791431760081,
+      "params": {
+        "parts": [
+          {
+            "CpuLoad": {
+              "cores": 2
+            }
+          },
+          {
+            "NetworkLoad": {
+              "streams": 2,
+              "rateKbPerStream": 1000,
+              "urls": [
+                "https://files.pythonhosted.org/packages/4a/9e/4e7a07fd0776dc2210cdacf2010be8665194d094defc10c419d7dea794cc/numpy-2.5.3-cp315-cp315t-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl",
+                "https://registry.npmjs.org/typescript/-/typescript-5.4.5.tgz",
+                "https://proxy.golang.org/golang.org/x/net/@v/v0.24.0.zip",
+                "https://pypi.org/simple/pandas/"
+              ]
+            }
+          },
+          {
+            "ProcessChurn": {
+              "sleepingProcesses": 100,
+              "churnPerSecond": 2
+            }
+          },
+          {
+            "MemoryLoad": {
+              "megabytes": 1500
+            }
+          }
+        ]
+      },
+      "description": "MIXED_LOAD; planned offset 570s, duration 90s"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "sessionId": "focus_01",
+  "plan": "focus",
+  "events": [
+    {
+      "id": "focus_loss-1",
+      "type": "FOCUS_LOSS",
+      "category": "anomaly",
+      "startTime": 1791433799540,
+      "endTime": 1791433889540,
+      "params": {
+        "everySeconds": 8,
+        "mechanism": "Swing WindowFocusListener under Xvfb",
+        "commandsSent": 12
+      },
+      "description": "FOCUS_LOSS; planned offset 360s, duration 90s"
+    },
+    {
+      "id": "focus_loss-2",
+      "type": "FOCUS_LOSS",
+      "category": "anomaly",
+      "startTime": 1791434009540,
+      "endTime": 1791434099540,
+      "params": {
+        "everySeconds": 4,
+        "mechanism": "Swing WindowFocusListener under Xvfb",
+        "commandsSent": 23
+      },
+      "description": "FOCUS_LOSS; planned offset 570s, duration 90s"
+    }
+  ]
+}

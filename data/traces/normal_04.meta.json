@@ -1,0 +1,15 @@
+{
+  "sessionId": "normal_04",
+  "machineId": "LOCAL",
+  "scenario": "normal",
+  "intervalSeconds": 10,
+  "startTime": 1791434238363,
+  "endTime": 1791434958368,
+  "samples": 72,
+  "source": "OSHI LINUX",
+  "focusProbe": false,
+  "osName": "Linux 6.18.44-fc-v80",
+  "cpuCores": 4,
+  "java": "21.0.12.1",
+  "totalMemoryMb": 16094
+}

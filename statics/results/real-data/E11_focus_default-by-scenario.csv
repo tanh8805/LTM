@@ -1,0 +1,6 @@
+mode,scenario,samples,detectedSamples,windows,detectedWindows,avgDelaySamples
+NONE,FOCUS_LOSS,18,0,2,0,
+IF,FOCUS_LOSS,18,0,2,0,
+CHRONOS,FOCUS_LOSS,18,1,2,1,8.00
+BOTH_OR,FOCUS_LOSS,18,1,2,1,8.00
+BOTH_AND,FOCUS_LOSS,18,0,2,0,

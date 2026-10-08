@@ -1,0 +1,6 @@
+mode,precision,recall,f1,fpr,tp,fp,fn,tn,falseAlarmEpisodes,fpNormal,normalSamples,fpBenign,benignSamples,windowsDetected,windowsTotal,avgDelaySamples,timeMs,skipped
+NONE,0.0000,0.0000,0.0000,0.0000,0,0,72,162,0,0,162,0,0,0,8,,0,
+IF,0.0000,0.0000,0.0000,0.0000,0,0,72,162,0,0,162,0,0,0,8,,37,
+CHRONOS,0.4286,0.0417,0.0759,0.0247,3,4,69,158,3,4,162,0,0,1,8,0.00,3102,
+BOTH_OR,0.4286,0.0417,0.0759,0.0247,3,4,69,158,3,4,162,0,0,1,8,0.00,3139,
+BOTH_AND,0.0000,0.0000,0.0000,0.0000,0,0,72,162,0,0,162,0,0,0,8,,3139,

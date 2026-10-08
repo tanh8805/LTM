@@ -1,0 +1,13 @@
+metric,group,n,coverage_in_q10_q90,zero_width_fraction,median_width,median_abs_error_q50
+kbSent,normal,162,0.8086,0.0000,0.2799,0.0925
+kbSent,anomaly,72,0.8472,0.0000,0.2874,0.1095
+kbReceived,normal,162,0.7407,0.0000,0.1591,0.0535
+kbReceived,anomaly,72,0.7361,0.0000,0.1561,0.0562
+connectionCount,normal,162,0.9506,0.1852,0.0000,0.0000
+connectionCount,anomaly,72,0.9306,0.2500,0.0000,0.0000
+distinctDestinationCount,normal,162,0.9506,0.2160,0.0000,0.0000
+distinctDestinationCount,anomaly,72,0.9722,0.2222,0.0000,0.0000
+cpuPercent,normal,162,0.7901,0.0000,0.3038,0.0809
+cpuPercent,anomaly,72,0.7500,0.0000,0.6014,0.2426
+ramPercent,normal,162,0.9012,0.0000,0.0409,0.0076
+ramPercent,anomaly,72,0.8333,0.0000,0.0811,0.0196

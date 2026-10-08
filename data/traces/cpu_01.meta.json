@@ -1,0 +1,15 @@
+{
+  "sessionId": "cpu_01",
+  "machineId": "LOCAL",
+  "scenario": "cpu",
+  "intervalSeconds": 10,
+  "startTime": 1791427166475,
+  "endTime": 1791427946487,
+  "samples": 78,
+  "source": "OSHI LINUX",
+  "focusProbe": false,
+  "osName": "Linux 6.18.44-fc-v80",
+  "cpuCores": 4,
+  "java": "21.0.12.1",
+  "totalMemoryMb": 16094
+}

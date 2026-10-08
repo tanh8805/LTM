@@ -1,0 +1,15 @@
+{
+  "sessionId": "mixed_01",
+  "machineId": "LOCAL",
+  "scenario": "mixed",
+  "intervalSeconds": 10,
+  "startTime": 1791431099982,
+  "endTime": 1791431879987,
+  "samples": 78,
+  "source": "OSHI LINUX",
+  "focusProbe": false,
+  "osName": "Linux 6.18.44-fc-v80",
+  "cpuCores": 4,
+  "java": "21.0.12.1",
+  "totalMemoryMb": 16094
+}

@@ -1,0 +1,15 @@
+{
+  "sessionId": "focus_01",
+  "machineId": "LOCAL",
+  "scenario": "focus",
+  "intervalSeconds": 10,
+  "startTime": 1791433439490,
+  "endTime": 1791434219504,
+  "samples": 78,
+  "source": "OSHI LINUX",
+  "focusProbe": true,
+  "osName": "Linux 6.18.44-fc-v80",
+  "cpuCores": 4,
+  "java": "21.0.12.1",
+  "totalMemoryMb": 16094
+}

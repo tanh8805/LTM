@@ -1,0 +1,28 @@
+{
+  "sessionId": "memory_01",
+  "plan": "memory",
+  "events": [
+    {
+      "id": "memory_load-1",
+      "type": "MEMORY_LOAD",
+      "category": "anomaly",
+      "startTime": 1791429862691,
+      "endTime": 1791429952756,
+      "params": {
+        "megabytes": 1500
+      },
+      "description": "MEMORY_LOAD; planned offset 360s, duration 90s"
+    },
+    {
+      "id": "memory_load-2",
+      "type": "MEMORY_LOAD",
+      "category": "anomaly",
+      "startTime": 1791430072691,
+      "endTime": 1791430162859,
+      "params": {
+        "megabytes": 4000
+      },
+      "description": "MEMORY_LOAD; planned offset 570s, duration 90s"
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "sessionId": "cpu_02",
+  "plan": "cpu",
+  "events": [
+    {
+      "id": "cpu_load-1",
+      "type": "CPU_LOAD",
+      "category": "anomaly",
+      "startTime": 1791435337085,
+      "endTime": 1791435427085,
+      "params": {
+        "cores": 1
+      },
+      "description": "CPU_LOAD; planned offset 360s, duration 90s"
+    },
+    {
+      "id": "cpu_load-2",
+      "type": "CPU_LOAD",
+      "category": "anomaly",
+      "startTime": 1791435547085,
+      "endTime": 1791435637090,
+      "params": {
+        "cores": 4
+      },
+      "description": "CPU_LOAD; planned offset 570s, duration 90s"
+    }
+  ]
+}

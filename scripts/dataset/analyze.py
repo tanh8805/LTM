@@ -315,7 +315,7 @@ def log_row(log_path, experiment_id, split, stage, detector, changed, config, re
 # Mỗi yếu tố được thử MỘT mình quanh cấu hình mặc định.
 FACTORS = [
     ("if_consecutive", [1, 2, 3, 4, 5]),
-    ("if_margin", [0.0, 0.025, 0.05, 0.1, 0.15]),
+    ("if_margin", [-0.1, -0.05, 0.0, 0.025, 0.05, 0.1, 0.15]),
     ("ch_consecutive", [1, 2, 3, 4, 5, 6]),
     ("ch_widen", [1.0, 1.5, 2.0, 3.0]),
     ("ch_floor_std_k", [0.0, 1.0, 2.0, 3.0]),

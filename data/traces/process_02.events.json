@@ -1,0 +1,30 @@
+{
+  "sessionId": "process_02",
+  "plan": "process",
+  "events": [
+    {
+      "id": "process_churn-1",
+      "type": "PROCESS_CHURN",
+      "category": "anomaly",
+      "startTime": 1791437733508,
+      "endTime": 1791437823515,
+      "params": {
+        "sleepingProcesses": 40,
+        "churnPerSecond": 2
+      },
+      "description": "PROCESS_CHURN; planned offset 360s, duration 90s"
+    },
+    {
+      "id": "process_churn-2",
+      "type": "PROCESS_CHURN",
+      "category": "anomaly",
+      "startTime": 1791437943508,
+      "endTime": 1791438033543,
+      "params": {
+        "sleepingProcesses": 200,
+        "churnPerSecond": 2
+      },
+      "description": "PROCESS_CHURN; planned offset 570s, duration 90s"
+    }
+  ]
+}
