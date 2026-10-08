@@ -20,7 +20,7 @@ Toàn bộ chức năng trong bảng dưới đây đã được cài đặt và
 
 | Việc còn lại | Người | Vì sao chưa xong |
 |---|---|---|
-| **N4-05 / N4-14 / N4-15**: chạy Chronos-Bolt **thật**, so sánh với số liệu thật, chọn `ml.mode` mặc định (hiện `NONE`) | Nguoi4 | Môi trường phát triển chặn `huggingface.co` nên chưa tải được trọng số. Đường ống đã kiểm thử bằng model khởi tạo ngẫu nhiên và backend `naive`. Số liệu mô phỏng ở `statics/results/` chỉ có phần Isolation Forest là thật (xem `statics/results/README.md`) |
+| **N4-15**: chọn `ml.mode` mặc định (hiện `NONE`) | Nguoi4 | Chronos-Bolt thật đã chạy (N4-05 xong, N4-14 có bảng trên trace mô phỏng) nhưng kết quả mô phỏng kém và không phản ánh phòng thi thật; cần trace thật. Xem `statics/results/README.md` |
 | **Thu trace thật** bằng `Recorder` trên máy thật / baseline phòng thi | Nguoi3, Nguoi4 | Cần máy thật và thời gian đo; hiện mới có `data/traces/sim.csv` (mô phỏng) |
 | **N1-03 / N1-04 ở mức 500 client đăng nhập thật** | Nguoi1 | Đã có test 40 client đăng nhập đồng thời và 500 connection nhàn rỗi (client mới vẫn đăng nhập trong ~100 ms). Chương trình tạo tải 500 client đã đăng nhập chưa viết |
 | **Phần báo cáo (d)** và slide | cả nhóm | Chưa viết (`report/` trống) |

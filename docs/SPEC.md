@@ -162,8 +162,8 @@ File `config/ml.properties`, khóa `ml.mode`:
 | `BOTH_OR` | Đáng ngờ nếu IF **hoặc** Chronos báo bất thường |
 | `BOTH_AND` | Đáng ngờ nếu IF **và** Chronos cùng báo bất thường |
 
-Mặc định vẫn là `NONE` vì chưa có số liệu Chronos-Bolt thật để chọn (xem `statics/results/README.md`).
-Sau khi chạy `exam.tools.ExperimentRunner` với Chronos thật, Nguoi4 chọn giá trị tốt nhất và sửa `config/ml.properties` (`TODO(Nguoi4)` ở file đó).
+Mặc định vẫn là `NONE` vì chưa có trace thật để chọn (xem `statics/results/README.md`).
+Sau khi chạy `exam.tools.ExperimentRunner` trên trace thật, Nguoi4 chọn giá trị tốt nhất và sửa `config/ml.properties` (`TODO(Nguoi4)` ở file đó).
 Khi đáng ngờ, Server đặt cảnh báo **VÀNG** với lý do bắt đầu bằng `ML (<mode>)` cho giáo viên.
 
 ## 14. Dữ liệu mẫu (SQLite)
@@ -193,9 +193,9 @@ Recorder/Simulator/ExperimentRunner, giao diện Swing Teacher/Student, kịch b
 
 **Hạn chế đã biết (không phải lỗi chưa làm):**
 
-- **Chưa chạy với trọng số Chronos-Bolt thật** (môi trường phát triển chặn `huggingface.co`). Đường ống đã kiểm thử đầy đủ với model Chronos khởi tạo ngẫu nhiên
-  và với backend `naive`; số liệu Chronos trong `statics/results/` là của backend `naive`, chỉ để kiểm thử đường ống.
+- Chronos-Bolt tiny thật đã chạy được (ml-service nạp model, e2e 52/52 với model thật), nhưng **trên trace mô phỏng** nó phát hiện kém (recall 0.03, FPR 4.7%).
+  Chưa có trace thật nên chưa kết luận được mode nào tốt (xem `statics/results/README.md`).
 - Isolation Forest theo đúng luật của đề có recall thấp trên dữ liệu mô phỏng (mục 8).
-- `ml.mode` mặc định `NONE` cho tới khi có số liệu Chronos thật (`TODO(Nguoi4)`).
+- `ml.mode` mặc định `NONE` cho tới khi có trace thật để chọn mode (`TODO(Nguoi4)`).
 - Đường truyền là TCP thuần (không TLS) theo quyết định thiết kế của nhóm; mật khẩu chỉ được bảo vệ ở phía lưu trữ (hash).
 - Các nhận diện GitHub `@REPLACE-ME-NGUOI1/3/4` trong `.github/CODEOWNERS` chưa điền vì chưa biết tài khoản.
