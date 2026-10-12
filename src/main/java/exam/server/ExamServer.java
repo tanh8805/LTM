@@ -8,8 +8,11 @@ import exam.common.Protocol;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -64,6 +67,7 @@ public class ExamServer {
     });
     private Consumer<String> listener;
     private ServerSocket serverSocket;
+    private DatagramSocket udpSocket;
     private Path resultsFile = Path.of("results.csv");
     private JsonObject exam;
     private JsonArray publicQuestions;         // bản sao câu hỏi không có "answer"
@@ -123,10 +127,42 @@ public class ExamServer {
         }
     }
 
+    /** Luồng daemon trả lời EXAM_DISCOVER bằng EXAM_SERVER <cổng TCP> về đúng người gửi. */
+    public void startDiscovery(int udpPort) throws SocketException {
+        udpSocket = new DatagramSocket(udpPort);
+        Thread t = new Thread(this::discoveryLoop, "udp-discovery");
+        t.setDaemon(true);
+        t.start();
+        log("Server lắng nghe UDP cổng " + udpPort);
+    }
+
+    private void discoveryLoop() {
+        DatagramSocket socket = udpSocket;
+        byte[] buf = new byte[256];
+        while (!socket.isClosed()) {
+            try {
+                DatagramPacket p = new DatagramPacket(buf, buf.length);
+                socket.receive(p);
+                String text = new String(p.getData(), 0, p.getLength(), StandardCharsets.UTF_8).trim();
+                if (text.equals(Protocol.DISCOVER)) {
+                    byte[] reply = (Protocol.SERVER_REPLY + " " + tcpPort()).getBytes(StandardCharsets.UTF_8);
+                    socket.send(new DatagramPacket(reply, reply.length, p.getAddress(), p.getPort()));
+                }
+            } catch (IOException e) {
+                if (!socket.isClosed()) {
+                    log("Lỗi UDP: " + e.getMessage());
+                }
+            }
+        }
+    }
+
     public void stop() {
         scheduler.shutdownNow();
         synchronized (this) {
             closeQuietly(serverSocket);
+            if (udpSocket != null) {
+                udpSocket.close();
+            }
             for (Session s : sessions.values()) {
                 closeQuietly(s.socket);
             }
