@@ -1,4 +1,4 @@
-// Một luồng cho mỗi kết nối: đọc từng dòng JSON, kiểm tra trường rồi chuyển cho ExamServer xử lý.
+// Một luồng cho mỗi kết nối: đọc từng dòng JSON, kiểm tra trường rồi chuyển cho ExamServer xử lý (Người 3).
 package exam.server;
 
 import com.google.gson.JsonArray;

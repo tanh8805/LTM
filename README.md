@@ -27,13 +27,24 @@ Client chỉ phát hiện và báo cáo: không chặn mạng, không kill tiế
 
 ## 2. Phân công
 
-| Người | File | Cần hiểu |
-|---|---|---|
-| Cả nhóm | `src/main/java/exam/common/Protocol.java` | - Mỗi tin nhắn là một dòng JSON, luôn có `type`<br>- Gson tự escape ký tự xuống dòng nên không bao giờ vỡ dòng |
-| Người 1 | `StudentApp.java`, `ServerConnection.java`, `ServerFinder.java` | - Luồng màn hình: đăng nhập, PRECHECK, chờ, làm bài, kết quả<br>- Tự kết nối lại mỗi 5 giây và đăng nhập lại; vì sao chỉ tính "rời cửa sổ" khi `getOppositeWindow() == null`<br>- Tìm server bằng UDP broadcast tới từng card mạng |
-| Người 2 | `Monitor.java` | - Baseline lấy ở PRECHECK, so sánh mỗi 3 giây; vì sao cần `SYSTEM_PROCESSES`<br>- 6 feature mỗi 30 giây và cách reset cửa sổ<br>- Tách phần lấy dữ liệu (chạy lệnh) khỏi `processSnapshot` để test được trên Linux |
-| Người 3 | `ExamServer.java`, `ClientHandler.java`, `TeacherWindow.java` | - `Session` giữ trạng thái khi mất kết nối; `trySendExam` là điểm gửi đề duy nhất<br>- Chống nhầm session cũ và mới (so sánh socket); watchdog 90 giây<br>- Chấm điểm, `results.csv` (UTF-8 có BOM) |
-| Người 4 | `MlClient.java`, `ml/ml_service.py`, `ml/simulate_clients.py` | - Isolation Forest không giám sát, fit trên chính dữ liệu buổi thi; điểm chuẩn hoá min-max và 3 cửa sổ gần nhất<br>- Vì sao `anomaly` có thêm điều kiện điểm ≥ 0.7 (xem mục 9)<br>- Gọi HTTP ngoài khối `synchronized` để ML chậm không treo server |
+| Người | File | Mảng phụ trách | Cần hiểu |
+|---|---|---|---|
+| Cả nhóm | `exam/common/Protocol.java` | Giao thức chung | - Mỗi tin nhắn là một dòng JSON, luôn có `type`<br>- Gson tự escape ký tự xuống dòng nên không bao giờ vỡ dòng |
+| 1 | `StudentApp`, `StudentScreens`, `ServerConnection`, `ServerFinder` | Client sinh viên: kết nối TCP, tìm server UDP, giao diện làm bài | - Luồng màn hình: đăng nhập, PRECHECK, chờ, làm bài, kết quả<br>- Tự kết nối lại mỗi 5 giây và đăng nhập lại; vì sao chỉ tính "rời cửa sổ" khi `getOppositeWindow() == null`<br>- Tìm server bằng UDP broadcast tới từng card mạng |
+| 2 | `Monitor`, `WindowsProbe`, `TeacherWindow`, `config/rules.json` | Giám sát: phát hiện vi phạm ở client và hiển thị cho giám thị | - Baseline lấy ở PRECHECK, so sánh mỗi 3 giây; vì sao cần `SYSTEM_PROCESSES`<br>- 6 feature mỗi 30 giây và cách reset cửa sổ<br>- `WindowsProbe` chạy lệnh Windows; `Monitor` chỉ chứa luật nên test được trên Linux |
+| 3 | `ExamServer`, `ExamRoom`, `Session`, `ExamFile`, `ClientHandler` | Server: nhận kết nối, luật phòng thi, chấm điểm, lưu kết quả | - `ExamRoom` giữ mọi trạng thái và mọi phương thức đổi trạng thái đều `synchronized`; `trySendExam` là điểm gửi đề duy nhất<br>- Chống nhầm session cũ và mới (so sánh socket); watchdog 90 giây<br>- Chấm điểm, `results.csv` (UTF-8 có BOM) |
+| 4 | `ml/ml_service.py`, `ml/simulate_clients.py`, `MlClient` | ML: Isolation Forest, giả lập phòng thi, nối Java với Python | - Isolation Forest không giám sát, fit trên chính dữ liệu buổi thi; điểm chuẩn hoá min-max và 3 cửa sổ gần nhất<br>- Vì sao `anomaly` có thêm điều kiện điểm ≥ 0.7 (xem mục 9)<br>- Gọi HTTP ngoài khối `synchronized` để ML chậm không treo server |
+
+Cấu trúc mã nguồn (mỗi file Java trong `src/main` dài tối đa 220 dòng):
+
+```
+src/main/java/exam/
+  common/   Protocol
+  client/   StudentApp  StudentScreens  ServerConnection  ServerFinder  Monitor  WindowsProbe
+  server/   ExamServer  ExamRoom  Session  ExamFile  ClientHandler  TeacherWindow  MlClient
+ml/         ml_service.py  simulate_clients.py  test_ml_service.py
+config/     rules.json        exams/   sample_exam.json
+```
 
 ## 3. Giao thức
 
@@ -120,14 +131,22 @@ Phần quét tiến trình, mạng, USB chỉ chạy trên Windows nên chưa ki
 - [ ] Tắt Wi-Fi rồi bật lại: client báo "Mất kết nối, đang thử lại...", tự vào lại, giữ đáp án, thời gian còn lại đúng.
 - [ ] Tìm server qua UDP (để trống ô IP), kể cả máy có ZeroTier (nhiều card mạng).
 - [ ] Nhập IP server thủ công.
-- [ ] Windows ngôn ngữ khác tiếng Anh: `netstat -no` in trạng thái `ESTABLISHED` bằng chữ gì (luật NET đang đọc chữ tiếng Anh).
+- [ ] Windows ngôn ngữ khác tiếng Anh: luật NET vẫn bắt được kết nối tới tên miền bị cấm (parser không đọc cột trạng thái, chỉ cần `netstat -no` có đúng 5 cột).
 
 ## 9. Giới hạn đã biết
 
-- **Luật NET không bắt được 100%:** tên miền được phân giải một lần lúc bắt đầu thi; trang dùng CDN đổi IP sẽ lọt. Trạng thái kết nối được đọc theo chữ tiếng Anh của `netstat`.
+- **Luật NET không bắt được 100%:** tên miền được phân giải một lần lúc bắt đầu thi; trang dùng CDN đổi IP sẽ lọt. Cột trạng thái của `netstat` không được đọc (để chạy được trên Windows mọi ngôn ngữ) nên cả kết nối đã đóng (`TIME_WAIT`) cũng được tính.
 - **Isolation Forest chỉ phát hiện "khác số đông"**, không biết ai gian lận. Giao diện chỉ ghi "Bất thường"; giám thị quyết định.
-- **Điều kiện `anomaly` khác đặc tả gốc:** `predict() == -1` của Isolation Forest gắn cờ 25-88% sinh viên bình thường khi feature là số đếm nhỏ, nên service chỉ đánh dấu khi điểm chuẩn hoá cũng ≥ 0.7 (`FLAG_MIN_SCORE` trong `ml/ml_service.py`; chi tiết và số liệu ở PR Task 8). Điểm chuẩn hoá là tương đối theo phòng, nên phòng không có ai lệch vẫn có thể có vài máy ở dải cao nhất bị đánh dấu.
+- **Điều kiện `anomaly` khác đặc tả gốc:** `predict() == -1` của Isolation Forest gắn cờ 25-88% sinh viên bình thường khi feature là số đếm nhỏ, nên service chỉ đánh dấu khi điểm chuẩn hoá cũng ≥ 0.7 (`FLAG_MIN_SCORE = 0.7` trong `ml/ml_service.py`; chi tiết và số liệu ở PR Task 8). Điểm chuẩn hoá là tương đối theo phòng, nên phòng không có ai lệch vẫn có thể có vài máy ở dải cao nhất bị đánh dấu.
 - **Đáp án chỉ lưu trong bộ nhớ client:** rớt mạng mà không tắt app thì vẫn giữ; tắt hẳn app thì mất.
 - **Chưa có xác thực và mã hoá:** mã SV không có mật khẩu, kết nối TCP/UDP không mã hoá. Chỉ dùng trong mạng tin cậy.
 - **Phụ thuộc cấu hình Windows:** cần PowerShell và `tasklist`/`netstat` có sẵn (mặc định đều có).
-- **Kích thước file:** `ExamServer.java`, `Monitor.java`, `StudentApp.java` dài hơn giới hạn 250 dòng của đặc tả vì API bắt buộc nằm hết trong một file; cần nhóm quyết định có tách file hay chấp nhận.
+
+## 10. Hướng dẫn đọc code
+
+Mỗi người có một file hướng dẫn riêng (phụ trách gì, thứ tự đọc, lần theo một luồng chạy thật, kiến thức để trả lời thầy, 3 câu thầy có thể hỏi và cách sửa):
+
+- [Người 1: client sinh viên](docs/huong-dan-doc-code/nguoi-1.md)
+- [Người 2: giám sát và giao diện giám thị](docs/huong-dan-doc-code/nguoi-2.md)
+- [Người 3: server và phòng thi](docs/huong-dan-doc-code/nguoi-3.md)
+- [Người 4: ML và giả lập](docs/huong-dan-doc-code/nguoi-4.md)

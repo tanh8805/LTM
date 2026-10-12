@@ -1,4 +1,4 @@
-// Tìm server trong LAN bằng UDP broadcast: gửi EXAM_DISCOVER, nhận EXAM_SERVER <cổng TCP>.
+// Tìm server trong LAN bằng UDP broadcast: gửi EXAM_DISCOVER, nhận EXAM_SERVER <cổng TCP> (Người 1).
 package exam.client;
 
 import exam.common.Protocol;
