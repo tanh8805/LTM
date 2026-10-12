@@ -7,7 +7,9 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import exam.common.Protocol;
+import exam.server.ExamRoom;
 import exam.server.ExamServer;
+import exam.server.Session;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -98,10 +100,10 @@ class ExamServerTest {
         rules.add("blacklistApps", black);
         server = new ExamServer(rules);
         resultsFile = tmp.resolve("results.csv");
-        server.setResultsFile(resultsFile);
+        server.room().setResultsFile(resultsFile);
         Path exam = tmp.resolve("exam.json");
         Files.writeString(exam, EXAM_JSON, StandardCharsets.UTF_8);
-        server.loadExam(exam);
+        server.room().loadExam(exam);
         server.start(0);
     }
 
@@ -144,8 +146,8 @@ class ExamServerTest {
     private TestClient loginAndStart(String id) throws IOException {
         TestClient c = login(id);
         precheck(c, true);
-        if (!server.isStarted()) {
-            server.startExam();
+        if (!server.room().isStarted()) {
+            server.room().startExam();
         }
         c.next(Protocol.EXAM_START, 2000);
         return c;
@@ -161,8 +163,8 @@ class ExamServerTest {
         return c.next(Protocol.RESULT, 2000);
     }
 
-    private ExamServer.Row row(String id) {
-        for (ExamServer.Row r : server.rows()) {
+    private ExamRoom.Row row(String id) {
+        for (ExamRoom.Row r : server.room().rows()) {
             if (r.studentId().equals(id)) {
                 return r;
             }
@@ -173,7 +175,7 @@ class ExamServerTest {
     private boolean waitStatus(String id, String status, int ms) throws InterruptedException {
         long deadline = System.currentTimeMillis() + ms;
         while (System.currentTimeMillis() < deadline) {
-            ExamServer.Row r = row(id);
+            ExamRoom.Row r = row(id);
             if (r != null && r.status().equals(status)) {
                 return true;
             }
@@ -209,7 +211,7 @@ class ExamServerTest {
     @Test
     void examNotSentBeforePrecheck() throws IOException {
         TestClient c = login("S1");
-        server.startExam();
+        server.room().startExam();
         assertNull(c.tryNext(Protocol.EXAM_START, 500));
         precheck(c, true);
         assertNotNull(c.next(Protocol.EXAM_START, 2000));
@@ -219,7 +221,7 @@ class ExamServerTest {
     void examQuestionsHaveNoAnswers() throws IOException {
         TestClient c = login("S1");
         precheck(c, true);
-        server.startExam();
+        server.room().startExam();
         JsonObject start = c.next(Protocol.EXAM_START, 2000);
         JsonArray qs = start.getAsJsonArray("questions");
         assertEquals(2, qs.size());
@@ -258,7 +260,7 @@ class ExamServerTest {
     void reconnectGetsExamWithRemainingTime() throws Exception {
         TestClient c = loginAndStart("S1");
         c.close();
-        assertTrue(waitStatus("S1", ExamServer.ST_DISCONNECTED, 2000));
+        assertTrue(waitStatus("S1", Session.ST_DISCONNECTED, 2000));
         JsonObject start = loginAgainForExam("S1");
         int remaining = start.get("remainingSeconds").getAsInt();
         assertTrue(remaining > 0 && remaining <= 60, "remaining = " + remaining);
@@ -276,13 +278,13 @@ class ExamServerTest {
             }
         }
         Thread.sleep(1000);
-        assertNotEquals(ExamServer.ST_DISCONNECTED, row("S1").status());
+        assertNotEquals(Session.ST_DISCONNECTED, row("S1").status());
     }
 
     @Test
     void submitAfterEndIsAcceptedAndWritten() throws IOException {
         TestClient c = loginAndStart("S1");
-        server.endExam("test");
+        server.room().endExam("test");
         c.next(Protocol.EXAM_END, 2000);
         JsonObject r = submitCorrect(c);
         assertEquals(10.0, r.get("score").getAsDouble());
@@ -334,14 +336,14 @@ class ExamServerTest {
         server.idleTimeoutMs = 50;
         Thread.sleep(100);
         server.checkIdle();
-        assertEquals(ExamServer.ST_DISCONNECTED, row("S1").status());
+        assertEquals(Session.ST_DISCONNECTED, row("S1").status());
     }
 
     @Test
     void loadExamRejectsBadAnswerIndex() throws IOException {
         Path bad = tmp.resolve("bad.json");
         Files.writeString(bad, EXAM_JSON.replace("\"answer\":0", "\"answer\":7"), StandardCharsets.UTF_8);
-        IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> server.loadExam(bad));
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> server.room().loadExam(bad));
         assertTrue(e.getMessage().contains("2"), e.getMessage());
     }
 }
