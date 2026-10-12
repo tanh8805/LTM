@@ -1,0 +1,5 @@
+{
+  "blacklistApps": ["chrome.exe", "msedge.exe", "firefox.exe", "opera.exe", "brave.exe", "zalo.exe", "discord.exe", "teams.exe", "ms-teams.exe", "telegram.exe", "messenger.exe"],
+  "whitelistApps": ["calc.exe", "calculatorapp.exe", "notepad.exe"],
+  "blockedDomains": ["chatgpt.com", "chat.openai.com", "gemini.google.com", "claude.ai", "copilot.microsoft.com", "chat.deepseek.com"]
+}

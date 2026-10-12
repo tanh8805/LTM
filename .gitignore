@@ -1,0 +1,8 @@
+target/
+results.csv
+__pycache__/
+.venv/
+.pytest_cache/
+.idea/
+.vscode/
+*.iml
