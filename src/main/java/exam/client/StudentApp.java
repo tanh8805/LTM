@@ -245,11 +245,15 @@ public class StudentApp {
             JsonArray arr = new JsonArray();
             issues.forEach(arr::add);
             m.add("issues", arr);
-            conn.send(m);
+            // Đưa việc cập nhật giao diện vào hàng đợi TRƯỚC khi gửi kết quả: nếu giáo viên đã bắt đầu thi thì
+            // EXAM_START về ngay sau đó và phải được xử lý sau, không bị màn "Chờ" đè lên màn làm bài.
             SwingUtilities.invokeLater(() -> {
                 issuesArea.setText(String.join("\n", issues));
-                cards.show(root, issues.isEmpty() ? "wait" : "precheck");
+                if (questions == null) {
+                    cards.show(root, issues.isEmpty() ? "wait" : "precheck");
+                }
             });
+            conn.send(m);
         }, "precheck").start();
     }
 
