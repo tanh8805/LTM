@@ -1,4 +1,4 @@
-// Gọi service ML (Python) qua HTTP: gửi các mẫu FEATURES của cả phòng, nhận điểm bất thường.
+// Gọi service ML (Python) qua HTTP: gửi các mẫu FEATURES của cả phòng, nhận điểm bất thường (Người 4).
 package exam.server;
 
 import com.google.gson.JsonArray;

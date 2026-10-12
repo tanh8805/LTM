@@ -1,4 +1,4 @@
-// Kết nối TCP tới server: luồng đọc nhận từng dòng JSON và tự kết nối lại mỗi 5 giây khi rớt mạng.
+// Kết nối TCP tới server: luồng đọc nhận từng dòng JSON và tự kết nối lại mỗi 5 giây khi rớt mạng (Người 1).
 package exam.client;
 
 import com.google.gson.JsonObject;

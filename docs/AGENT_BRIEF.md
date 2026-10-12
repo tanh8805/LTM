@@ -1,5 +1,7 @@
 # Tài liệu giao việc cho agent: Hệ thống thi trắc nghiệm có giám sát
 
+> Đã cập nhật sau đợt tách file, xem lịch sử commit.
+>
 > Dành cho agent lập trình. Đọc **toàn bộ** tài liệu trước khi làm. Thực hiện các Task ở Phần 5 **theo đúng thứ tự**. Mỗi Task là **một nhánh Git riêng**, làm xong thì mở Pull Request, merge vào `main`, rồi mới sang Task tiếp theo. Không tự ý thêm tính năng ngoài tài liệu. Gặp điều tài liệu không nói rõ thì chọn cách **đơn giản nhất** và ghi lại lựa chọn đó trong mô tả PR.
 
 Ngày: 2026-10-12 · Repo: `https://github.com/tanh8805/LTM` · Môn: Lập trình mạng (bài tập lớn nhóm 4 người)
@@ -92,22 +94,29 @@ pom.xml
 README.md
 .gitignore
 docs/AGENT_BRIEF.md                               # chính tài liệu này
-config/rules.json                                 # luật giám sát, nằm ở server
+docs/huong-dan-doc-code/nguoi-1.md ... nguoi-4.md # hướng dẫn đọc code cho từng người
+config/rules.json                                 # luật giám sát, nằm ở server; Người 2
 exams/sample_exam.json                            # đề mẫu 10 câu
 src/main/java/exam/common/Protocol.java           # cả nhóm đọc
-src/main/java/exam/client/StudentApp.java         # Người 1
+src/main/java/exam/client/StudentApp.java         # Người 1: logic sinh viên
+src/main/java/exam/client/StudentScreens.java     # Người 1: dựng giao diện
 src/main/java/exam/client/ServerConnection.java   # Người 1
 src/main/java/exam/client/ServerFinder.java       # Người 1
-src/main/java/exam/client/Monitor.java            # Người 2
-src/main/java/exam/server/ExamServer.java         # Người 3
+src/main/java/exam/client/Monitor.java            # Người 2: luật giám sát
+src/main/java/exam/client/WindowsProbe.java       # Người 2: nói chuyện với Windows
+src/main/java/exam/server/TeacherWindow.java      # Người 2: bảng giám thị
+src/main/java/exam/server/ExamServer.java         # Người 3: mạng và luồng
+src/main/java/exam/server/ExamRoom.java           # Người 3: luật phòng thi
+src/main/java/exam/server/Session.java            # Người 3: dữ liệu một sinh viên
+src/main/java/exam/server/ExamFile.java           # Người 3: đề, chấm điểm, results.csv
 src/main/java/exam/server/ClientHandler.java      # Người 3
-src/main/java/exam/server/TeacherWindow.java      # Người 3
 src/main/java/exam/server/MlClient.java           # Người 4
 src/test/java/exam/ProtocolTest.java
 src/test/java/exam/GradingTest.java
 src/test/java/exam/ExamServerTest.java
 src/test/java/exam/DiscoveryTest.java
 src/test/java/exam/MonitorTest.java
+src/test/java/exam/WindowsProbeTest.java
 src/test/java/exam/MlClientTest.java
 ml/requirements.txt
 ml/ml_service.py                                  # Người 4
@@ -115,7 +124,7 @@ ml/simulate_clients.py                            # Người 4
 ml/test_ml_service.py
 ```
 
-Không tạo thêm file Java nào ngoài danh sách trên. Class phụ nhỏ (ví dụ `Session`, `Row`) đặt làm **class lồng** (`static class` hoặc `record`) bên trong file sở hữu nó.
+Không tạo thêm file Java nào ngoài danh sách trên. Class phụ rất nhỏ (ví dụ `Row`) đặt làm **class lồng** (`static class` hoặc `record`) bên trong file sở hữu nó. Mỗi file Java trong `src/main` dài tối đa 220 dòng.
 
 Cách chạy (chạy từ thư mục gốc repo):
 - Service ML: `cd ml && uvicorn ml_service:app --host 127.0.0.1 --port 8000`
@@ -229,7 +238,7 @@ public synchronized void focusGained()
 - **Trong giờ thi**, mỗi 3 giây (trên Windows):
   - **APP:** tiến trình không có trong baseline, không thuộc `SYSTEM_PROCESSES` → được tính là *tiến trình mới* của cửa sổ 30 giây hiện tại. Nếu thêm điều kiện không thuộc `whitelistApps` → vi phạm `APP`, `detail` = tên tiến trình.
   - **USB:** ổ trong `File.listRoots()` không có trong baseline → vi phạm `USB`, `detail` = tên ổ (ví dụ `E:\`).
-  - **NET:** lúc `start`, phân giải mỗi tên miền trong `blockedDomains` bằng `InetAddress.getAllByName` (lỗi thì bỏ qua tên miền đó), lưu bảng IP → tên miền. Mỗi lần quét chạy `netstat -no`, lấy IP đích của các dòng `TCP` ở trạng thái `ESTABLISHED` hoặc `SYN_SENT`, bỏ qua `0.0.0.0`, `127.*`, `::`, `::1`. IP thuộc bảng → vi phạm `NET`, `detail` = `<tên miền> (<IP>)`. IP không có trong baseline → được tính là *host mới* của cửa sổ hiện tại. Giới hạn đã biết, ghi trong README: trang dùng CDN đổi IP nên luật này không bắt được 100%.
+  - **NET:** lúc `start`, phân giải mỗi tên miền trong `blockedDomains` bằng `InetAddress.getAllByName` (lỗi thì bỏ qua tên miền đó), lưu bảng IP → tên miền. Mỗi lần quét chạy `netstat -no`, lấy IP đích của các dòng bắt đầu bằng `TCP` (cột thứ 3, tách IP khỏi cổng ở dấu `:` cuối, bỏ ngoặc vuông của IPv6), **không đọc cột trạng thái** vì Windows ngôn ngữ khác có thể dịch chữ `ESTABLISHED`; bỏ qua IP `0.0.0.0`, `::`, `*`, `127.*`, `::1` và mọi dòng có **cổng đích là `0`** (dòng `LISTENING` có đích `0.0.0.0:0` hoặc `[::]:0`). IP thuộc bảng → vi phạm `NET`, `detail` = `<tên miền> (<IP>)`. IP không có trong baseline → được tính là *host mới* của cửa sổ hiện tại. Giới hạn đã biết, ghi trong README: trang dùng CDN đổi IP nên luật này không bắt được 100%.
   - **Chống spam:** mỗi cặp (`kind`, `detail`) chỉ gửi `VIOLATION` **một lần** trong cả buổi thi.
 - **Máy không phải Windows:** `precheck` luôn trả danh sách rỗng và in một dòng cảnh báo ra `System.err`; không quét tiến trình, mạng, USB. Focus và số câu trả lời vẫn đếm thật, `FEATURES` vẫn gửi. Nhờ vậy dev được trên Linux.
 - Chạy lệnh hệ thống: `ProcessBuilder` + `redirectErrorStream(true)`, chờ tối đa 10 giây, lỗi thì trả chuỗi rỗng (không ném exception ra ngoài).
@@ -252,7 +261,7 @@ Vector feature mỗi 30 giây, **đúng thứ tự**, sau khi gửi thì reset b
   - Dưới 20 mẫu → `not_enough_data`.
   - Fit `IsolationForest(n_estimators=100, random_state=42)` (`contamination` để mặc định) trên **tất cả** mẫu nhận được.
   - Điểm thô = `-model.score_samples(X)` (càng cao càng bất thường), chuẩn hoá min–max về 0–1 trên toàn bộ mẫu. Nếu `max − min < 1e-9` (mọi máy hành xử giống hệt nhau) thì mọi điểm = 0 và mọi `anomaly = false`.
-  - Mỗi studentId: lấy **3 mẫu có `window` lớn nhất**; `score` = điểm lớn nhất trong 3 mẫu đó, làm tròn 3 chữ số; `anomaly = true` nếu `model.predict` trả `-1` ở bất kỳ mẫu nào trong 3 mẫu đó.
+  - Mỗi studentId: lấy **3 mẫu có `window` lớn nhất**; `score` = điểm lớn nhất trong 3 mẫu đó, làm tròn 3 chữ số; `anomaly = true` nếu `model.predict` trả `-1` **và** điểm chuẩn hoá của mẫu đó ≥ `FLAG_MIN_SCORE` (0.7), ở bất kỳ mẫu nào trong 3 mẫu đó. Lý do: feature là số đếm nhỏ nên `predict` mặc định gắn cờ quá nhiều máy bình thường (25–88% trong thí nghiệm giả lập).
   - Logic tính nằm trong hàm thuần `score_samples(samples: list[Sample]) -> dict` để test không cần HTTP.
 - `MlClient.java`: dùng `java.net.http.HttpClient`, timeout kết nối và request 5 giây. Mã trạng thái khác 200 → ném `IOException`.
 - Server: mỗi 30 giây, nếu bài thi đang diễn ra, gom tất cả mẫu của mọi session thành mảng `samples` (lấy dữ liệu trong khối `synchronized`, **gọi HTTP ngoài khối `synchronized`**), gọi ML, rồi cập nhật điểm bất thường. ML lỗi hoặc tắt → ghi log `ML lỗi: ...`, giữ nguyên điểm cũ, server không được sập.
