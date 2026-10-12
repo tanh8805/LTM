@@ -69,6 +69,7 @@ public class ExamServer {
     private Consumer<String> listener;
     private ServerSocket serverSocket;
     private DatagramSocket udpSocket;
+    private MlClient mlClient;                 // null = không chấm bất thường
     private Path resultsFile = Path.of("results.csv");
     private JsonObject exam;
     private JsonArray publicQuestions;         // bản sao câu hỏi không có "answer"
@@ -89,6 +90,7 @@ public class ExamServer {
             return;
         }
         ExamServer server = new ExamServer(rules);
+        server.setMlClient(new MlClient("http://localhost:8000"));
         SwingUtilities.invokeLater(() -> {
             new TeacherWindow(server).setVisible(true);     // tạo cửa sổ trước để log lúc khởi động hiện được
             try {
@@ -131,6 +133,7 @@ public class ExamServer {
         t.setDaemon(true);
         t.start();
         scheduler.scheduleAtFixedRate(this::checkIdle, 10, 10, TimeUnit.SECONDS);
+        scheduler.scheduleAtFixedRate(this::scoreIfRunning, 30, 30, TimeUnit.SECONDS);
         log("Server lắng nghe TCP cổng " + tcpPort());
     }
 
@@ -456,6 +459,61 @@ public class ExamServer {
                 markDisconnected(s);
                 closeQuietly(old);
             }
+        }
+    }
+
+    // ---------- Chấm bất thường bằng service ML ----------
+
+    public synchronized void setMlClient(MlClient ml) {
+        this.mlClient = ml;
+    }
+
+    private void scoreIfRunning() {
+        if (isStarted() && !isEnded()) {
+            scoreRoomNow();
+        }
+    }
+
+    /** Gom mẫu trong khối synchronized, gọi HTTP ngoài khối để ML chậm không treo cả server. */
+    public void scoreRoomNow() {
+        MlClient ml;
+        JsonArray samples = new JsonArray();
+        synchronized (this) {
+            ml = mlClient;
+            for (Session s : sessions.values()) {
+                for (JsonObject sample : s.samples) {
+                    JsonObject copy = sample.deepCopy();
+                    copy.addProperty("studentId", s.id);
+                    samples.add(copy);
+                }
+            }
+        }
+        if (ml == null || samples.isEmpty()) {
+            return;
+        }
+        try {
+            applyScores(ml.score(samples));
+        } catch (IOException | RuntimeException e) {
+            log("ML lỗi: " + e);          // giữ điểm cũ, không để lỗi ML làm sập server
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private synchronized void applyScores(JsonObject response) {
+        if (!"ok".equals(Protocol.str(response, "status"))) {
+            return;                                    // not_enough_data: chưa đủ mẫu để so với số đông
+        }
+        for (JsonElement el : response.getAsJsonArray("results")) {
+            JsonObject r = el.getAsJsonObject();
+            Session s = sessions.get(Protocol.str(r, "studentId"));
+            if (s == null) {
+                continue;
+            }
+            double score = r.get("score").getAsDouble();
+            s.anomalyScore = score;
+            s.anomaly = r.get("anomaly").getAsBoolean();
+            s.maxAnomaly = s.maxAnomaly == null ? score : Math.max(s.maxAnomaly, score);
         }
     }
 
