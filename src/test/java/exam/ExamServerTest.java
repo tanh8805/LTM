@@ -1,0 +1,347 @@
+// Test server thật trên cổng 0 với client TCP giả: đăng nhập, gửi đề, nộp bài, mất kết nối, vào lại.
+package exam;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import exam.common.Protocol;
+import exam.server.ExamServer;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.net.Socket;
+import java.net.SocketTimeoutException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+class ExamServerTest {
+    static final String EXAM_JSON = "{\"title\":\"De thu\",\"durationMinutes\":1,\"questions\":["
+            + "{\"id\":1,\"text\":\"Q1\",\"options\":[\"a\",\"b\",\"c\"],\"answer\":1},"
+            + "{\"id\":2,\"text\":\"Q2\",\"options\":[\"a\",\"b\"],\"answer\":0}]}";
+
+    /** Client TCP đơn giản: send, và next() đọc bỏ qua tin khác loại cho tới khi gặp type cần tìm. */
+    static class TestClient implements AutoCloseable {
+        final Socket socket;
+        final BufferedReader in;
+        final PrintWriter out;
+
+        TestClient(int port) throws IOException {
+            socket = new Socket("localhost", port);
+            in = Protocol.reader(socket);
+            out = Protocol.writer(socket);
+        }
+
+        void send(JsonObject m) {
+            Protocol.send(out, m);
+        }
+
+        void sendRaw(String line) {
+            out.print(line + "\n");
+            out.flush();
+        }
+
+        /** Trả null nếu hết giờ mà chưa thấy tin loại này. */
+        JsonObject tryNext(String type, int timeoutMs) throws IOException {
+            long deadline = System.currentTimeMillis() + timeoutMs;
+            while (true) {
+                long left = deadline - System.currentTimeMillis();
+                if (left <= 0) {
+                    return null;
+                }
+                socket.setSoTimeout((int) left);
+                try {
+                    String line = in.readLine();
+                    if (line == null) {
+                        return null;
+                    }
+                    JsonObject m = Protocol.parse(line);
+                    if (Protocol.type(m).equals(type)) {
+                        return m;
+                    }
+                } catch (SocketTimeoutException e) {
+                    return null;
+                }
+            }
+        }
+
+        JsonObject next(String type, int timeoutMs) throws IOException {
+            JsonObject m = tryNext(type, timeoutMs);
+            assertNotNull(m, "Không nhận được " + type);
+            return m;
+        }
+
+        @Override
+        public void close() throws IOException {
+            socket.close();
+        }
+    }
+
+    @TempDir Path tmp;
+    ExamServer server;
+    Path resultsFile;
+    final List<TestClient> clients = new ArrayList<>();
+
+    @BeforeEach
+    void setUp() throws IOException {
+        JsonObject rules = new JsonObject();
+        JsonArray black = new JsonArray();
+        black.add("zalo.exe");
+        rules.add("blacklistApps", black);
+        server = new ExamServer(rules);
+        resultsFile = tmp.resolve("results.csv");
+        server.setResultsFile(resultsFile);
+        Path exam = tmp.resolve("exam.json");
+        Files.writeString(exam, EXAM_JSON, StandardCharsets.UTF_8);
+        server.loadExam(exam);
+        server.start(0);
+    }
+
+    @AfterEach
+    void tearDown() throws IOException {
+        for (TestClient c : clients) {
+            c.close();
+        }
+        server.stop();
+    }
+
+    private TestClient connect() throws IOException {
+        TestClient c = new TestClient(server.tcpPort());
+        clients.add(c);
+        return c;
+    }
+
+    private JsonObject loginMsg(String id, String name) {
+        JsonObject m = Protocol.msg(Protocol.LOGIN);
+        m.addProperty("studentId", id);
+        m.addProperty("name", name);
+        return m;
+    }
+
+    private TestClient login(String id) throws IOException {
+        TestClient c = connect();
+        c.send(loginMsg(id, "Sinh viên " + id));
+        c.next(Protocol.LOGIN_OK, 2000);
+        return c;
+    }
+
+    private void precheck(TestClient c, boolean ok) {
+        JsonObject m = Protocol.msg(Protocol.PRECHECK_RESULT);
+        m.addProperty("ok", ok);
+        m.add("issues", new JsonArray());
+        c.send(m);
+    }
+
+    /** Đăng nhập + PRECHECK đạt + giáo viên bắt đầu (nếu chưa) + nhận EXAM_START. */
+    private TestClient loginAndStart(String id) throws IOException {
+        TestClient c = login(id);
+        precheck(c, true);
+        if (!server.isStarted()) {
+            server.startExam();
+        }
+        c.next(Protocol.EXAM_START, 2000);
+        return c;
+    }
+
+    private JsonObject submitCorrect(TestClient c) throws IOException {
+        JsonObject answers = new JsonObject();
+        answers.addProperty("1", 1);
+        answers.addProperty("2", 0);
+        JsonObject m = Protocol.msg(Protocol.SUBMIT);
+        m.add("answers", answers);
+        c.send(m);
+        return c.next(Protocol.RESULT, 2000);
+    }
+
+    private ExamServer.Row row(String id) {
+        for (ExamServer.Row r : server.rows()) {
+            if (r.studentId().equals(id)) {
+                return r;
+            }
+        }
+        return null;
+    }
+
+    private boolean waitStatus(String id, String status, int ms) throws InterruptedException {
+        long deadline = System.currentTimeMillis() + ms;
+        while (System.currentTimeMillis() < deadline) {
+            ExamServer.Row r = row(id);
+            if (r != null && r.status().equals(status)) {
+                return true;
+            }
+            Thread.sleep(20);
+        }
+        return false;
+    }
+
+    @Test
+    void loginOkContainsRules() throws IOException {
+        TestClient c = connect();
+        c.send(loginMsg("S1", "An"));
+        JsonObject ok = c.next(Protocol.LOGIN_OK, 2000);
+        assertEquals("zalo.exe", ok.getAsJsonObject("rules").getAsJsonArray("blacklistApps").get(0).getAsString());
+    }
+
+    @Test
+    void emptyIdIsRejected() throws IOException {
+        TestClient c = connect();
+        c.send(loginMsg("", "An"));
+        assertEquals("Thiếu mã SV hoặc họ tên", Protocol.str(c.next(Protocol.LOGIN_FAIL, 2000), "reason"));
+    }
+
+    @Test
+    void duplicateLoginWhileConnectedFails() throws IOException {
+        login("S1");
+        TestClient second = connect();
+        second.send(loginMsg("S1", "Máy khác"));
+        JsonObject fail = second.next(Protocol.LOGIN_FAIL, 2000);
+        assertEquals("Mã SV này đang đăng nhập ở máy khác", Protocol.str(fail, "reason"));
+    }
+
+    @Test
+    void examNotSentBeforePrecheck() throws IOException {
+        TestClient c = login("S1");
+        server.startExam();
+        assertNull(c.tryNext(Protocol.EXAM_START, 500));
+        precheck(c, true);
+        assertNotNull(c.next(Protocol.EXAM_START, 2000));
+    }
+
+    @Test
+    void examQuestionsHaveNoAnswers() throws IOException {
+        TestClient c = login("S1");
+        precheck(c, true);
+        server.startExam();
+        JsonObject start = c.next(Protocol.EXAM_START, 2000);
+        JsonArray qs = start.getAsJsonArray("questions");
+        assertEquals(2, qs.size());
+        for (JsonElement e : qs) {
+            JsonObject q = e.getAsJsonObject();
+            assertFalse(q.has("answer"));
+            assertTrue(q.has("id") && q.has("text") && q.has("options"));
+        }
+        assertEquals("De thu", Protocol.str(start, "title"));
+    }
+
+    /** Đóng kết nối cũ rồi vào lại cùng mã SV; trả về EXAM_START nhận được. */
+    private JsonObject loginAgainForExam(String id) throws IOException {
+        clients.get(clients.size() - 1).close();
+        TestClient c = connect();
+        for (int i = 0; i < 100; i++) {
+            c.send(loginMsg(id, "Sinh viên " + id));
+            JsonObject m = c.tryNext(Protocol.LOGIN_OK, 100);
+            if (m != null) {
+                return c.next(Protocol.EXAM_START, 2000);
+            }
+        }
+        fail("Không đăng nhập lại được");
+        return null;
+    }
+
+    @Test
+    void submitReturnsResult() throws IOException {
+        TestClient c = loginAndStart("S1");
+        JsonObject r = submitCorrect(c);
+        assertEquals(10.0, r.get("score").getAsDouble());
+        assertEquals("Đã nộp", row("S1").status());
+    }
+
+    @Test
+    void reconnectGetsExamWithRemainingTime() throws Exception {
+        TestClient c = loginAndStart("S1");
+        c.close();
+        assertTrue(waitStatus("S1", ExamServer.ST_DISCONNECTED, 2000));
+        JsonObject start = loginAgainForExam("S1");
+        int remaining = start.get("remainingSeconds").getAsInt();
+        assertTrue(remaining > 0 && remaining <= 60, "remaining = " + remaining);
+    }
+
+    @Test
+    void disconnectOfOldSocketDoesNotKickNewOne() throws Exception {
+        TestClient a = login("S1");
+        a.close();
+        TestClient b = connect();
+        for (int i = 0; i < 100; i++) { // B có thể đến trước khi server kịp thấy A đóng
+            b.send(loginMsg("S1", "Sinh viên S1"));
+            if (b.tryNext(Protocol.LOGIN_OK, 100) != null) {
+                break;
+            }
+        }
+        Thread.sleep(1000);
+        assertNotEquals(ExamServer.ST_DISCONNECTED, row("S1").status());
+    }
+
+    @Test
+    void submitAfterEndIsAcceptedAndWritten() throws IOException {
+        TestClient c = loginAndStart("S1");
+        server.endExam("test");
+        c.next(Protocol.EXAM_END, 2000);
+        JsonObject r = submitCorrect(c);
+        assertEquals(10.0, r.get("score").getAsDouble());
+        String csv = Files.readString(resultsFile, StandardCharsets.UTF_8);
+        assertTrue(csv.startsWith("\uFEFFstudentId,name,score,correct,total,violations,maxAnomaly,status"));
+        assertTrue(csv.contains("S1,Sinh viên S1,10.0,2,2,0,,Đã nộp"), csv);
+    }
+
+    @Test
+    void garbageLineDoesNotCloseConnection() throws IOException {
+        TestClient c = connect();
+        c.sendRaw("abc{");
+        c.send(loginMsg("S1", "An"));
+        assertNotNull(c.next(Protocol.LOGIN_OK, 2000));
+    }
+
+    @Test
+    void badFeaturesIgnored() throws IOException {
+        TestClient c = loginAndStart("S1");
+        JsonObject f = Protocol.msg(Protocol.FEATURES);
+        f.addProperty("window", 1);
+        JsonArray three = new JsonArray();
+        three.add(1);
+        three.add(2);
+        three.add(3);
+        f.add("values", three);
+        c.send(f);
+        assertNotNull(submitCorrect(c));
+    }
+
+    @Test
+    void violationCountedAndShownInRows() throws Exception {
+        TestClient c = loginAndStart("S1");
+        JsonObject v = Protocol.msg(Protocol.VIOLATION);
+        v.addProperty("kind", "USB");
+        v.addProperty("detail", "E:\\");
+        v.addProperty("time", "10:00:00");
+        c.send(v);
+        for (int i = 0; i < 100 && row("S1").violations() == 0; i++) {
+            Thread.sleep(20);
+        }
+        assertEquals(1, row("S1").violations());
+        assertTrue(row("S1").lastViolation().contains("USB"));
+    }
+
+    @Test
+    void silentClientDuringExamIsDropped() throws Exception {
+        loginAndStart("S1");
+        server.idleTimeoutMs = 50;
+        Thread.sleep(100);
+        server.checkIdle();
+        assertEquals(ExamServer.ST_DISCONNECTED, row("S1").status());
+    }
+
+    @Test
+    void loadExamRejectsBadAnswerIndex() throws IOException {
+        Path bad = tmp.resolve("bad.json");
+        Files.writeString(bad, EXAM_JSON.replace("\"answer\":0", "\"answer\":7"), StandardCharsets.UTF_8);
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> server.loadExam(bad));
+        assertTrue(e.getMessage().contains("2"), e.getMessage());
+    }
+}
