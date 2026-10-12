@@ -13,9 +13,8 @@ def sample(student, window, values):
 
 
 def normal_values():
-    # newProcesses, focusLostCount, focusLostSeconds, newRemoteHosts, violations, answers
-    return [random.randint(0, 1), random.randint(0, 1), random.randint(0, 1), random.randint(0, 1), 0,
-            random.randint(0, 3)]
+    # newProcesses, focusLostCount, focusLostSeconds, newRemoteHosts, violations: nhỏ trong khoảng 0-1; answers: 0-3
+    return [random.random(), random.random(), random.random(), random.random(), 0.0, random.randint(0, 3)]
 
 
 def room(deviant_windows=None):
