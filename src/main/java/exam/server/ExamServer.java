@@ -29,6 +29,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import javax.swing.SwingUtilities;
 
 public class ExamServer {
     public static final String ST_LOGGED_IN = "Đã đăng nhập", ST_PRECHECK_FAIL = "PRECHECK lỗi",
@@ -75,6 +76,30 @@ public class ExamServer {
     private long startMillis;
     private ScheduledFuture<?> autoEnd;
     public volatile long idleTimeoutMs = 90_000;   // public volatile để test rút ngắn
+
+    /** Chạy: java -cp target/exam.jar exam.server.ExamServer [đường dẫn rules.json] */
+    public static void main(String[] args) {
+        Path rulesFile = Path.of(args.length > 0 ? args[0] : "config/rules.json");
+        JsonObject rules;
+        try {
+            rules = Protocol.parse(Files.readString(rulesFile, StandardCharsets.UTF_8));
+        } catch (IOException | IllegalArgumentException e) {
+            System.err.println("Không đọc được file luật " + rulesFile.toAbsolutePath() + ": " + e.getMessage());
+            System.exit(1);
+            return;
+        }
+        ExamServer server = new ExamServer(rules);
+        SwingUtilities.invokeLater(() -> {
+            new TeacherWindow(server).setVisible(true);     // tạo cửa sổ trước để log lúc khởi động hiện được
+            try {
+                server.start(Protocol.TCP_PORT);
+                server.startDiscovery(Protocol.UDP_PORT);
+            } catch (IOException e) {
+                System.err.println("Không mở được cổng (đã có server khác đang chạy?): " + e.getMessage());
+                System.exit(1);
+            }
+        });
+    }
 
     public ExamServer(JsonObject rules) {
         this.rules = rules;
