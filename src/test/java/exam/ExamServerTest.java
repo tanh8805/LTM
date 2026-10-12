@@ -217,10 +217,10 @@ class ExamServerTest {
 
     @Test
     void examQuestionsHaveNoAnswers() throws IOException {
-        TestClient c = loginAndStart("S1");
-        server.endExam("dọn dẹp");
-        // Đề đã gửi từ loginAndStart; đăng nhập lại để lấy EXAM_START mới và kiểm tra nội dung
-        JsonObject start = loginAgainForExam("S1");
+        TestClient c = login("S1");
+        precheck(c, true);
+        server.startExam();
+        JsonObject start = c.next(Protocol.EXAM_START, 2000);
         JsonArray qs = start.getAsJsonArray("questions");
         assertEquals(2, qs.size());
         for (JsonElement e : qs) {
