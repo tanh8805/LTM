@@ -83,22 +83,25 @@ public final class WindowsProbe {
         return names;
     }
 
-    /** IP đích của các kết nối TCP ESTABLISHED/SYN_SENT, bỏ loopback và địa chỉ rỗng. */
+    /**
+     * IP đích của mọi dòng TCP. Không đọc cột trạng thái vì Windows ngôn ngữ khác có thể dịch chữ ESTABLISHED;
+     * dòng LISTENING có đích dạng 0.0.0.0:0 hoặc [::]:0 nên bị loại nhờ cổng 0.
+     */
     public static Set<String> parseNetstat(String output) {
         Set<String> ips = new HashSet<>();
         for (String line : output.split("\\R")) {
             String[] cols = line.trim().split("\\s+");
-            if (cols.length < 4 || !cols[0].equals("TCP")
-                    || !(cols[3].equals("ESTABLISHED") || cols[3].equals("SYN_SENT"))) {
+            if (cols.length < 3 || !cols[0].equals("TCP") || cols[2].lastIndexOf(':') < 0) {
                 continue;
             }
-            String remote = cols[2];
-            String ip = remote.substring(0, Math.max(0, remote.lastIndexOf(':')));
+            int colon = cols[2].lastIndexOf(':');
+            String ip = cols[2].substring(0, colon);
+            String port = cols[2].substring(colon + 1);
             if (ip.startsWith("[") && ip.endsWith("]")) {
                 ip = ip.substring(1, ip.length() - 1);
             }
-            boolean ignored = ip.isEmpty() || ip.equals("0.0.0.0") || ip.startsWith("127.")
-                || ip.equals("::") || ip.equals("::1");
+            boolean ignored = ip.isEmpty() || ip.equals("0.0.0.0") || ip.equals("::") || ip.equals("*")
+                || ip.startsWith("127.") || ip.equals("::1") || port.equals("0");
             if (!ignored) {
                 ips.add(ip);
             }
