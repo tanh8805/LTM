@@ -1,4 +1,4 @@
-// Giao diện giám thị (Swing): chọn đề, bắt đầu/kết thúc thi, bảng sinh viên làm mới mỗi giây và ô log.
+// Giao diện giám thị (Swing): chọn đề, bắt đầu/kết thúc thi, bảng sinh viên làm mới mỗi giây và ô log (Người 2).
 package exam.server;
 
 import java.awt.BorderLayout;
@@ -35,9 +35,9 @@ public class TeacherWindow extends JFrame {
     private static final String[] COLUMNS = {"Mã SV", "Họ tên", "Trạng thái", "Số vi phạm", "Vi phạm gần nhất",
         "Bất thường", "Điểm"};
 
-    /** Bảng dữ liệu lấy từ server.rows(); mỗi giây thay cả danh sách cho đơn giản. */
+    /** Bảng dữ liệu lấy từ room.rows(); mỗi giây thay cả danh sách cho đơn giản. */
     private static class RowsModel extends AbstractTableModel {
-        List<ExamServer.Row> rows = new ArrayList<>();
+        List<ExamRoom.Row> rows = new ArrayList<>();
 
         @Override public int getRowCount() { return rows.size(); }
         @Override public int getColumnCount() { return COLUMNS.length; }
@@ -45,7 +45,7 @@ public class TeacherWindow extends JFrame {
 
         @Override
         public Object getValueAt(int r, int c) {
-            ExamServer.Row row = rows.get(r);
+            ExamRoom.Row row = rows.get(r);
             return switch (c) {
                 case 0 -> row.studentId();
                 case 1 -> row.name();
@@ -59,6 +59,7 @@ public class TeacherWindow extends JFrame {
     }
 
     private final ExamServer server;
+    private final ExamRoom room;
     private final RowsModel model = new RowsModel();
     private final JLabel examLabel = new JLabel("Chưa chọn đề"), timeLabel = new JLabel("Còn lại: -");
     private final JButton startBtn = new JButton("Bắt đầu thi"), endBtn = new JButton("Kết thúc thi");
@@ -67,6 +68,7 @@ public class TeacherWindow extends JFrame {
     public TeacherWindow(ExamServer server) {
         super("Giám thị - Server thi");
         this.server = server;
+        this.room = server.room();
         server.setListener(line -> SwingUtilities.invokeLater(() -> {
             logArea.append(line + "\n");
             logArea.setCaretPosition(logArea.getDocument().getLength());    // tự cuộn xuống dòng mới nhất
@@ -88,7 +90,7 @@ public class TeacherWindow extends JFrame {
             @Override
             public Component getTableCellRendererComponent(JTable t, Object v, boolean sel, boolean focus, int r, int c) {
                 Component comp = super.getTableCellRendererComponent(t, v, sel, focus, r, c);
-                ExamServer.Row row = model.rows.get(t.convertRowIndexToModel(r));
+                ExamRoom.Row row = model.rows.get(t.convertRowIndexToModel(r));
                 boolean warn = row.violations() > 0 || row.anomaly();
                 comp.setBackground(sel ? t.getSelectionBackground() : warn ? WARN : Color.WHITE);
                 return comp;
@@ -113,15 +115,15 @@ public class TeacherWindow extends JFrame {
     }
 
     private void refresh() {
-        String title = server.examTitle();
+        String title = room.examTitle();
         examLabel.setText(title == null ? "Chưa chọn đề" : "Đề: " + title);
-        model.rows = server.rows();
+        model.rows = room.rows();
         model.fireTableDataChanged();
-        boolean started = server.isStarted();
-        startBtn.setEnabled(server.examTitle() != null && !started);
-        endBtn.setEnabled(started && !server.isEnded());
+        boolean started = room.isStarted();
+        startBtn.setEnabled(room.examTitle() != null && !started);
+        endBtn.setEnabled(started && !room.isEnded());
         if (started) {
-            int s = server.remainingSeconds();
+            int s = room.remainingSeconds();
             timeLabel.setText(String.format("Còn lại: %02d:%02d", s / 60, s % 60));
         }
     }
@@ -132,7 +134,7 @@ public class TeacherWindow extends JFrame {
             return;
         }
         try {
-            server.loadExam(chooser.getSelectedFile().toPath());
+            room.loadExam(chooser.getSelectedFile().toPath());
             refresh();
         } catch (IllegalArgumentException | IllegalStateException | IOException ex) {
             JOptionPane.showMessageDialog(this, ex.getMessage(), "Không nạp được đề", JOptionPane.ERROR_MESSAGE);
@@ -141,7 +143,7 @@ public class TeacherWindow extends JFrame {
 
     private void startExam() {
         try {
-            server.startExam();
+            room.startExam();
         } catch (IllegalStateException ex) {
             JOptionPane.showMessageDialog(this, ex.getMessage());
         }
@@ -151,7 +153,7 @@ public class TeacherWindow extends JFrame {
     private void endExam() {
         if (JOptionPane.showConfirmDialog(this, "Kết thúc bài thi ngay?", "Xác nhận", JOptionPane.YES_NO_OPTION)
                 == JOptionPane.YES_OPTION) {
-            server.endExam("Giáo viên kết thúc");
+            room.endExam("Giáo viên kết thúc");
             refresh();
         }
     }

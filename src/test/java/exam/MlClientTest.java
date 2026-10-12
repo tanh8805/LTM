@@ -7,6 +7,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.sun.net.httpserver.HttpServer;
 import exam.common.Protocol;
+import exam.server.ExamRoom;
 import exam.server.ExamServer;
 import exam.server.MlClient;
 import java.io.IOException;
@@ -79,10 +80,10 @@ class MlClientTest {
     /** Server thi thật, một máy S1 đã vào thi và gửi một FEATURES. */
     private void startExamWithFeatures() throws Exception {
         server = new ExamServer(new JsonObject());
-        server.setResultsFile(tmp.resolve("results.csv"));
+        server.room().setResultsFile(tmp.resolve("results.csv"));
         Path exam = tmp.resolve("exam.json");
         Files.writeString(exam, ExamServerTest.EXAM_JSON, StandardCharsets.UTF_8);
-        server.loadExam(exam);
+        server.room().loadExam(exam);
         server.start(0);
         ExamServerTest.TestClient c = new ExamServerTest.TestClient(server.tcpPort());
         JsonObject login = Protocol.msg(Protocol.LOGIN);
@@ -93,7 +94,7 @@ class MlClientTest {
         JsonObject pre = Protocol.msg(Protocol.PRECHECK_RESULT);
         pre.addProperty("ok", true);
         c.send(pre);
-        server.startExam();
+        server.room().startExam();
         c.next(Protocol.EXAM_START, 2000);
         JsonObject f = Protocol.msg(Protocol.FEATURES);
         f.addProperty("window", 1);
@@ -105,8 +106,8 @@ class MlClientTest {
         c.send(f);
     }
 
-    private ExamServer.Row s1() {
-        return server.rows().get(0);
+    private ExamRoom.Row s1() {
+        return server.room().rows().get(0);
     }
 
     /** FEATURES đến server bất đồng bộ nên gọi scoreRoomNow lặp lại cho tới khi điểm xuất hiện. */
