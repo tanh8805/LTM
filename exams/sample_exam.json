@@ -1,0 +1,116 @@
+{
+  "title": "Kiểm tra Lập trình mạng",
+  "durationMinutes": 15,
+  "questions": [
+    {
+      "id": 1,
+      "text": "TCP là giao thức...",
+      "options": [
+        "Không kết nối",
+        "Hướng kết nối",
+        "Tầng ứng dụng",
+        "Tầng vật lý"
+      ],
+      "answer": 1
+    },
+    {
+      "id": 2,
+      "text": "UDP khác TCP ở điểm nào?",
+      "options": [
+        "Đảm bảo thứ tự gói tin",
+        "Có bắt tay ba bước",
+        "Luôn truyền lại gói bị mất",
+        "Không cần thiết lập kết nối trước"
+      ],
+      "answer": 3
+    },
+    {
+      "id": 3,
+      "text": "Lớp nào của Java dùng để tạo server TCP?",
+      "options": [
+        "Socket",
+        "DatagramSocket",
+        "ServerSocket",
+        "InetAddress"
+      ],
+      "answer": 2
+    },
+    {
+      "id": 4,
+      "text": "Lớp nào của Java dùng để gửi gói UDP?",
+      "options": [
+        "DatagramSocket",
+        "ServerSocket",
+        "URLConnection",
+        "BufferedReader"
+      ],
+      "answer": 0
+    },
+    {
+      "id": 5,
+      "text": "Cổng (port) có kích thước bao nhiêu bit?",
+      "options": [
+        "8 bit",
+        "16 bit",
+        "32 bit",
+        "64 bit"
+      ],
+      "answer": 1
+    },
+    {
+      "id": 6,
+      "text": "Địa chỉ IPv4 gồm bao nhiêu bit?",
+      "options": [
+        "16 bit",
+        "48 bit",
+        "64 bit",
+        "32 bit"
+      ],
+      "answer": 3
+    },
+    {
+      "id": 7,
+      "text": "DNS dùng để làm gì?",
+      "options": [
+        "Phân giải tên miền thành địa chỉ IP",
+        "Mã hoá dữ liệu truyền đi",
+        "Cấp phát địa chỉ IP động",
+        "Truyền tệp giữa các máy"
+      ],
+      "answer": 0
+    },
+    {
+      "id": 8,
+      "text": "Cổng mặc định của HTTP là?",
+      "options": [
+        "21",
+        "25",
+        "80",
+        "443"
+      ],
+      "answer": 2
+    },
+    {
+      "id": 9,
+      "text": "Địa chỉ 255.255.255.255 được dùng để...",
+      "options": [
+        "Quảng bá (broadcast) trong mạng cục bộ",
+        "Tự trỏ về máy mình",
+        "Gửi tới một máy duy nhất",
+        "Gửi ra Internet"
+      ],
+      "answer": 0
+    },
+    {
+      "id": 10,
+      "text": "Địa chỉ loopback 127.0.0.1 trỏ tới đâu?",
+      "options": [
+        "Máy chủ DNS",
+        "Cổng mặc định",
+        "Chính máy đang chạy chương trình",
+        "Máy khác trong LAN"
+      ],
+      "answer": 2
+    }
+  ]
+}
