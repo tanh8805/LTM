@@ -6,6 +6,10 @@ from sklearn.ensemble import IsolationForest
 
 MIN_SAMPLES = 20  # ít hơn thì chưa đủ cơ sở để so với số đông
 RECENT = 3        # chỉ xét 3 cửa sổ gần nhất của mỗi sinh viên
+# predict() của Isolation Forest (contamination mặc định) gắn -1 cho đa số mẫu bình thường khi feature là số đếm
+# nhỏ nên chỉ đánh dấu anomaly khi điểm chuẩn hoá cũng thuộc dải cao nhất phòng. Đo trên dữ liệu giả lập:
+# không có điều kiện này 25-88% sinh viên bình thường bị đánh dấu, có thì ~0-1%, vẫn bắt được 97-100% máy lệch.
+FLAG_MIN_SCORE = 0.7
 
 
 class Sample(BaseModel):
@@ -44,7 +48,7 @@ def score_samples(samples: list[Sample]) -> dict:
         results.append({
             "studentId": student_id,
             "score": round(float(max(scores[i] for i in latest)), 3),
-            "anomaly": bool(any(flagged[i] for i in latest)),
+            "anomaly": bool(any(flagged[i] and scores[i] >= FLAG_MIN_SCORE for i in latest)),
         })
     return {"status": "ok", "results": results}
 
