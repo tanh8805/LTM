@@ -111,7 +111,7 @@ public final class ExamFile {
     /** Ghi toàn bộ results.csv (UTF-8 có BOM để Excel đọc đúng tiếng Việt), kể cả máy chưa nộp. */
     public static void writeResults(Path file, List<Session> sessions, Function<Session, String> statusOf)
             throws IOException {
-        StringBuilder sb = new StringBuilder("﻿studentId,name,score,correct,total,violations,maxAnomaly,status\n");
+        StringBuilder sb = new StringBuilder("﻿studentId,name,score,correct,total,violations,maxAnomaly,status,samples,flaggedCount\n");
         for (Session s : sessions) {
             JsonObject r = s.result;
             sb.append(csv(s.id)).append(',').append(csv(s.name)).append(',')
@@ -120,7 +120,8 @@ public final class ExamFile {
               .append(r == null ? "" : r.get("total").getAsString()).append(',')
               .append(s.violations).append(',')
               .append(s.maxAnomaly == null ? "" : s.maxAnomaly.toString()).append(',')
-              .append(csv(statusOf.apply(s))).append('\n');
+              .append(csv(statusOf.apply(s))).append(',')
+              .append(s.samples.size()).append(',').append(s.flaggedCount).append('\n');
         }
         Files.writeString(file, sb.toString(), StandardCharsets.UTF_8);
     }

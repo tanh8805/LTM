@@ -16,7 +16,7 @@ public class Session {
     Socket socket;
     PrintWriter out;                           // null = đang mất kết nối; session vẫn giữ nguyên để vào lại được
     boolean precheckOk, precheckFailed, submitted, anomaly;
-    int violations;
+    int violations, flaggedCount;              // flaggedCount: số lần chấm ML mà máy này bị cờ bất thường
     String lastViolation = "";
     final List<JsonObject> samples = new ArrayList<>();    // các FEATURES đã nhận, gửi sang ML
     Double anomalyScore, maxAnomaly;
