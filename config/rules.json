@@ -1,5 +1,34 @@
 {
-  "blacklistApps": ["chrome.exe", "msedge.exe", "firefox.exe", "opera.exe", "brave.exe", "zalo.exe", "discord.exe", "teams.exe", "ms-teams.exe", "telegram.exe", "messenger.exe"],
+  "blacklistApps": [
+    "chrome.exe", "msedge.exe", "firefox.exe", "opera.exe", "brave.exe",
+    "zalo.exe", "discord.exe", "teams.exe", "ms-teams.exe", "telegram.exe", "messenger.exe",
+    "antigravity", "cursor", "windsurf", "code", "chatgpt", "claude", "copilot", "ms-copilot", "perplexity", "gemini",
+    "trae", "kiro", "ollama", "ollama app", "lm studio"
+  ],
   "whitelistApps": ["calc.exe", "calculatorapp.exe", "notepad.exe"],
-  "blockedDomains": ["chatgpt.com", "chat.openai.com", "gemini.google.com", "claude.ai", "copilot.microsoft.com", "chat.deepseek.com"]
+  "allowedWindowApps": [
+    "java", "javaw",
+    "cmd", "powershell", "pwsh", "windowsterminal", "openconsole", "conhost",
+    "explorer", "applicationframehost", "textinputhost", "searchhost", "startmenuexperiencehost",
+    "shellexperiencehost", "lockapp", "searchapp", "searchui", "widgets", "systemsettings"
+  ],
+  "ignoreProcesses": [
+    "rtkauduservice64", "rtkngui64", "ravbg64", "ravcpl64", "nahimicservice", "nahimicsvc64", "nahimicsvc32",
+    "wavessyssvc64", "dolbydax2api",
+    "nvcontainer", "nvdisplay.container", "igfxem", "igfxhk", "igfxtray", "igfxcuiservice", "amdrsserv", "atieclxx",
+    "atiesrxx", "amdow",
+    "onedrive", "onedrive.sync.service", "onedrivestandaloneupdater", "filecoauth", "googledrivefs", "dropbox",
+    "microsoftedgeupdate", "googleupdate", "usocoreworker", "mousocoreworker", "musnotification", "musnotificationux",
+    "wuauclt", "trustedinstaller", "tiworker", "compattelrunner", "sihclient", "devicecensus", "wsqmcons",
+    "officeclicktorun", "officec2rclient",
+    "phoneexperiencehost", "yourphone", "yourphoneserver", "crossdeviceservice", "crossdeviceresume",
+    "securityhealthsystray", "securityhealthservice", "sgrmbroker", "ctfmon", "fontdrvhost", "sihost",
+    "useroobebroker", "unsecapp", "gamebarpresencewriter", "gamebarftserver", "gamingservices", "gamingservicesnet",
+    "msedgewebview2"
+  ],
+  "blockedDomains": [
+    "chatgpt.com", "chat.openai.com", "gemini.google.com", "claude.ai", "copilot.microsoft.com", "chat.deepseek.com",
+    "aistudio.google.com", "generativelanguage.googleapis.com", "api.openai.com", "api.anthropic.com",
+    "cursor.sh", "api2.cursor.sh", "windsurf.com", "codeium.com", "perplexity.ai", "www.perplexity.ai"
+  ]
 }
