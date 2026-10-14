@@ -416,6 +416,92 @@ class ExamServerTest {
     }
 
     @Test
+    void newSessionAfterEndAllowsStart() throws Exception {
+        TestClient c = loginAndStart("S1");
+        assertThrows(IllegalStateException.class, () -> server.room().newSession(), "Chưa kết thúc thì không được làm mới");
+        server.room().endExam("test");
+        c.next(Protocol.EXAM_END, 2000);
+        Path firstDir = server.room().examDir();
+        server.room().newSession();
+        assertFalse(server.room().isStarted());
+        assertFalse(server.room().isEnded());
+        assertEquals("De thu", server.room().examTitle(), "Đề đang nạp phải được giữ lại");
+        assertNull(server.room().examDir());
+        server.room().startExam();
+        assertTrue(server.room().isStarted());
+        assertNotEquals(firstDir, server.room().examDir());
+        assertTrue(Files.exists(firstDir.resolve("results.csv")), "Kết quả kỳ trước vẫn còn nguyên");
+        assertTrue(Files.readString(firstDir.resolve("events.csv"), StandardCharsets.UTF_8).contains(",S1,"));
+        assertFalse(Files.readString(server.room().examDir().resolve("events.csv"), StandardCharsets.UTF_8).contains(",S1,"),
+            "events.csv của kỳ mới không lẫn dữ liệu kỳ trước");
+    }
+
+    @Test
+    void canLoadAnotherExamAfterNewSession() throws Exception {
+        loginAndStart("S1");
+        server.room().endExam("test");
+        Path other = tmp.resolve("other.json");
+        Files.writeString(other, EXAM_JSON.replace("De thu", "De khac"), StandardCharsets.UTF_8);
+        assertThrows(IllegalStateException.class, () -> server.room().loadExam(other), "Đã bắt đầu thì chưa đổi đề được");
+        server.room().newSession();
+        server.room().loadExam(other);
+        assertEquals("De khac", server.room().examTitle());
+    }
+
+    @Test
+    void newSessionClearsSamplesAndSessions() throws Exception {
+        TestClient c = loginAndStart("S1");
+        JsonObject f = Protocol.msg(Protocol.FEATURES);
+        f.addProperty("window", 1);
+        JsonArray values = new JsonArray();
+        for (int i = 0; i < 6; i++) { values.add(i); }
+        f.add("values", values);
+        c.send(f);
+        JsonObject v = Protocol.msg(Protocol.VIOLATION);
+        v.addProperty("kind", "USB");
+        v.addProperty("detail", "E:");
+        c.send(v);
+        long deadline = System.currentTimeMillis() + 2000;
+        while ((row("S1").samples() == 0 || row("S1").violations() == 0) && System.currentTimeMillis() < deadline) { Thread.sleep(20); }
+        assertEquals(1, row("S1").samples());
+        server.room().endExam("test");
+        server.room().newSession();
+        assertTrue(server.room().rows().isEmpty());
+        assertNull(c.tryNext(Protocol.EXAM_START, 300));
+        assertEquals(-1, c.socket.getInputStream().read(), "Server phải đóng kết nối của máy còn lại");
+        Thread.sleep(150);                             // luồng đọc cũ kết thúc sau đó không được làm bẩn kỳ mới
+        assertTrue(server.room().history("S1").isEmpty());
+        assertTrue(server.room().rows().isEmpty());
+        TestClient again = login("S1");
+        assertEquals(0, row("S1").samples());
+        assertEquals(0, row("S1").violations());
+        assertNull(row("S1").anomalyScore());
+    }
+
+    @Test
+    void sameStudentCanLoginInNewSession() throws Exception {
+        TestClient c = loginAndStart("S1");
+        assertEquals(10.0, submitCorrect(c).get("score").getAsDouble());
+        server.room().endExam("test");
+        server.room().newSession();
+        TestClient again = login("S1");                // không bị "đang đăng nhập ở máy khác", không nhận lại RESULT cũ
+        assertNull(row("S1").score());
+        precheck(again, true);
+        server.room().startExam();
+        JsonObject start = again.next(Protocol.EXAM_START, 2000);
+        assertTrue(start.get("remainingSeconds").getAsInt() > 55, "Kỳ mới có đủ thời gian làm bài");
+        assertEquals(10.0, submitCorrect(again).get("score").getAsDouble());
+    }
+
+    @Test
+    void unsubmittedClientGetsExamEndWhenNewSessionStarts() throws Exception {
+        TestClient c = loginAndStart("S1");
+        server.room().endExam("test");
+        server.room().newSession();
+        assertNotNull(c.tryNext(Protocol.EXAM_END, 500), "Máy chưa nộp phải được báo kết thúc trước khi đóng");
+    }
+
+    @Test
     void loadExamRejectsBadAnswerIndex() throws IOException {
         Path bad = tmp.resolve("bad.json");
         Files.writeString(bad, EXAM_JSON.replace("\"answer\":0", "\"answer\":7"), StandardCharsets.UTF_8);

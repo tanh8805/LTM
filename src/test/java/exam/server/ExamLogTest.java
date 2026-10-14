@@ -72,4 +72,19 @@ class ExamLogTest {
         assertEquals("LOGIN_FAIL", e.type());
         assertTrue(e.detail().contains("Thiếu mã SV"), e.detail());
     }
+
+    @Test
+    void staleScoresAreIgnoredAfterNewSession() throws IOException {
+        ExamServer s = serverWithExam();
+        ExamRoom room = s.room();
+        room.login("S1", "An", null, new PrintWriter(new StringWriter()));
+        room.startExam();
+        int epoch = room.epoch();                      // lần chấm ML bắt đầu ở kỳ cũ
+        room.endExam("test");
+        room.newSession();
+        room.login("S1", "An", null, new PrintWriter(new StringWriter()));
+        room.applyScores(scores("S1", 0.9, true), epoch);   // trả về muộn, sau khi đã sang kỳ mới
+        assertNull(room.rows().get(0).anomalyScore());
+        assertEquals(List.of("LOGIN"), room.history("S1").stream().map(ExamLog.Event::type).toList());
+    }
 }

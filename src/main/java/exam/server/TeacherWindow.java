@@ -71,7 +71,8 @@ public class TeacherWindow extends JFrame {
     private final RowsModel model = new RowsModel();
     private final JLabel examLabel = new JLabel("Chưa chọn đề"), timeLabel = new JLabel("Còn lại: -");
     private final JButton startBtn = new JButton("Bắt đầu thi"), endBtn = new JButton("Kết thúc thi"),
-        openBtn = new JButton("Mở thư mục kết quả");
+        openBtn = new JButton("Mở thư mục kết quả"), newBtn = new JButton("Kỳ thi mới"),
+        chooseBtn = new JButton("Chọn file đề...");
     private final JTextArea logArea = new JTextArea(8, 60);
 
     public TeacherWindow(ExamServer server) {
@@ -82,16 +83,17 @@ public class TeacherWindow extends JFrame {
             logArea.append(line + "\n");
             logArea.setCaretPosition(logArea.getDocument().getLength());    // tự cuộn xuống dòng mới nhất
         }));
-        JButton chooseBtn = new JButton("Chọn file đề...");
         chooseBtn.addActionListener(e -> chooseExam());
         startBtn.addActionListener(e -> startExam());
         endBtn.addActionListener(e -> endExam());
+        newBtn.addActionListener(e -> newSession());
         openBtn.addActionListener(e -> openResults());
         JPanel top = new JPanel(new FlowLayout(FlowLayout.LEFT));
         top.add(chooseBtn);
         top.add(examLabel);
         top.add(startBtn);
         top.add(endBtn);
+        top.add(newBtn);
         top.add(openBtn);
         top.add(timeLabel);
         top.add(new JLabel("IP máy chủ: " + localAddresses()));
@@ -123,7 +125,7 @@ public class TeacherWindow extends JFrame {
         add(top, BorderLayout.NORTH);
         add(new JSplitPane(JSplitPane.VERTICAL_SPLIT, new JScrollPane(table), new JScrollPane(logArea)),
             BorderLayout.CENTER);
-        setSize(1000, 650);
+        setSize(1260, 680);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
         addWindowListener(new WindowAdapter() {
@@ -145,11 +147,15 @@ public class TeacherWindow extends JFrame {
         boolean started = room.isStarted();
         startBtn.setEnabled(room.examTitle() != null && !started);
         endBtn.setEnabled(started && !room.isEnded());
+        chooseBtn.setEnabled(!started);                    // chỉ đổi được đề khi bài thi chưa bắt đầu (kể cả sau Kỳ thi mới)
+        newBtn.setEnabled(room.isEnded());
         if (room.isEnded()) {
             timeLabel.setText("Đã kết thúc");
         } else if (started) {
             int s = room.remainingSeconds();
             timeLabel.setText(String.format("Còn lại: %02d:%02d", s / 60, s % 60));
+        } else {
+            timeLabel.setText("Còn lại: -");
         }
     }
 
@@ -187,6 +193,18 @@ public class TeacherWindow extends JFrame {
             JOptionPane.showMessageDialog(this, ex.getMessage());
         }
         refresh();
+    }
+
+    private void newSession() {
+        if (JOptionPane.showConfirmDialog(this, "Bắt đầu kỳ thi mới?\nMọi máy còn lại sẽ bị ngắt kết nối và danh sách thí sinh bị xoá.\n"
+                + "Kết quả kỳ này vẫn nằm trong thư mục riêng của nó.", "Xác nhận", JOptionPane.YES_NO_OPTION) == JOptionPane.YES_OPTION) {
+            try {
+                room.newSession();
+            } catch (IllegalStateException ex) {
+                JOptionPane.showMessageDialog(this, ex.getMessage());
+            }
+            refresh();
+        }
     }
 
     private void endExam() {
