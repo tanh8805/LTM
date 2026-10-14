@@ -502,6 +502,35 @@ class ExamServerTest {
     }
 
     @Test
+    void rowCarriesOsFocusLostAndViolationTime() throws Exception {
+        TestClient c = connect();
+        JsonObject login = loginMsg("S1", "An");
+        login.addProperty("os", "Windows 11");
+        c.send(login);
+        c.next(Protocol.LOGIN_OK, 2000);
+        precheck(c, true);
+        server.room().startExam();
+        c.next(Protocol.EXAM_START, 2000);
+        for (int window = 1; window <= 2; window++) {          // hai cửa sổ, mỗi cửa sổ rời cửa sổ thi 3 lần
+            JsonObject f = Protocol.msg(Protocol.FEATURES);
+            f.addProperty("window", window);
+            JsonArray values = new JsonArray();
+            for (int v : new int[] {0, 3, 10, 0, 0, 1}) { values.add(v); }
+            f.add("values", values);
+            c.send(f);
+        }
+        JsonObject v = Protocol.msg(Protocol.VIOLATION);
+        v.addProperty("kind", "NET");
+        v.addProperty("detail", "chatgpt.com (1.2.3.4)");
+        c.send(v);
+        long deadline = System.currentTimeMillis() + 2000;
+        while ((row("S1").samples() < 2 || row("S1").violations() == 0) && System.currentTimeMillis() < deadline) { Thread.sleep(20); }
+        assertEquals("Windows 11", row("S1").os());
+        assertEquals(6, row("S1").focusLost());
+        assertTrue(row("S1").lastViolationAt().matches("\\d\\d:\\d\\d"), row("S1").lastViolationAt());
+    }
+
+    @Test
     void loadExamRejectsBadAnswerIndex() throws IOException {
         Path bad = tmp.resolve("bad.json");
         Files.writeString(bad, EXAM_JSON.replace("\"answer\":0", "\"answer\":7"), StandardCharsets.UTF_8);

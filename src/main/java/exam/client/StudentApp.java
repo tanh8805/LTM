@@ -90,6 +90,7 @@ public class StudentApp {
         JsonObject m = Protocol.msg(Protocol.LOGIN);
         m.addProperty("studentId", studentId);
         m.addProperty("name", studentName);
+        m.addProperty("os", System.getProperty("os.name", ""));
         conn.send(m);
     }
 

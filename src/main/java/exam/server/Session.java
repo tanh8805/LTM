@@ -17,7 +17,7 @@ public class Session {
     PrintWriter out;                           // null = đang mất kết nối; session vẫn giữ nguyên để vào lại được
     boolean precheckOk, precheckFailed, submitted, anomaly;
     int violations, flaggedCount;              // flaggedCount: số lần chấm ML mà máy này bị cờ bất thường
-    String lastViolation = "";
+    String lastViolation = "", lastViolationAt = "", os = "";    // lastViolationAt: giờ:phút; os: tên hệ điều hành client gửi lúc đăng nhập
     final List<JsonObject> samples = new ArrayList<>();    // các FEATURES đã nhận, gửi sang ML
     Double anomalyScore, maxAnomaly;
     JsonObject result;                         // {score, correct, total}, null nếu chưa nộp
@@ -29,6 +29,13 @@ public class Session {
     }
 
     boolean connected() { return out != null; }
+
+    /** Tổng số lần rời cửa sổ thi (feature thứ hai của mỗi FEATURES) trong cả buổi. */
+    int focusLost() {
+        int total = 0;
+        for (JsonObject sample : samples) { total += sample.getAsJsonArray("values").get(1).getAsInt(); }
+        return total;
+    }
 
     /** Trạng thái hiển thị, suy ra từ các cờ nên không bao giờ lệch với dữ liệu thật. */
     String status(boolean examStarted) {

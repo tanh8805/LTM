@@ -8,6 +8,10 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.net.Socket;
 import java.nio.file.Path;
+import java.time.Instant;
+import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -20,8 +24,12 @@ import java.util.function.Consumer;
 
 public class ExamRoom {
     public record Row(String studentId, String name, String status, int violations, String lastViolation,
-                      Double anomalyScore, boolean anomaly, Double score, int samples) {}
+                      Double anomalyScore, boolean anomaly, Double score, int samples, String os, int focusLost,
+                      String lastViolationAt) {}
+    /** Thông tin đề cho thanh trên của cửa sổ giám thị; startedAt rỗng nếu chưa bắt đầu. */
+    public record Summary(String title, int questions, int minutes, String startedAt) {}
 
+    private static final DateTimeFormatter HOUR_MINUTE = DateTimeFormatter.ofPattern("HH:mm");
     private final JsonObject rules;
     private final ScheduledExecutorService scheduler;
     private final Consumer<String> log;
@@ -51,6 +59,11 @@ public class ExamRoom {
     public synchronized Path resultsRoot() { return resultsRoot; }
     public List<ExamLog.Event> history(String studentId) { return records.history(studentId); }
     public synchronized String examTitle() { return exam == null ? null : exam.get("title").getAsString(); }
+    public synchronized Summary summary() {
+        if (exam == null) { return null; }
+        return new Summary(examTitle(), exam.getAsJsonArray("questions").size(), exam.get("durationMinutes").getAsInt(),
+            started ? LocalTime.ofInstant(Instant.ofEpochMilli(startMillis), ZoneId.systemDefault()).format(HOUR_MINUTE) : "");
+    }
     public synchronized boolean isStarted() { return started; }
     public synchronized boolean isEnded() { return ended; }
 
@@ -143,6 +156,10 @@ public class ExamRoom {
 
     /** Trả session nếu đăng nhập được; nếu không thì đã gửi LOGIN_FAIL và trả null. */
     synchronized Session login(String id, String name, Socket socket, PrintWriter out) {
+        return login(id, name, "", socket, out);
+    }
+
+    synchronized Session login(String id, String name, String os, Socket socket, PrintWriter out) {
         Session s = sessions.get(id);
         String fail = id.isEmpty() || name.isEmpty() ? "Thiếu mã SV hoặc họ tên"
             : s != null && s.connected() ? "Mã SV này đang đăng nhập ở máy khác"
@@ -161,6 +178,7 @@ public class ExamRoom {
         }
         s.socket = socket;
         s.out = out;
+        s.os = os;
         s.lastSeen = System.currentTimeMillis();
         JsonObject ok = Protocol.msg(Protocol.LOGIN_OK);
         ok.add("rules", rules);
@@ -190,6 +208,7 @@ public class ExamRoom {
         if (!live(s)) { return; }
         s.violations++;
         s.lastViolation = kind + ": " + detail;
+        s.lastViolationAt = LocalTime.now().format(HOUR_MINUTE);
         log.accept("Vi phạm " + s.id + " - " + s.lastViolation);
         event(s, "VIOLATION", s.lastViolation);
     }
@@ -247,7 +266,8 @@ public class ExamRoom {
         List<Row> list = new ArrayList<>();
         for (Session s : sessions.values()) {
             list.add(new Row(s.id, s.name, s.status(started), s.violations, s.lastViolation, s.anomalyScore,
-                s.anomaly, s.result == null ? null : s.result.get("score").getAsDouble(), s.samples.size()));
+                s.anomaly, s.result == null ? null : s.result.get("score").getAsDouble(), s.samples.size(), s.os,
+                s.focusLost(), s.lastViolationAt));
         }
         return list;
     }
