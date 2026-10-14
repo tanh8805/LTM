@@ -33,7 +33,7 @@ import javax.swing.table.DefaultTableCellRenderer;
 public class TeacherWindow extends JFrame {
     private static final Color WARN = new Color(255, 205, 205);
     private static final String[] COLUMNS = {"Mã SV", "Họ tên", "Trạng thái", "Số vi phạm", "Vi phạm gần nhất",
-        "Bất thường", "Điểm"};
+        "Mẫu", "Bất thường", "Điểm"};
 
     /** Bảng dữ liệu lấy từ room.rows(); mỗi giây thay cả danh sách cho đơn giản. */
     private static class RowsModel extends AbstractTableModel {
@@ -52,7 +52,8 @@ public class TeacherWindow extends JFrame {
                 case 2 -> row.status();
                 case 3 -> row.violations();
                 case 4 -> row.lastViolation();
-                case 5 -> row.anomalyScore() == null ? "-" : String.format("%.2f", row.anomalyScore());
+                case 5 -> row.samples();
+                case 6 -> row.anomalyScore() == null ? "-" : String.format("%.2f", row.anomalyScore());
                 default -> row.score() == null ? "-" : row.score().toString();
             };
         }

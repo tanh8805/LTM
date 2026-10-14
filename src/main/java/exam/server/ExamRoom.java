@@ -19,7 +19,7 @@ import java.util.function.Consumer;
 
 public class ExamRoom {
     public record Row(String studentId, String name, String status, int violations, String lastViolation,
-                      Double anomalyScore, boolean anomaly, Double score) {}
+                      Double anomalyScore, boolean anomaly, Double score, int samples) {}
 
     private final JsonObject rules;
     private final ScheduledExecutorService scheduler;
@@ -30,6 +30,7 @@ public class ExamRoom {
     private JsonArray clientQuestions;         // câu hỏi không có "answer"
     private boolean started, ended;
     private String endReason = "";
+    private final MlScores mlScores = new MlScores();
     private long startMillis;
     private ScheduledFuture<?> autoEnd;
 
@@ -182,13 +183,13 @@ public class ExamRoom {
 
     synchronized JsonArray samplesForMl() { return MlScores.samples(sessions.values()); }
 
-    synchronized void applyScores(JsonObject response) { MlScores.apply(response, sessions, log); }
+    synchronized void applyScores(JsonObject response) { mlScores.apply(response, sessions, log); }
 
     public synchronized List<Row> rows() {
         List<Row> list = new ArrayList<>();
         for (Session s : sessions.values()) {
             list.add(new Row(s.id, s.name, s.status(started), s.violations, s.lastViolation, s.anomalyScore,
-                s.anomaly, s.result == null ? null : s.result.get("score").getAsDouble()));
+                s.anomaly, s.result == null ? null : s.result.get("score").getAsDouble(), s.samples.size()));
         }
         return list;
     }

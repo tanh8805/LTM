@@ -31,7 +31,9 @@ public class Monitor {
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm:ss");
 
     private final boolean windows = WindowsProbe.isWindows();
-    private ScheduledExecutorService scheduler;
+    private final Runnable scanTask;
+    private final long scanMs, featuresMs;
+    private ScheduledExecutorService scanner, heartbeat;        // hai luồng riêng: quét chậm không được làm trễ FEATURES
     private volatile Consumer<JsonObject> sender;
 
     // Luật và baseline lấy ở lần PRECHECK cuối cùng
@@ -48,7 +50,12 @@ public class Monitor {
     private long focusLostMillis;
     private long lostSince = -1;                                  // -1 = đang ở trong cửa sổ thi
 
-    public Monitor() {}
+    public Monitor() { this(null, 3000, 30_000); }
+    /** Cho test: {@code scanTask} thay phép quét thật (null = quét tiến trình/USB/mạng như bình thường). */
+    public Monitor(Runnable scanTask, long scanMs, long featuresMs) {
+        this.scanTask = scanTask != null ? scanTask : this::scan;
+        this.scanMs = scanMs; this.featuresMs = featuresMs;
+    }
 
     /** Danh sách vấn đề (rỗng = đạt). Chạy lệnh hệ thống nên phải gọi ngoài luồng giao diện. */
     public List<String> precheck(JsonObject rules) {
@@ -87,18 +94,21 @@ public class Monitor {
 
     public void start(Consumer<JsonObject> sender) {
         this.sender = sender;
-        scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
-            Thread t = new Thread(r, "monitor");
-            t.setDaemon(true);
-            return t;
-        });
-        scheduler.execute(() -> safely(this::resolveBlockedDomains));      // DNS có thể chậm nên không chạy ở luồng giao diện
-        scheduler.scheduleWithFixedDelay(() -> safely(this::scan), 3, 3, TimeUnit.SECONDS);
-        scheduler.scheduleAtFixedRate(() -> safely(this::sendFeatures), 30, 30, TimeUnit.SECONDS);
+        scanner = newThread("monitor-scan");
+        heartbeat = newThread("monitor-features");
+        scanner.execute(() -> safely(this::resolveBlockedDomains));        // DNS có thể chậm nên không chạy ở luồng giao diện
+        scanner.scheduleWithFixedDelay(() -> safely(scanTask), scanMs, scanMs, TimeUnit.MILLISECONDS);
+        heartbeat.scheduleAtFixedRate(() -> safely(this::sendFeatures), featuresMs, featuresMs, TimeUnit.MILLISECONDS);
+    }
+
+    private static ScheduledExecutorService newThread(String name) {
+        return Executors.newSingleThreadScheduledExecutor(r -> { Thread t = new Thread(r, name); t.setDaemon(true); return t; });
     }
 
     public void stop() {
-        if (scheduler != null) { scheduler.shutdownNow(); }
+        for (ScheduledExecutorService e : new ScheduledExecutorService[] {scanner, heartbeat}) {
+            if (e != null) { e.shutdownNow(); }
+        }
     }
 
     /** Một việc định kỳ ném exception sẽ bị executor hủy lặng lẽ, nên bắt lại và báo ra stderr. */
@@ -119,7 +129,8 @@ public class Monitor {
 
     private void scan() {
         if (!windows) { return; }
-        processSnapshot(WindowsProbe.processes(), WindowsProbe.roots(), WindowsProbe.remoteIps());
+        processSnapshot(Debug.timed("quét tasklist", WindowsProbe::processes), Debug.timed("quét ổ đĩa", WindowsProbe::roots),
+            Debug.timed("quét netstat", WindowsProbe::remoteIps));
     }
 
     /** Áp dụng một lần quét: cập nhật bộ đếm và gửi VIOLATION cho điều mới. */
@@ -151,8 +162,8 @@ public class Monitor {
 
     private void sendFeatures() {
         JsonObject m = buildFeatures();
-        Consumer<JsonObject> s = sender;
-        if (s != null) { s.accept(m); }
+        Debug.log("gửi FEATURES " + m);
+        if (sender != null) { sender.accept(m); }
     }
 
     /** Tạo tin FEATURES của cửa sổ hiện tại rồi reset bộ đếm. */
