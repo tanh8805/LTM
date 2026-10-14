@@ -134,4 +134,24 @@ class MonitorTest {
         assertEquals(0, second[1]);                            // không đếm lại lần rời cửa sổ
         assertTrue(second[2] >= 1);
     }
+    /** Quét chậm (tasklist/PowerShell treo) không được làm trễ FEATURES: nếu trễ quá 90 giây server coi là mất kết nối. */
+    @Test
+    void featuresSentEvenWhenScanIsSlow() throws Exception {
+        List<JsonObject> got = java.util.Collections.synchronizedList(new ArrayList<>());
+        Monitor slow = new Monitor(() -> {
+            try {
+                Thread.sleep(4000);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }, 50, 100);
+        slow.start(got::add);
+        try {
+            Thread.sleep(1500);
+        } finally {
+            slow.stop();
+        }
+        long features = got.stream().filter(m -> "FEATURES".equals(m.get("type").getAsString())).count();
+        assertTrue(features >= 5, "chỉ gửi được " + features + " FEATURES trong 1,5 giây trong khi quét đang chậm");
+    }
 }

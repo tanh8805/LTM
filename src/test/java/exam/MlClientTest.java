@@ -15,6 +15,9 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -24,16 +27,18 @@ class MlClientTest {
     static final String OK_BODY = "{\"status\":\"ok\",\"results\":[{\"studentId\":\"S1\",\"score\":0.9,\"anomaly\":true}]}";
 
     HttpServer fake;
+    volatile String fakeBody;
     ExamServer server;
     @TempDir Path tmp;
 
     /** Service giả: ghi lại body nhận được và trả status/body cố định. */
     private AtomicReference<String> startFake(int status, String body) throws IOException {
         AtomicReference<String> received = new AtomicReference<>();
+        fakeBody = body;
         fake = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         fake.createContext("/score", ex -> {
             received.set(new String(ex.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
-            byte[] out = body.getBytes(StandardCharsets.UTF_8);
+            byte[] out = fakeBody.getBytes(StandardCharsets.UTF_8);
             ex.getResponseHeaders().add("Content-Type", "application/json");
             ex.sendResponseHeaders(status, out.length);
             ex.getResponseBody().write(out);
@@ -141,5 +146,75 @@ class MlClientTest {
         assertDoesNotThrow(() -> server.scoreRoomNow());
         assertEquals(0.9, s1().anomalyScore());
         assertTrue(s1().anomaly());
+    }
+    private List<String> captureLog() {
+        List<String> lines = Collections.synchronizedList(new ArrayList<>());
+        server.setListener(lines::add);
+        return lines;
+    }
+
+    private void waitSamples(int n) throws InterruptedException {
+        for (int i = 0; i < 100 && s1().samples() < n; i++) {
+            Thread.sleep(20);
+        }
+        assertEquals(n, s1().samples());
+    }
+
+    private long count(List<String> lines, String part) {
+        synchronized (lines) {
+            return lines.stream().filter(l -> l.contains(part)).count();
+        }
+    }
+
+    @Test
+    void rowShowsSampleCount() throws Exception {
+        startFake(200, OK_BODY);
+        startExamWithFeatures();
+        waitSamples(1);
+    }
+
+    @Test
+    void logsFlagTransitionsOnlyOnce() throws Exception {
+        startFake(200, OK_BODY);
+        startExamWithFeatures();
+        List<String> lines = captureLog();
+        server.setMlClient(new MlClient(fakeUrl()));
+        waitSamples(1);
+        server.scoreRoomNow();
+        server.scoreRoomNow();
+        assertEquals(1, count(lines, "Bất thường: S1 (0.90)"), "bị cờ liên tiếp chỉ log một lần");
+        fakeBody = "{\"status\":\"ok\",\"results\":[{\"studentId\":\"S1\",\"score\":0.2,\"anomaly\":false}]}";
+        server.scoreRoomNow();
+        server.scoreRoomNow();
+        assertEquals(1, count(lines, "Hết bất thường: S1"));
+        assertEquals(1, count(lines, "Bất thường: S1"));
+    }
+
+    @Test
+    void logsNotEnoughDataOnlyWhenCountChanges() throws Exception {
+        startFake(200, "{\"status\":\"not_enough_data\",\"results\":[]}");
+        startExamWithFeatures();
+        List<String> lines = captureLog();
+        server.setMlClient(new MlClient(fakeUrl()));
+        waitSamples(1);
+        server.scoreRoomNow();
+        server.scoreRoomNow();
+        server.scoreRoomNow();
+        assertEquals(1, count(lines, "ML: chưa đủ dữ liệu (1/20 mẫu)"));
+        assertEquals(1, count(lines, "chưa đủ dữ liệu"));
+    }
+
+    @Test
+    void resultsCsvHasSamplesAndFlaggedCount() throws Exception {
+        startFake(200, OK_BODY);
+        startExamWithFeatures();
+        server.setMlClient(new MlClient(fakeUrl()));
+        waitSamples(1);
+        server.scoreRoomNow();
+        server.scoreRoomNow();
+        server.room().endExam("test");
+        List<String> csv = Files.readAllLines(tmp.resolve("results.csv"), StandardCharsets.UTF_8);
+        assertTrue(csv.get(0).endsWith(",maxAnomaly,status,samples,flaggedCount"), csv.get(0));
+        assertTrue(csv.get(1).endsWith(",1,2"), csv.get(1));     // 1 mẫu FEATURES, bị cờ trong 2 lần chấm
     }
 }
