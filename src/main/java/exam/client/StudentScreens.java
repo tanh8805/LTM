@@ -28,15 +28,16 @@ class StudentScreens {
     private final LoginPanel login;
     private final PrecheckPanel precheck;
     private final ExamPanel exam;
-    private final ResultPanel result = new ResultPanel();
+    private final ResultPanel result;
     private final JPanel header = new JPanel();
     private final Timer lostTimer = new Timer(LOST_AFTER_MS, e -> topBar.setConnection(TopBar.Conn.LOST));
     private int unanswered;
 
     /** Sự kiện nút bấm gọi ngược về StudentApp qua các callback; mọi phương thức show... gọi trên luồng giao diện. */
     StudentScreens(JFrame frame, Runnable onLogin, Runnable onRecheck, Runnable onPrev, Runnable onNext,
-                   Runnable onSubmit, IntConsumer onAnswer, IntConsumer onGoto) {
+                   Runnable onSubmit, IntConsumer onAnswer, IntConsumer onGoto, Runnable onNewRound) {
         this.frame = frame;
+        result = new ResultPanel(onNewRound);
         login = new LoginPanel(onLogin);
         precheck = new PrecheckPanel(onRecheck);
         exam = new ExamPanel(onGoto, onPrev, onNext, () -> confirmSubmit(onSubmit), onAnswer);
@@ -129,6 +130,23 @@ class StudentScreens {
         result.showMessage(text);
         topBar.setTimerVisible(false);
         show("result");
+    }
+
+    /** Bài thi đã kết thúc từ trước khi máy này vào: có nút Thi lượt mới. */
+    void showEnded(String text) {
+        result.showEnded(text);
+        topBar.setTimerVisible(false);
+        show("result");
+    }
+
+    /** Quay về màn đăng nhập cho kỳ thi mới; mã SV, họ tên vẫn nằm sẵn trong form. */
+    void resetForNewRound() {
+        login.setBusy(false, "");
+        login.setError(" ");
+        setStatus(" ");
+        setConnection(TopBar.Conn.NONE);
+        topBar.setTimerVisible(false);
+        show("login");
     }
 
     void showResult(double score, int correct, int total) {

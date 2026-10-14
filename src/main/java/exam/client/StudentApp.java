@@ -40,7 +40,7 @@ public class StudentApp {
 
     private void show() {
         screens = new StudentScreens(frame, this::login, this::runPrecheck, () -> goTo(current - 1),
-            () -> goTo(current + 1), this::submit, this::onAnswer, this::goTo);
+            () -> goTo(current + 1), this::submit, this::onAnswer, this::goTo, this::newRound);
         frame.addWindowFocusListener(new WindowAdapter() {
             @Override public void windowGainedFocus(WindowEvent e) { if (otherApp(e)) { monitor.focusGained(); } }
             @Override public void windowLostFocus(WindowEvent e) { if (otherApp(e)) { monitor.focusLost(); } }
@@ -155,6 +155,21 @@ public class StudentApp {
         screens.showExam(Protocol.str(m, "title"));
     }
 
+    /** Nút "Thi lượt mới": xoá mọi trạng thái của lượt trước rồi về màn đăng nhập (mã SV, họ tên giữ nguyên trong form). */
+    private void newRound() {
+        if (conn != null) { conn.close(); }
+        monitor.stop();
+        monitor.reset();
+        countdown.stop();
+        answers.clear();
+        questions = null;
+        rules = null;
+        current = 0;
+        deadlineMillis = 0;
+        loggedInOnce = examActive = submitted = finished = false;
+        screens.resetForNewRound();
+    }
+
     private void tick() {
         int left = (int) Math.max(0, (deadlineMillis - System.currentTimeMillis()) / 1000);
         screens.setTimer(left);
@@ -197,7 +212,7 @@ public class StudentApp {
     private void onExamEnd() {
         if (questions == null) {               // chưa có đề (vào sau khi kết thúc): không có gì để nộp
             finished = true;
-            screens.showFinished("Bài thi đã kết thúc");
+            screens.showEnded("Bài thi đã kết thúc");
             screens.setConnection(TopBar.Conn.NONE);
             conn.close();
         } else if (submitted) {

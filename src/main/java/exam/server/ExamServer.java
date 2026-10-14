@@ -169,12 +169,13 @@ public class ExamServer {
     /** Lấy mẫu trong khối synchronized của phòng, gọi HTTP ngoài khối để ML chậm không treo cả phòng. */
     public void scoreRoomNow() {
         MlClient ml = mlClient;
+        int epoch = room.epoch();              // lấy trước khi gọi HTTP: nếu giáo viên làm mới kỳ thi giữa chừng thì bỏ điểm này
         JsonArray samples = room.samplesForMl();
         if (ml == null || samples.isEmpty()) {
             return;
         }
         try {
-            room.applyScores(ml.score(samples));
+            room.applyScores(ml.score(samples), epoch);
         } catch (IOException | RuntimeException e) {
             log("ML lỗi: " + e);               // giữ điểm cũ, không để lỗi ML làm sập server
         } catch (InterruptedException e) {

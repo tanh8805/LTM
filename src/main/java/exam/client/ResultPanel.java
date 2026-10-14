@@ -8,14 +8,17 @@ import java.text.DecimalFormatSymbols;
 import java.util.Locale;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
+import javax.swing.JButton;
 import javax.swing.JComponent;
 import javax.swing.JPanel;
 
 class ResultPanel extends JPanel {
     private final JPanel box = new JPanel();
+    private final JButton newRoundBtn = Theme.primaryButton("Thi lượt mới");
 
-    ResultPanel() {
+    ResultPanel(Runnable onNewRound) {
         super(new GridBagLayout());
+        newRoundBtn.addActionListener(e -> onNewRound.run());
         setBackground(Theme.BACKGROUND);
         box.setOpaque(false);
         box.setLayout(new BoxLayout(box, BoxLayout.Y_AXIS));
@@ -27,14 +30,21 @@ class ResultPanel extends JPanel {
         return new DecimalFormat("0.##", DecimalFormatSymbols.getInstance(Locale.ROOT)).format(score) + " / 10";
     }
 
+    /** Thông báo ngắn khi đang nộp bài: chưa có nút vì kết nối còn đang dùng. */
     void showMessage(String text) {
         fill(Theme.label(text, 28, true, Theme.TEXT));
+    }
+
+    /** Bài thi đã kết thúc mà máy này không có đề để nộp: cho phép đăng nhập lại kỳ mới. */
+    void showEnded(String text) {
+        fill(Theme.label(text, 28, true, Theme.TEXT), newRoundBtn);
     }
 
     void showResult(double score, int correct, int total) {
         fill(Theme.label("Kết quả bài thi", 20, false, Theme.MUTED), Theme.label(scoreText(score), 72, true, Theme.PRIMARY),
             Theme.label("Đúng " + correct + "/" + total + " câu", 24, false, Theme.TEXT),
-            Theme.label("Cảm ơn bạn đã hoàn thành bài thi. Chúc bạn kết quả tốt!", Theme.BASE_SIZE, false, Theme.MUTED));
+            Theme.label("Cảm ơn bạn đã hoàn thành bài thi. Chúc bạn kết quả tốt!", Theme.BASE_SIZE, false, Theme.MUTED),
+            newRoundBtn);
     }
 
     private void fill(JComponent... parts) {

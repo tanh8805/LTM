@@ -32,7 +32,8 @@ public class ExamRoom {
     private JsonArray clientQuestions;         // câu hỏi không có "answer"
     private boolean started, ended;
     private String endReason = "";
-    private final MlScores mlScores = new MlScores();
+    private MlScores mlScores = new MlScores();
+    private int epoch;                         // tăng mỗi lần làm mới kỳ thi, để bỏ qua điểm ML trả về muộn của kỳ cũ
     private long startMillis;
     private ScheduledFuture<?> autoEnd;
 
@@ -86,6 +87,25 @@ public class ExamRoom {
         records.record("", "", "EXAM_END", reason + ". Đã nộp " + done + "/" + sessions.size() + " máy");
         writeResults();
     }
+
+    /** Làm mới phòng cho kỳ thi kế tiếp: chỉ được gọi sau khi kết thúc; đề đang nạp được giữ lại, kết quả kỳ trước nằm nguyên trong thư mục của nó. */
+    public synchronized void newSession() {
+        if (!ended) { throw new IllegalStateException("Kỳ thi chưa kết thúc"); }
+        sessions.values().stream().filter(s -> s.connected() && !s.submitted).forEach(this::sendEnd);
+        closeAll();
+        sessions.clear();
+        mlScores = new MlScores();
+        started = ended = false;
+        endReason = "";
+        startMillis = 0;
+        autoEnd = null;
+        examDir = null;
+        epoch++;
+        records.reset();
+        log.accept("Kỳ thi mới: đã xoá phiên và mẫu cũ, giữ đề \"" + examTitle() + "\"");
+    }
+
+    public synchronized int epoch() { return epoch; }
 
     public synchronized int remainingSeconds() {
         if (exam == null || ended) { return 0; }     // đã kết thúc thì đồng hồ phải dừng ở 0
@@ -151,10 +171,14 @@ public class ExamRoom {
         return s;
     }
 
-    synchronized void touch(Session s) { s.lastSeen = System.currentTimeMillis(); }
-    synchronized void features(Session s, JsonObject sample) { s.samples.add(sample); }
+    /** Session của kỳ trước (đã bị xoá khi làm mới) còn nhận tin muộn thì phải bỏ qua. */
+    private boolean live(Session s) { return sessions.get(s.id) == s; }
+
+    synchronized void touch(Session s) { if (live(s)) { s.lastSeen = System.currentTimeMillis(); } }
+    synchronized void features(Session s, JsonObject sample) { if (live(s)) { s.samples.add(sample); } }
 
     synchronized void precheckResult(Session s, boolean ok, String issues) {
+        if (!live(s)) { return; }
         s.precheckOk = ok;
         s.precheckFailed = !ok;
         log.accept("PRECHECK " + s.id + (ok ? ": đạt" : ": lỗi - " + issues));
@@ -163,6 +187,7 @@ public class ExamRoom {
     }
 
     synchronized void violation(Session s, String kind, String detail) {
+        if (!live(s)) { return; }
         s.violations++;
         s.lastViolation = kind + ": " + detail;
         log.accept("Vi phạm " + s.id + " - " + s.lastViolation);
@@ -170,6 +195,7 @@ public class ExamRoom {
     }
 
     synchronized void submit(Session s, JsonObject answers) {
+        if (!live(s)) { return; }
         if (!started) { log.accept("Bỏ qua SUBMIT của " + s.id + ": bài thi chưa bắt đầu"); return; }
         if (s.result == null) {                // nộp lần hai không chấm lại, chỉ gửi lại RESULT cũ
             s.result = ExamFile.grade(exam, answers);
@@ -184,7 +210,7 @@ public class ExamRoom {
 
     /** Chỉ đánh dấu mất kết nối nếu socket vẫn là socket của luồng đọc vừa kết thúc (tránh đá máy đã vào lại). */
     synchronized void disconnected(Session s, Socket socket) {
-        if (s != null && s.socket == socket) { markDisconnected(s, "socket đóng"); }
+        if (s != null && live(s) && s.socket == socket) { markDisconnected(s, "socket đóng"); }
     }
 
     private void markDisconnected(Session s, String why) {
@@ -209,7 +235,11 @@ public class ExamRoom {
 
     synchronized JsonArray samplesForMl() { return MlScores.samples(sessions.values()); }
 
-    synchronized void applyScores(JsonObject response) {
+    synchronized void applyScores(JsonObject response) { applyScores(response, epoch); }
+
+    /** Điểm ML tính cho kỳ thi cũ (epoch khác) thì bỏ, không áp vào máy cùng mã SV của kỳ mới. */
+    synchronized void applyScores(JsonObject response, int forEpoch) {
+        if (forEpoch != epoch) { return; }
         mlScores.apply(response, sessions, log, (s, type) -> event(s, type, String.format(Locale.ROOT, "%.2f", s.anomalyScore)));
     }
 
