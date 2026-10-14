@@ -11,6 +11,7 @@ Mảng của bạn: phát hiện máy "khác số đông" bằng Isolation Fores
 | `ml/ml_service.py` | Service FastAPI: nhận các mẫu `FEATURES` của cả phòng, fit Isolation Forest, trả điểm bất thường 0–1 cho từng sinh viên. |
 | `ml/simulate_clients.py` | Giả lập nhiều client TCP thật (kể cả một máy "gian lận") để demo mà không cần nhiều laptop. |
 | `server/MlClient.java` | Phía Java gọi `POST /score` bằng `HttpClient`, timeout 5 giây. |
+| `server/MlScores.java` | Gom mẫu gửi ML và ghi điểm trả về vào `Session`; log `Bất thường`/`Hết bất thường`/`ML: chưa đủ dữ liệu (n/20 mẫu)`. |
 | `ml/test_ml_service.py` | 5 test của service. |
 
 ## 2. Thứ tự đọc
@@ -19,7 +20,7 @@ Mảng của bạn: phát hiện máy "khác số đông" bằng Isolation Fores
 2. `ml_service.score` và hai lớp `Sample`, `ScoreRequest`: endpoint `/score` và kiểm tra dữ liệu vào (`values` đúng 6 số, sai thì FastAPI trả 422).
 3. `MlClient.score`: gửi JSON, mã khác 200 thì ném `IOException`.
 4. `ExamServer.scoreRoomNow`: gom mẫu, gọi ML ngoài khối khoá, lỗi thì ghi log `ML lỗi` và giữ điểm cũ.
-5. `ExamRoom.applyScores`: ghi `anomalyScore`, `anomaly`, `maxAnomaly` vào từng `Session`.
+5. `ExamRoom.applyScores` → `MlScores.apply`: ghi `anomalyScore`, `anomaly`, `maxAnomaly`, `flaggedCount` vào từng `Session`, và log khi trạng thái đổi.
 6. `simulate_clients.SimClient.handle` và `feature_loop`: client giả phản ứng với từng loại tin và gửi `FEATURES`.
 7. `test_ml_service.py`: đọc để hiểu mỗi quy tắc được kiểm tra thế nào.
 
@@ -28,9 +29,9 @@ Mảng của bạn: phát hiện máy "khác số đông" bằng Isolation Fores
 1. Mỗi 30 giây client gửi `FEATURES` (`window` và 6 số) từ `Monitor.sendFeatures`. Trên server, `ClientHandler.features` kiểm tra đúng 6 số rồi `ExamRoom.features` lưu mẫu vào `Session.samples`.
 2. `ExamServer` có lịch 30 giây gọi `scoreIfRunning`. Bài đang diễn ra nên gọi `scoreRoomNow`: `room.samplesForMl()` gom mẫu của mọi sinh viên (thêm `studentId`).
 3. `MlClient.score` gửi `POST http://localhost:8000/score` với `{"samples": [...]}` (không giữ khoá nào của phòng trong lúc chờ).
-4. `ml_service.score` gọi `score_samples`: dưới 20 mẫu thì trả `not_enough_data`; ngược lại fit `IsolationForest`, tính điểm thô `-model.score_samples(x)`, chuẩn hoá min–max về 0–1, rồi với mỗi sinh viên lấy tối đa trong **3 cửa sổ gần nhất** và đặt `anomaly` theo quy tắc ở mục 4.
+4. `ml_service.score` gọi `score_samples`: dưới 20 mẫu **trong cả phòng** thì trả `not_enough_data` (server log `ML: chưa đủ dữ liệu (n/20 mẫu)`, cột Mẫu của từng máy cho biết đang ở đâu); ngược lại fit `IsolationForest`, tính điểm thô `-model.score_samples(x)`, chuẩn hoá min–max về 0–1, rồi với mỗi sinh viên lấy tối đa trong **3 cửa sổ gần nhất** và đặt `anomaly` theo quy tắc ở mục 4.
 5. Trả `{"status": "ok", "results": [...]}`. `ExamRoom.applyScores` cập nhật `Session` (`status` khác `ok` thì bỏ qua).
-6. `TeacherWindow.refresh` (mỗi giây) đọc `room.rows()` và hiện cột "Bất thường" (`%.2f`); dòng có `anomaly` bị tô đỏ nhạt.
+6. `TeacherWindow.refresh` (mỗi giây) đọc `room.rows()` và hiện cột "Mẫu" (số `FEATURES` đã nhận) và "Bất thường" (`%.2f`); dòng có `anomaly` bị tô đỏ nhạt. `results.csv` có thêm cột `samples` và `flaggedCount` (số lần chấm máy bị gắn cờ).
 
 ## 4. Kiến thức cần giải thích được với thầy
 
@@ -38,6 +39,7 @@ Mảng của bạn: phát hiện máy "khác số đông" bằng Isolation Fores
 - **Vì sao không cần dataset:** đây là học không giám sát; mỗi chu kỳ fit lại ngay trên dữ liệu của chính buổi thi và so các máy với nhau. Không có nhãn "gian lận" nào để học.
 - **Chuẩn hoá min–max:** `score_samples` của sklearn càng âm càng bất thường; ta đổi dấu rồi đưa về 0–1 để dễ đọc: 1 là máy khác biệt nhất phòng, 0 là giống số đông nhất. Mọi máy giống hệt nhau thì mọi điểm bằng 0.
 - **Vì sao thêm ngưỡng 0.7 cho `anomaly`:** feature là số đếm nhỏ, nhiều mẫu trùng nhau nên `predict() == -1` mặc định gắn cờ quá nhiều máy bình thường (25–88% trong thí nghiệm giả lập). Cờ chỉ bật khi `predict == -1` **và** điểm chuẩn hoá ≥ `FLAG_MIN_SCORE` = 0.7. Điểm tương đối theo phòng nên phòng không có ai lệch vẫn có máy ở dải cao nhất.
+- **Vì sao máy thật chưa có điểm lúc đầu:** ngưỡng 20 mẫu tính trên cả phòng và mỗi máy chỉ gửi 1 mẫu / 30 giây, nên phòng 4 máy cần khoảng 150 giây (rồi chờ thêm lần chấm 30 giây kế). Đây không phải lỗi; cột Mẫu và log giúp thấy điều đó. Phòng đông máy hoặc chạy thêm `simulate_clients.py` thì đủ mẫu sớm hơn.
 - **Chỉ xét 3 cửa sổ gần nhất:** hành vi cũ không nên kéo dài mãi; máy chỉ lệch ở đầu giờ rồi bình thường lại thì không còn bị cờ.
 - **Vì sao tách ML thành service Python gọi qua HTTP:** scikit-learn có sẵn ở Python; Java không có Isolation Forest. Tách ra thì hai bên độc lập, và service tắt hay lỗi chỉ làm cột "Bất thường" đứng yên (`ML lỗi` trong log), server thi vẫn chạy.
 - **Giao diện ghi "Bất thường", không ghi "Gian lận":** mô hình chỉ biết máy khác số đông; giám thị mới là người quyết định.

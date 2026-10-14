@@ -30,17 +30,18 @@ Client chỉ phát hiện và báo cáo: không chặn mạng, không kill tiế
 | Người | File | Mảng phụ trách | Cần hiểu |
 |---|---|---|---|
 | Cả nhóm | `exam/common/Protocol.java` | Giao thức chung | - Mỗi tin nhắn là một dòng JSON, luôn có `type`<br>- Gson tự escape ký tự xuống dòng nên không bao giờ vỡ dòng |
-| 1 | `StudentApp`, `StudentScreens`, `ServerConnection`, `ServerFinder` | Client sinh viên: kết nối TCP, tìm server UDP, giao diện làm bài | - Luồng màn hình: đăng nhập, PRECHECK, chờ, làm bài, kết quả<br>- Tự kết nối lại mỗi 5 giây và đăng nhập lại; vì sao chỉ tính "rời cửa sổ" khi `getOppositeWindow() == null`<br>- Tìm server bằng UDP broadcast tới từng card mạng |
+| 1 | `StudentApp`, `StudentScreens` (+ `Theme`, `TopBar`, `LoginPanel`, `PrecheckPanel`, `ExamPanel`, `NumberButton`, `OptionRow`, `ResultPanel`), `ServerConnection`, `ServerFinder` | Client sinh viên: kết nối TCP, tìm server UDP, giao diện làm bài (FlatLaf) | - Luồng màn hình: đăng nhập, PRECHECK, chờ, làm bài, kết quả<br>- `StudentApp` chỉ lo logic, `StudentScreens` ghép các panel; vì sao dùng callback<br>- Tự kết nối lại mỗi 5 giây và đăng nhập lại; vì sao chỉ tính "rời cửa sổ" khi `getOppositeWindow() == null`<br>- Tìm server bằng UDP broadcast tới từng card mạng |
 | 2 | `Monitor`, `AppRules`, `WindowsProbe`, `Diagnose`, `TeacherWindow`, `config/rules.json` | Giám sát: phát hiện vi phạm ở client và hiển thị cho giám thị | - Baseline lấy ở PRECHECK, so sánh mỗi 3 giây; vì sao chỉ xét app có cửa sổ và cần `SYSTEM_PROCESSES`<br>- 6 feature mỗi 30 giây và cách reset cửa sổ<br>- `WindowsProbe` chạy lệnh Windows; `Monitor` chỉ chứa luật nên test được trên Linux |
 | 3 | `ExamServer`, `ExamRoom`, `Session`, `ExamFile`, `ClientHandler` | Server: nhận kết nối, luật phòng thi, chấm điểm, lưu kết quả | - `ExamRoom` giữ mọi trạng thái và mọi phương thức đổi trạng thái đều `synchronized`; `trySendExam` là điểm gửi đề duy nhất<br>- Chống nhầm session cũ và mới (so sánh socket); watchdog 90 giây<br>- Chấm điểm, `results.csv` (UTF-8 có BOM) |
 | 4 | `ml/ml_service.py`, `ml/simulate_clients.py`, `MlClient` | ML: Isolation Forest, giả lập phòng thi, nối Java với Python | - Isolation Forest không giám sát, fit trên chính dữ liệu buổi thi; điểm chuẩn hoá min-max và 3 cửa sổ gần nhất<br>- Vì sao `anomaly` có thêm điều kiện điểm ≥ 0.7 (xem mục 9)<br>- Gọi HTTP ngoài khối `synchronized` để ML chậm không treo server |
 
-Cấu trúc mã nguồn (mỗi file Java trong `src/main` dài tối đa 220 dòng):
+Cấu trúc mã nguồn (mỗi file Java trong `src/main` dài khoảng 280 dòng trở xuống; cần thì tách file mới):
 
 ```
 src/main/java/exam/
   common/   Protocol
-  client/   StudentApp  StudentScreens  ServerConnection  ServerFinder  Monitor  AppRules  WindowsProbe  Diagnose  Debug
+  client/   StudentApp  StudentScreens  Theme  TopBar  LoginPanel  PrecheckPanel  ExamPanel  NumberButton  OptionRow  ResultPanel
+            ServerConnection  ServerFinder  Monitor  AppRules  WindowsProbe  Diagnose  Debug
   server/   ExamServer  ExamRoom  Session  ExamFile  ClientHandler  TeacherWindow  MlClient
 ml/         ml_service.py  simulate_clients.py  test_ml_service.py
 config/     rules.json        exams/   sample_exam.json
@@ -75,6 +76,7 @@ Sáu giá trị của `values`: số tiến trình mới, số lần rời cửa
 
 - **Máy server:** JDK 17+ và Maven; Python 3.10+.
 - **Máy client (Windows):** chỉ cần Java 17+ (JRE là đủ), chép `exam.jar` sang.
+- **Thư viện Java** (Maven tự tải, shade plugin gói hết vào `exam.jar` nên client chỉ cần một file): Gson 2.11.0 (JSON) và **FlatLaf 3.7.2** (giao diện Swing hiện đại; `Theme.install()` ở client và `FlatLightLaf.setup()` ở server).
 - **Python:**
   ```bash
   python3 -m venv ml/.venv
@@ -121,6 +123,25 @@ Luật nằm trong `config/rules.json` **ở server** và được gửi xuống
 3. Thêm tên (chỉ những tên chắc chắn là phần mềm lành) vào `ignoreProcesses` (bỏ qua hẳn) hoặc `allowedWindowApps` (cho phép có cửa sổ) trong `config/rules.json` ở server.
 4. Khởi động lại server; sinh viên đăng nhập lại là nhận luật mới.
 
+### Giao diện
+
+Ảnh chụp trong `statics/results/ui/` (chụp bằng Xvfb trên Linux; ảnh PRECHECK, đang tìm server và mất kết nối dùng dữ liệu mẫu).
+
+| Đăng nhập | PRECHECK không đạt |
+|---|---|
+| ![Đăng nhập](statics/results/ui/01-dang-nhap.png) | ![PRECHECK](statics/results/ui/02-precheck-khong-dat.png) |
+
+| Chờ bắt đầu | Làm bài |
+|---|---|
+| ![Chờ](statics/results/ui/03-cho-bat-dau.png) | ![Làm bài](statics/results/ui/04-lam-bai.png) |
+
+| Mất kết nối | Kết quả |
+|---|---|
+| ![Mất kết nối](statics/results/ui/05-mat-ket-noi.png) | ![Kết quả](statics/results/ui/07-ket-qua.png) |
+
+Hộp xác nhận nộp bài: [06-xac-nhan-nop-bai.png](statics/results/ui/06-xac-nhan-nop-bai.png). Cửa sổ giám thị (dòng bị gắn cờ tô đỏ nhạt, dòng có vi phạm tô cam nhạt): [08-giam-thi.png](statics/results/ui/08-giam-thi.png).
+Phím tắt khi làm bài: `1`-`9` hoặc `A`-`I` chọn đáp án, mũi tên trái/phải chuyển câu.
+
 ## 6. Mạng
 
 - **Làm ở nhà:** ZeroTier (gói Personal miễn phí), 4 máy join cùng một network. Không dùng Tailscale (không hỗ trợ broadcast) hay Radmin VPN (không có bản Linux). Nếu UDP không tìm được server, nhập IP của máy server (hiện ở thanh trên cùng của cửa sổ giám thị).
@@ -147,7 +168,13 @@ Phần quét tiến trình, mạng, USB chỉ chạy trên Windows nên chưa ki
 - [ ] PRECHECK với Zalo mở: báo `Đang mở ứng dụng bị cấm: zalo.exe`; đóng Zalo rồi Kiểm tra lại thì đạt.
 - [ ] PRECHECK với Chrome mở: báo `Đang mở ứng dụng bị cấm: chrome.exe`.
 - [ ] PRECHECK khi đang cắm USB: báo `Đang cắm USB: <ổ>` (kiểm tra lệnh PowerShell `Get-CimInstance Win32_LogicalDisk` chạy được).
+- [ ] Chạy `java -cp exam.jar exam.client.Diagnose` trên mỗi máy Windows và gửi file `chan-doan-<tên máy>.txt` (thời gian `tasklist`/`netstat`/PowerShell, app có cửa sổ, tiến trình nền).
 - [ ] Máy sạch (không mở app lạ) làm bài 5 phút: **không** có vi phạm APP nào do tiến trình nền của Windows hay của chính client.
+- [ ] App micro, app nền (OneDrive, driver âm thanh, Phone Link...) đang chạy: không bị báo vi phạm.
+- [ ] Antigravity mở **trước** lúc đăng nhập: PRECHECK không đạt; mở **trong** giờ thi: vi phạm `APP`.
+- [ ] Calculator vẫn dùng được (không vi phạm, cửa sổ UWP nằm dưới `ApplicationFrameHost`).
+- [ ] Cột **Mẫu** của máy Windows tăng đều 30 giây một lần; có điểm Bất thường sau khi cả phòng đủ 20 mẫu (bật `-Dexam.debug=true` để xem thời gian quét).
+- [ ] Giao diện mới hiển thị đúng tiếng Việt có dấu, không vỡ bố cục ở độ phóng to 125%/150% của Windows.
 - [ ] Cắm USB khi đang thi: dòng tô đỏ, vi phạm `USB`.
 - [ ] Vào chatgpt.com khi đang thi: vi phạm `NET` (và `APP` nếu mở bằng trình duyệt mới).
 - [ ] Chuyển qua lại với Calculator: không có vi phạm, nhưng đếm `focusLostCount` và `focusLostSeconds`.
