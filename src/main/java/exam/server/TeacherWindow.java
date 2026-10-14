@@ -122,7 +122,9 @@ public class TeacherWindow extends JFrame {
         boolean started = room.isStarted();
         startBtn.setEnabled(room.examTitle() != null && !started);
         endBtn.setEnabled(started && !room.isEnded());
-        if (started) {
+        if (room.isEnded()) {
+            timeLabel.setText("Đã kết thúc");
+        } else if (started) {
             int s = room.remainingSeconds();
             timeLabel.setText(String.format("Còn lại: %02d:%02d", s / 60, s % 60));
         }
