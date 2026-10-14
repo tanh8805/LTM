@@ -89,6 +89,7 @@ public class ExamRoom {
         m.addProperty("remainingSeconds", remainingSeconds());
         m.add("questions", clientQuestions);
         Protocol.send(s.out, m);
+        s.lastSeen = System.currentTimeMillis();       // thời gian im lặng chỉ tính từ lúc máy nhận đề, không tính từ lúc chờ trước giờ thi
     }
 
     private void sendEnd(Session s) {

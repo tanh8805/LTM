@@ -393,6 +393,31 @@ class ExamServerTest {
     }
 
     @Test
+    void longWaitBeforeStartIsNotDropped() throws Exception {
+        TestClient c = login("S1");
+        precheck(c, true);                             // PRECHECK xong rồi chờ giáo viên bấm Bắt đầu, client không gửi gì thêm
+        server.idleTimeoutMs = 50;
+        Thread.sleep(150);                             // chờ lâu hơn ngưỡng im lặng
+        server.room().startExam();
+        server.checkIdle();
+        assertEquals(Session.ST_IN_EXAM, row("S1").status());
+        assertNotNull(c.tryNext(Protocol.EXAM_START, 2000), "Vẫn phải nhận EXAM_START");
+    }
+
+    @Test
+    void silentAfterReceivingExamIsStillDropped() throws Exception {
+        TestClient c = login("S1");
+        precheck(c, true);
+        server.idleTimeoutMs = 100;
+        Thread.sleep(150);
+        server.room().startExam();
+        c.next(Protocol.EXAM_START, 2000);
+        Thread.sleep(200);                             // nhận đề rồi mà im lặng thật sự thì vẫn bị đá
+        server.checkIdle();
+        assertEquals(Session.ST_DISCONNECTED, row("S1").status());
+    }
+
+    @Test
     void loadExamRejectsBadAnswerIndex() throws IOException {
         Path bad = tmp.resolve("bad.json");
         Files.writeString(bad, EXAM_JSON.replace("\"answer\":0", "\"answer\":7"), StandardCharsets.UTF_8);
