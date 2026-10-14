@@ -88,6 +88,12 @@ class StudentScreens {
         cards.show(root, "exam");
     }
 
+    /** Màn thông báo thay cho kết quả: đang nộp bài, hoặc bài thi đã kết thúc. */
+    void showFinished(String text) {
+        resultLabel.setText(text);
+        cards.show(root, "result");
+    }
+
     void showResult(double score, int correct, int total) {
         resultLabel.setText("Điểm: " + new DecimalFormat("0.##").format(score) + "/10 (đúng " + correct + "/" + total + " câu)");
         cards.show(root, "result");

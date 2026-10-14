@@ -330,6 +330,59 @@ class ExamServerTest {
         assertTrue(row("S1").lastViolation().contains("USB"));
     }
 
+    /** Đóng kết nối cũ rồi đăng nhập lại cùng mã SV (thử lại tới khi server nhận ra kết nối cũ đã đóng). */
+    private TestClient reconnect(TestClient old, String id) throws IOException {
+        old.close();
+        TestClient c = connect();
+        for (int i = 0; i < 100; i++) {
+            c.send(loginMsg(id, "Sinh viên " + id));
+            if (c.tryNext(Protocol.LOGIN_OK, 100) != null) {
+                return c;
+            }
+        }
+        fail("Không đăng nhập lại được");
+        return null;
+    }
+
+    @Test
+    void remainingIsZeroAfterEnd() throws IOException {
+        loginAndStart("S1");
+        assertTrue(server.room().remainingSeconds() > 0);
+        server.room().endExam("test");
+        assertEquals(0, server.room().remainingSeconds());
+    }
+
+    @Test
+    void loginAfterEndIsHandled() throws IOException {
+        TestClient s1 = loginAndStart("S1");
+        TestClient s2 = loginAndStart("S2");
+        submitCorrect(s1);
+        server.room().endExam("test");
+        s2.next(Protocol.EXAM_END, 2000);
+
+        // máy mới đăng nhập sau khi kết thúc: bị từ chối với lý do rõ ràng, không treo ở màn chờ
+        TestClient late = connect();
+        late.send(loginMsg("S3", "Đến muộn"));
+        assertEquals("Bài thi đã kết thúc", Protocol.str(late.next(Protocol.LOGIN_FAIL, 2000), "reason"));
+
+        // máy đã nộp bài vào lại: nhận lại đúng RESULT cũ
+        TestClient again = reconnect(s1, "S1");
+        assertEquals(10.0, again.next(Protocol.RESULT, 2000).get("score").getAsDouble());
+
+        // máy chưa nộp (rớt mạng đúng lúc kết thúc) vào lại: nhận EXAM_END để tự nộp, nộp muộn vẫn được chấm
+        TestClient back = reconnect(s2, "S2");
+        back.next(Protocol.EXAM_END, 2000);
+        assertEquals(10.0, submitCorrect(back).get("score").getAsDouble());
+    }
+
+    @Test
+    void submittedStudentGetsResultAgainWhenReconnectingDuringExam() throws IOException {
+        TestClient c = loginAndStart("S1");
+        submitCorrect(c);                              // RESULT có thể đã mất do rớt mạng: vào lại phải nhận lại
+        TestClient again = reconnect(c, "S1");
+        assertEquals(10.0, again.next(Protocol.RESULT, 2000).get("score").getAsDouble());
+    }
+
     @Test
     void silentClientDuringExamIsDropped() throws Exception {
         loginAndStart("S1");

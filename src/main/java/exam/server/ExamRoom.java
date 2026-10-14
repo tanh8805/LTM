@@ -2,7 +2,6 @@
 package exam.server;
 
 import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import exam.common.Protocol;
 import java.io.IOException;
@@ -30,6 +29,7 @@ public class ExamRoom {
     private JsonObject exam;
     private JsonArray clientQuestions;         // câu hỏi không có "answer"
     private boolean started, ended;
+    private String endReason = "";
     private long startMillis;
     private ScheduledFuture<?> autoEnd;
 
@@ -56,8 +56,7 @@ public class ExamRoom {
         if (started) { throw new IllegalStateException("Bài thi đã bắt đầu"); }
         started = true;
         startMillis = System.currentTimeMillis();
-        autoEnd = scheduler.schedule(() -> endExam("Hết giờ"),
-            exam.get("durationMinutes").getAsInt(), TimeUnit.MINUTES);
+        autoEnd = scheduler.schedule(() -> endExam("Hết giờ"), exam.get("durationMinutes").getAsInt(), TimeUnit.MINUTES);
         log.accept("Bắt đầu thi: " + examTitle());
         sessions.values().forEach(this::trySendExam);
     }
@@ -65,20 +64,16 @@ public class ExamRoom {
     public synchronized void endExam(String reason) {
         if (!started || ended) { return; }
         ended = true;
+        endReason = reason;
         autoEnd.cancel(false);
-        for (Session s : sessions.values()) {
-            if (s.connected() && !s.submitted) {
-                JsonObject m = Protocol.msg(Protocol.EXAM_END);
-                m.addProperty("reason", reason);
-                Protocol.send(s.out, m);
-            }
-        }
-        log.accept("Kết thúc thi: " + reason);
+        long done = sessions.values().stream().filter(s -> s.submitted).count();
+        sessions.values().stream().filter(s -> s.connected() && !s.submitted).forEach(this::sendEnd);
+        log.accept("Kết thúc thi: " + reason + ". Đã nộp " + done + "/" + sessions.size() + " máy");
         writeResults();
     }
 
     public synchronized int remainingSeconds() {
-        if (exam == null) { return 0; }
+        if (exam == null || ended) { return 0; }     // đã kết thúc thì đồng hồ phải dừng ở 0
         int total = exam.get("durationMinutes").getAsInt() * 60;
         long elapsed = started ? (System.currentTimeMillis() - startMillis) / 1000 : 0;
         return (int) Math.max(0, total - elapsed);
@@ -87,6 +82,7 @@ public class ExamRoom {
     /** Điểm gửi đề duy nhất: dùng cho cả vào thi muộn lẫn vào lại sau khi rớt mạng. */
     private void trySendExam(Session s) {
         if (!started || !s.connected() || !s.precheckOk || s.submitted) { return; }
+        if (ended) { sendEnd(s); return; }             // vào sau khi kết thúc: báo hết giờ để client tự nộp
         JsonObject m = Protocol.msg(Protocol.EXAM_START);
         m.addProperty("title", examTitle());
         m.addProperty("remainingSeconds", remainingSeconds());
@@ -94,11 +90,24 @@ public class ExamRoom {
         Protocol.send(s.out, m);
     }
 
+    private void sendEnd(Session s) {
+        JsonObject m = Protocol.msg(Protocol.EXAM_END);
+        m.addProperty("reason", endReason);
+        Protocol.send(s.out, m);
+    }
+
+    private void sendResult(Session s) {
+        JsonObject m = s.result.deepCopy();
+        m.addProperty("type", Protocol.RESULT);
+        Protocol.send(s.out, m);
+    }
+
     /** Trả session nếu đăng nhập được; nếu không thì đã gửi LOGIN_FAIL và trả null. */
     synchronized Session login(String id, String name, Socket socket, PrintWriter out) {
         Session s = sessions.get(id);
         String fail = id.isEmpty() || name.isEmpty() ? "Thiếu mã SV hoặc họ tên"
-            : s != null && s.connected() ? "Mã SV này đang đăng nhập ở máy khác" : null;
+            : s != null && s.connected() ? "Mã SV này đang đăng nhập ở máy khác"
+            : s == null && ended ? "Bài thi đã kết thúc" : null;
         if (fail != null) {
             JsonObject m = Protocol.msg(Protocol.LOGIN_FAIL);
             m.addProperty("reason", fail);
@@ -116,7 +125,7 @@ public class ExamRoom {
         ok.add("rules", rules);
         Protocol.send(out, ok);
         log.accept("Đăng nhập: " + id + " - " + s.name);
-        trySendExam(s);
+        if (s.submitted) { sendResult(s); } else { trySendExam(s); }   // RESULT có thể đã mất khi rớt mạng
         return s;
     }
 
@@ -144,11 +153,7 @@ public class ExamRoom {
             log.accept("Nộp bài: " + s.id + " - điểm " + s.result.get("score").getAsString());
             writeResults();
         }
-        if (s.connected()) {
-            JsonObject m = s.result.deepCopy();
-            m.addProperty("type", Protocol.RESULT);
-            Protocol.send(s.out, m);
-        }
+        if (s.connected()) { sendResult(s); }
     }
 
     /** Chỉ đánh dấu mất kết nối nếu socket vẫn là socket của luồng đọc vừa kết thúc (tránh đá máy đã vào lại). */
@@ -175,31 +180,9 @@ public class ExamRoom {
 
     synchronized void closeAll() { sessions.values().forEach(Session::close); }
 
-    /** Bản sao mọi mẫu FEATURES của cả phòng, mỗi mẫu có thêm studentId. */
-    synchronized JsonArray samplesForMl() {
-        JsonArray samples = new JsonArray();
-        for (Session s : sessions.values()) {
-            for (JsonObject sample : s.samples) {
-                JsonObject copy = sample.deepCopy();
-                copy.addProperty("studentId", s.id);
-                samples.add(copy);
-            }
-        }
-        return samples;
-    }
+    synchronized JsonArray samplesForMl() { return MlScores.samples(sessions.values()); }
 
-    synchronized void applyScores(JsonObject response) {
-        if (!"ok".equals(Protocol.str(response, "status"))) { return; }   // not_enough_data: chưa đủ mẫu
-        for (JsonElement el : response.getAsJsonArray("results")) {
-            JsonObject r = el.getAsJsonObject();
-            Session s = sessions.get(Protocol.str(r, "studentId"));
-            if (s == null) { continue; }
-            double score = r.get("score").getAsDouble();
-            s.anomalyScore = score;
-            s.anomaly = r.get("anomaly").getAsBoolean();
-            s.maxAnomaly = s.maxAnomaly == null ? score : Math.max(s.maxAnomaly, score);
-        }
-    }
+    synchronized void applyScores(JsonObject response) { MlScores.apply(response, sessions, log); }
 
     public synchronized List<Row> rows() {
         List<Row> list = new ArrayList<>();

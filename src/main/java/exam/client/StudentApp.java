@@ -29,11 +29,9 @@ public class StudentApp {
     private String studentId = "", studentName = "";
     private int current;
     private long deadlineMillis;
-    private boolean loggedInOnce, examActive, submitted;
+    private boolean loggedInOnce, examActive, submitted, finished;   // finished: đã hiện màn kết thúc/kết quả
 
-    public static void main(String[] args) {
-        SwingUtilities.invokeLater(() -> new StudentApp().show());
-    }
+    public static void main(String[] args) { SwingUtilities.invokeLater(() -> new StudentApp().show()); }
 
     private void show() {
         screens = new StudentScreens(frame, this::login, this::runPrecheck, () -> goTo(current - 1),
@@ -48,8 +46,6 @@ public class StudentApp {
 
     /** getOppositeWindow() == null nghĩa là focus đi/đến app khác; hộp thoại của chính app thì không tính. */
     private boolean otherApp(WindowEvent e) { return examActive && e.getOppositeWindow() == null; }
-
-    // ---------- Đăng nhập và nhận tin ----------
 
     private void login() {
         studentId = screens.studentId();
@@ -67,10 +63,7 @@ public class StudentApp {
         if (address == null) { loginFailed("Không tìm thấy server, hãy nhập IP"); return; }
         conn = new ServerConnection(address, m -> SwingUtilities.invokeLater(() -> onMessage(m)),
             () -> screens.setStatus("Mất kết nối, đang thử lại..."),
-            () -> {
-                screens.setStatus("Đã kết nối lại");
-                sendLogin();
-            });
+            () -> { screens.setStatus("Đã kết nối lại"); sendLogin(); });
         try {
             conn.connect();
             screens.setStatus("Đã kết nối " + address.getHostString() + ":" + address.getPort());
@@ -100,7 +93,7 @@ public class StudentApp {
             case Protocol.LOGIN_OK -> onLoginOk(m);
             case Protocol.LOGIN_FAIL -> onLoginFail(Protocol.str(m, "reason"));
             case Protocol.EXAM_START -> onExamStart(m);
-            case Protocol.EXAM_END -> submit();
+            case Protocol.EXAM_END -> onExamEnd();
             case Protocol.RESULT -> onResult(m);
             default -> { }
         }
@@ -109,9 +102,7 @@ public class StudentApp {
     private void onLoginOk(JsonObject m) {
         loggedInOnce = true;
         rules = m.getAsJsonObject("rules");
-        if (questions == null) {               // đã có đề (vào lại giữa giờ): server sẽ gửi lại EXAM_START
-            runPrecheck();
-        }
+        if (questions == null) { runPrecheck(); }      // đã có đề (vào lại giữa giờ): server sẽ gửi lại EXAM_START
     }
 
     private void onLoginFail(String reason) {
@@ -137,19 +128,13 @@ public class StudentApp {
             // Đưa việc cập nhật giao diện vào hàng đợi TRƯỚC khi gửi kết quả: nếu giáo viên đã bắt đầu thi thì
             // EXAM_START về ngay sau đó và phải được xử lý sau, không bị màn "Chờ" đè lên màn làm bài.
             SwingUtilities.invokeLater(() -> {
-                if (questions == null) {
-                    if (issues.isEmpty()) {
-                        screens.showWaiting();
-                    } else {
-                        screens.showPrecheck(issues);
-                    }
+                if (questions == null && !finished) {
+                    if (issues.isEmpty()) { screens.showWaiting(); } else { screens.showPrecheck(issues); }
                 }
             });
             conn.send(m);
         }, "precheck").start();
     }
-
-    // ---------- Làm bài ----------
 
     private void onExamStart(JsonObject m) {
         deadlineMillis = System.currentTimeMillis() + m.get("remainingSeconds").getAsLong() * 1000;
@@ -168,14 +153,13 @@ public class StudentApp {
     private void tick() {
         int left = (int) Math.max(0, (deadlineMillis - System.currentTimeMillis()) / 1000);
         screens.setTimer(left);
-        if (left == 0) { submit(); }
+        if (left == 0) { finish("Đã hết giờ làm bài, đang nộp..."); }
     }
 
     private void goTo(int index) {
-        if (questions != null && index >= 0 && index < questions.size()) {
-            current = index;
-            showCurrentQuestion();
-        }
+        if (questions == null || index < 0 || index >= questions.size()) { return; }
+        current = index;
+        showCurrentQuestion();
     }
 
     private void showCurrentQuestion() {
@@ -191,27 +175,43 @@ public class StudentApp {
         monitor.recordAnswer();
     }
 
-    private void submit() {
+    private void submit() { finish("Đang nộp bài..."); }
+
+    /** Giáo viên kết thúc hoặc hết giờ: dừng đồng hồ và nộp ngay những gì đã làm. */
+    private void onExamEnd() {
+        if (questions == null) {               // chưa có đề (vào sau khi kết thúc): không có gì để nộp
+            finished = true;
+            screens.showFinished("Bài thi đã kết thúc");
+            conn.close();
+        } else if (submitted) {
+            sendSubmit();                      // SUBMIT lần trước có thể đã mất lúc rớt mạng; server nộp lần hai không chấm lại
+        } else {
+            finish("Đã hết giờ làm bài, đang nộp...");
+        }
+    }
+
+    private void finish(String message) {
         if (submitted || questions == null) { return; }
         submitted = true;
+        finished = true;
         examActive = false;
         monitor.stop();
         countdown.stop();
+        screens.showFinished(message);
         screens.setStatus("Đã nộp bài, chờ kết quả...");
         sendSubmit();
     }
 
     private void sendSubmit() {
         JsonObject a = new JsonObject();
-        for (Map.Entry<Integer, Integer> e : answers.entrySet()) {
-            a.addProperty(String.valueOf(e.getKey()), e.getValue());
-        }
+        answers.forEach((id, choice) -> a.addProperty(String.valueOf(id), choice));
         JsonObject m = Protocol.msg(Protocol.SUBMIT);
         m.add("answers", a);
         conn.send(m);
     }
 
     private void onResult(JsonObject m) {
+        finished = true;
         screens.showResult(m.get("score").getAsDouble(), m.get("correct").getAsInt(), m.get("total").getAsInt());
         conn.close();
         screens.setStatus("Đã hoàn thành");
