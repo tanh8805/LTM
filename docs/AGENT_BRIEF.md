@@ -8,6 +8,11 @@
 > - **Luật app mới:** chỉ kiểm soát app có cửa sổ; tiến trình nền không bao giờ là vi phạm. Thêm `allowedWindowApps`, `ignoreProcesses`, nhiều app AI và tên miền AI bị cấm; so khớp tên không phân biệt hoa thường và bỏ `.exe`. Công cụ `exam.client.Diagnose` để chẩn đoán máy Windows. Luật nằm ở server nên sửa không cần gửi lại jar.
 > - **Giao diện client mới** với FlatLaf (`Theme`, `TopBar`, các panel màn hình), cửa sổ giám thị tô màu hàng; ảnh ở `statics/results/ui/`.
 > - Giới hạn độ dài file Java nới lên khoảng 280 dòng.
+>
+> **Đợt 4, tóm tắt thay đổi:**
+> - **Watchdog** chỉ tính 90 giây im lặng từ lúc máy nhận đề (`trySendExam` đặt lại `lastSeen`), nên máy chờ lâu trước giờ thi không bị đá khi bấm Bắt đầu.
+> - **Hồ sơ kỳ thi:** mỗi kỳ có thư mục `ket-qua/<yyyyMMdd-HHmmss>_<tên đề không dấu>/` gồm `results.csv`, `events.csv` (sự kiện từng thí sinh, ghi ngay) và `server.log`; không còn `results.csv` ở thư mục gốc, `setResultsFile` thay bằng `setResultsRoot`. Nhấp đúp một dòng ở cửa sổ giám thị để xem lịch sử thí sinh.
+> - **Kỳ thi mới** (`ExamRoom.newSession`) làm mới phòng sau khi kết thúc mà không tắt server; client có nút **Thi lượt mới** ở màn kết quả.
 > - Các Task bên dưới là đặc tả gốc, một số chi tiết (giao diện client, luật APP) đã được thay bằng các thay đổi trên.
 >
 > Dành cho agent lập trình. Đọc **toàn bộ** tài liệu trước khi làm. Thực hiện các Task ở Phần 5 **theo đúng thứ tự**. Mỗi Task là **một nhánh Git riêng**, làm xong thì mở Pull Request, merge vào `main`, rồi mới sang Task tiếp theo. Không tự ý thêm tính năng ngoài tài liệu. Gặp điều tài liệu không nói rõ thì chọn cách **đơn giản nhất** và ghi lại lựa chọn đó trong mô tả PR.
@@ -436,7 +441,7 @@ public class ExamServer {
     public synchronized void endExam(String reason);          // gửi EXAM_END cho máy đang kết nối chưa nộp, ghi results.csv
     public synchronized int remainingSeconds();
     public synchronized List<Row> rows();                     // sắp theo mã SV
-    public void setResultsFile(Path p);                       // mặc định Path.of("results.csv"); test đổi sang thư mục tạm
+    public void setResultsRoot(Path p);                       // (đợt 4) mặc định Path.of("ket-qua"); mỗi kỳ thi có thư mục con riêng; test đổi sang thư mục tạm
     static JsonObject grade(JsonObject exam, JsonObject answers);  // {score, correct, total}
 }
 ```
