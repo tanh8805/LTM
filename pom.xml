@@ -30,6 +30,13 @@
 
   <build>
     <finalName>exam</finalName>
+    <resources>
+      <!-- Chép config/rules.json vào jar làm bản luật mặc định cho công cụ Diagnose; client thật vẫn nhận luật từ server -->
+      <resource>
+        <directory>config</directory>
+        <includes><include>rules.json</include></includes>
+      </resource>
+    </resources>
     <plugins>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>

@@ -6,24 +6,51 @@ import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.nio.charset.Charset;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.concurrent.TimeUnit;
 
 public final class WindowsProbe {
     private WindowsProbe() {}
+
+    /** Một tiến trình trong `tasklist`: tên chữ thường (có .exe) và PID. */
+    public record Proc(String name, int pid) {}
+
+    /** Một tiến trình có cửa sổ nhìn thấy được (PowerShell Get-Process): tên không có .exe, PID, tiêu đề cửa sổ. */
+    public record Win(String name, int pid, String title) {}
+
+    /** Mỗi dòng in ra dạng `tên|pid|tiêu đề`; dùng nối chuỗi bằng '+' để không phải gõ dấu nháy kép qua ProcessBuilder. */
+    private static final String WIN_FORMAT = "ForEach-Object { $_.ProcessName + '|' + $_.Id + '|' + $_.MainWindowTitle }";
+    private static final String UTF8 = "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;";
 
     /** Client chỉ giám sát được trên Windows; máy khác vẫn chạy được để dev. */
     public static boolean isWindows() {
         return System.getProperty("os.name", "").toLowerCase().contains("win");
     }
 
-    /** Tên các tiến trình đang chạy (chữ thường). */
-    public static Set<String> processes() {
-        return parseTasklist(run("tasklist", "/fo", "csv", "/nh"));
+    /** Mọi tiến trình đang chạy kèm PID (trùng tên thì nhiều dòng). */
+    public static List<Proc> processList() {
+        return parseTasklistProcs(run("tasklist", "/fo", "csv", "/nh"));
+    }
+
+    /** Các app có cửa sổ nhìn thấy được. Tên thuộc tính của Get-Process không đổi theo ngôn ngữ Windows. */
+    public static List<Win> windowedApps() {
+        return parseWindows(runUtf8(UTF8 + "Get-Process | Where-Object { $_.MainWindowHandle -ne 0 } | " + WIN_FORMAT));
+    }
+
+    /** Như windowedApps() nhưng chỉ xét các PID cho trước (rẻ hơn khi chỉ có vài tiến trình mới). */
+    public static List<Win> windowsOf(Collection<Integer> pids) {
+        if (pids.isEmpty()) { return List.of(); }
+        String ids = pids.stream().map(String::valueOf).collect(Collectors.joining(","));
+        return parseWindows(runUtf8(UTF8 + "Get-Process -Id " + ids
+            + " -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 } | " + WIN_FORMAT));
     }
 
     /** IP đích của các kết nối TCP đang có. */
@@ -83,6 +110,38 @@ public final class WindowsProbe {
         return names;
     }
 
+    /** Tên (chữ thường) và PID từ hai cột đầu của `tasklist /fo csv /nh`; dòng hỏng thì bỏ qua. */
+    public static List<Proc> parseTasklistProcs(String output) {
+        List<Proc> list = new ArrayList<>();
+        for (String line : output.split("\\R")) {
+            line = line.trim();
+            if (!line.startsWith("\"")) { continue; }
+            String[] cols = line.substring(1, line.endsWith("\"") ? line.length() - 1 : line.length()).split("\",\"");
+            if (cols.length < 2) { continue; }
+            try {
+                list.add(new Proc(cols[0].toLowerCase(), Integer.parseInt(cols[1].trim())));
+            } catch (NumberFormatException e) {
+                // dòng không đúng định dạng thì bỏ qua
+            }
+        }
+        return list;
+    }
+
+    /** Đọc các dòng `tên|pid|tiêu đề` (tiêu đề có thể chứa '|'); có thể có BOM đầu output. */
+    public static List<Win> parseWindows(String output) {
+        List<Win> list = new ArrayList<>();
+        for (String line : output.replace("\uFEFF", "").split("\\R")) {
+            String[] cols = line.split("\\|", 3);
+            if (cols.length < 3) { continue; }
+            try {
+                list.add(new Win(cols[0].trim().toLowerCase(), Integer.parseInt(cols[1].trim()), cols[2].trim()));
+            } catch (NumberFormatException e) {
+                // dòng không đúng định dạng thì bỏ qua
+            }
+        }
+        return list;
+    }
+
     /**
      * IP đích của mọi dòng TCP. Không đọc cột trạng thái vì Windows ngôn ngữ khác có thể dịch chữ ESTABLISHED;
      * dòng LISTENING có đích dạng 0.0.0.0:0 hoặc [::]:0 nên bị loại nhờ cổng 0.
@@ -109,8 +168,15 @@ public final class WindowsProbe {
         return ips;
     }
 
+    /** PowerShell đã được ép xuất UTF-8 (UTF8 ở trên) nên tiêu đề cửa sổ tiếng Việt không bị lỗi font. */
+    private static String runUtf8(String script) {
+        return run(java.nio.charset.StandardCharsets.UTF_8, "powershell", "-NoProfile", "-Command", script);
+    }
+
+    private static String run(String... cmd) { return run(Charset.defaultCharset(), cmd); }
+
     /** Chạy lệnh, chờ tối đa 10 giây; lỗi thì trả chuỗi rỗng để việc quét không ném exception ra ngoài. */
-    private static String run(String... cmd) {
+    private static String run(Charset charset, String... cmd) {
         try {
             Process p = new ProcessBuilder(cmd).redirectErrorStream(true).start();
             ByteArrayOutputStream buf = new ByteArrayOutputStream();
@@ -127,7 +193,7 @@ public final class WindowsProbe {
                 p.destroyForcibly();
             }
             reader.join(1000);
-            return buf.toString(Charset.defaultCharset());
+            return buf.toString(charset);
         } catch (IOException e) {
             return "";
         } catch (InterruptedException e) {

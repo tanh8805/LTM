@@ -4,6 +4,7 @@ package exam;
 import static org.junit.jupiter.api.Assertions.*;
 
 import exam.client.WindowsProbe;
+import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
@@ -45,5 +46,22 @@ class WindowsProbeTest {
         String out = "  TCP    0.0.0.0:135            0.0.0.0:0              LISTENING       1000\r\n"
             + "  TCP    [::]:445               [::]:0                 LISTENING       4\r\n";
         assertTrue(WindowsProbe.parseNetstat(out).isEmpty());
+    }
+
+    @Test
+    void parseTasklistProcsReadsNameAndPid() {
+        String out = "\"Chrome.exe\",\"1234\",\"Console\",\"1\",\"100,000 K\"\r\n"
+            + "\"System Idle Process\",\"0\",\"Services\",\"0\",\"8 K\"\r\n"
+            + "\"loi\"\r\n\"abc.exe\",\"khong-phai-so\",\"x\"\r\n";
+        assertEquals(List.of(new WindowsProbe.Proc("chrome.exe", 1234), new WindowsProbe.Proc("system idle process", 0)),
+            WindowsProbe.parseTasklistProcs(out));
+    }
+
+    @Test
+    void parseWindowsReadsNamePidTitle() {
+        String out = "\uFEFFAntigravity|4321|Welcome | Antigravity\r\nexplorer|88|Tệp\r\nrac\r\nx|abc|y\r\nnotitle|7|\r\n";
+        assertEquals(List.of(new WindowsProbe.Win("antigravity", 4321, "Welcome | Antigravity"),
+            new WindowsProbe.Win("explorer", 88, "Tệp"), new WindowsProbe.Win("notitle", 7, "")),
+            WindowsProbe.parseWindows(out));
     }
 }
