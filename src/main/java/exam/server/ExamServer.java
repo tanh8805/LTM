@@ -1,6 +1,7 @@
 // Mạng và các luồng của server: nhận kết nối TCP, trả lời UDP tìm server, watchdog, lịch gọi ML (Người 3).
 package exam.server;
 
+import com.formdev.flatlaf.FlatLightLaf;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import exam.common.Protocol;
@@ -50,6 +51,7 @@ public class ExamServer {
         ExamServer server = new ExamServer(rules);
         server.setMlClient(new MlClient("http://localhost:8000"));
         SwingUtilities.invokeLater(() -> {
+            FlatLightLaf.setup();                           // phải cài giao diện trước khi tạo cửa sổ
             new TeacherWindow(server).setVisible(true);     // tạo cửa sổ trước để log lúc khởi động hiện được
             try {
                 server.start(Protocol.TCP_PORT);

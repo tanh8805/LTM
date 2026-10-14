@@ -31,11 +31,16 @@ public class StudentApp {
     private long deadlineMillis;
     private boolean loggedInOnce, examActive, submitted, finished;   // finished: đã hiện màn kết thúc/kết quả
 
-    public static void main(String[] args) { SwingUtilities.invokeLater(() -> new StudentApp().show()); }
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(() -> {
+            Theme.install();                       // FlatLaf phải được cài trước khi tạo cửa sổ
+            new StudentApp().show();
+        });
+    }
 
     private void show() {
         screens = new StudentScreens(frame, this::login, this::runPrecheck, () -> goTo(current - 1),
-            () -> goTo(current + 1), this::submit, this::onAnswer);
+            () -> goTo(current + 1), this::submit, this::onAnswer, this::goTo);
         frame.addWindowFocusListener(new WindowAdapter() {
             @Override public void windowGainedFocus(WindowEvent e) { if (otherApp(e)) { monitor.focusGained(); } }
             @Override public void windowLostFocus(WindowEvent e) { if (otherApp(e)) { monitor.focusLost(); } }
@@ -51,9 +56,8 @@ public class StudentApp {
         studentId = screens.studentId();
         studentName = screens.studentName();
         if (studentId.isEmpty() || studentName.isEmpty()) { screens.showMessage("Hãy nhập mã SV và họ tên"); return; }
-        screens.setLoginEnabled(false);
-        screens.setStatus("Đang kết nối...");
         String host = screens.host();
+        screens.setLoginBusy(true, host.isEmpty() ? "Đang tìm server..." : "Đang kết nối...");
         new Thread(() -> connect(host), "login").start();   // tìm server và nối mạng không được chặn luồng giao diện
     }
 
@@ -62,11 +66,12 @@ public class StudentApp {
                                                    : new InetSocketAddress(host, Protocol.TCP_PORT);
         if (address == null) { loginFailed("Không tìm thấy server, hãy nhập IP"); return; }
         conn = new ServerConnection(address, m -> SwingUtilities.invokeLater(() -> onMessage(m)),
-            () -> screens.setStatus("Mất kết nối, đang thử lại..."),
-            () -> { screens.setStatus("Đã kết nối lại"); sendLogin(); });
+            () -> { screens.setStatus("Mất kết nối, đang thử lại..."); screens.setConnection(TopBar.Conn.RECONNECTING); },
+            () -> { screens.setStatus("Đã kết nối lại"); screens.setConnection(TopBar.Conn.CONNECTED); sendLogin(); });
         try {
             conn.connect();
             screens.setStatus("Đã kết nối " + address.getHostString() + ":" + address.getPort());
+            screens.setConnection(TopBar.Conn.CONNECTED);
             sendLogin();
         } catch (IOException e) {
             loginFailed("Không kết nối được: " + e.getMessage());
@@ -75,7 +80,7 @@ public class StudentApp {
 
     private void loginFailed(String message) {
         SwingUtilities.invokeLater(() -> {
-            screens.setLoginEnabled(true);
+            screens.setLoginBusy(false, "");
             screens.setStatus(" ");
             screens.showMessage(message);
         });
@@ -168,11 +173,22 @@ public class StudentApp {
         q.getAsJsonArray("options").forEach(o -> options.add(o.getAsString()));
         int selected = answers.getOrDefault(q.get("id").getAsInt(), -1);
         screens.showQuestion(current + 1, questions.size(), Protocol.str(q, "text"), options, selected);
+        showAnswered();
+    }
+
+    /** Báo cho giao diện biết câu nào đã có đáp án (tô màu lưới số câu, đếm số câu chưa làm). */
+    private void showAnswered() {
+        boolean[] done = new boolean[questions.size()];
+        for (int i = 0; i < done.length; i++) {
+            done[i] = answers.containsKey(questions.get(i).getAsJsonObject().get("id").getAsInt());
+        }
+        screens.setAnswered(done);
     }
 
     private void onAnswer(int choice) {
         answers.put(questions.get(current).getAsJsonObject().get("id").getAsInt(), choice);
         monitor.recordAnswer();
+        showAnswered();
     }
 
     private void submit() { finish("Đang nộp bài..."); }
@@ -182,6 +198,7 @@ public class StudentApp {
         if (questions == null) {               // chưa có đề (vào sau khi kết thúc): không có gì để nộp
             finished = true;
             screens.showFinished("Bài thi đã kết thúc");
+            screens.setConnection(TopBar.Conn.NONE);
             conn.close();
         } else if (submitted) {
             sendSubmit();                      // SUBMIT lần trước có thể đã mất lúc rớt mạng; server nộp lần hai không chấm lại
@@ -214,6 +231,7 @@ public class StudentApp {
         finished = true;
         screens.showResult(m.get("score").getAsDouble(), m.get("correct").getAsInt(), m.get("total").getAsInt());
         conn.close();
+        screens.setConnection(TopBar.Conn.NONE);
         screens.setStatus("Đã hoàn thành");
     }
 }

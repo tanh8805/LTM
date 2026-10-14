@@ -25,13 +25,15 @@ import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
 import javax.swing.JTable;
 import javax.swing.JTextArea;
+import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.Timer;
 import javax.swing.table.AbstractTableModel;
 import javax.swing.table.DefaultTableCellRenderer;
 
 public class TeacherWindow extends JFrame {
-    private static final Color WARN = new Color(255, 205, 205);
+    private static final Color FLAGGED = new Color(255, 218, 218), VIOLATED = new Color(255, 236, 204);   // bị gắn cờ ML: đỏ nhạt; có vi phạm: cam nhạt
+    private static final java.util.Set<Integer> CENTERED_COLUMNS = java.util.Set.of(3, 5, 6, 7);   // các cột số
     private static final String[] COLUMNS = {"Mã SV", "Họ tên", "Trạng thái", "Số vi phạm", "Vi phạm gần nhất",
         "Mẫu", "Bất thường", "Điểm"};
 
@@ -87,13 +89,15 @@ public class TeacherWindow extends JFrame {
         top.add(new JLabel("IP máy chủ: " + localAddresses()));
 
         JTable table = new JTable(model);
+        table.setRowHeight(26);
         table.setDefaultRenderer(Object.class, new DefaultTableCellRenderer() {
             @Override
             public Component getTableCellRendererComponent(JTable t, Object v, boolean sel, boolean focus, int r, int c) {
                 Component comp = super.getTableCellRendererComponent(t, v, sel, focus, r, c);
                 ExamRoom.Row row = model.rows.get(t.convertRowIndexToModel(r));
-                boolean warn = row.violations() > 0 || row.anomaly();
-                comp.setBackground(sel ? t.getSelectionBackground() : warn ? WARN : Color.WHITE);
+                setHorizontalAlignment(CENTERED_COLUMNS.contains(c) ? SwingConstants.CENTER : SwingConstants.LEFT);
+                comp.setBackground(sel ? t.getSelectionBackground() : row.anomaly() ? FLAGGED
+                    : row.violations() > 0 ? VIOLATED : Color.WHITE);
                 return comp;
             }
         });
