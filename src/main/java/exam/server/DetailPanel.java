@@ -1,6 +1,8 @@
 // Khung chi tiết bên phải cửa sổ giám thị: ba ô số liệu và các sự kiện đáng chú ý của thí sinh đang chọn (Người 2).
 package exam.server;
 
+import com.formdev.flatlaf.util.UIScale;
+import exam.common.Html;
 import exam.common.Palette;
 import java.awt.BorderLayout;
 import java.awt.Color;
@@ -8,7 +10,6 @@ import java.awt.Dimension;
 import java.awt.GridLayout;
 import java.awt.RenderingHints;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import javax.swing.BorderFactory;
@@ -27,7 +28,7 @@ class DetailPanel extends JPanel {
     DetailPanel() {
         super(new BorderLayout());
         setBackground(Color.WHITE);
-        setPreferredSize(new Dimension(310, 0));
+        setPreferredSize(new Dimension(UIScale.scale(340), 0));    // chữ HTML tự co giãn theo màn hình nên kích thước cũng phải co giãn
         setBorder(BorderFactory.createMatteBorder(0, 1, 0, 0, Palette.SEPARATOR));
         body.setLayout(new BoxLayout(body, BoxLayout.Y_AXIS));
         body.setOpaque(false);
@@ -59,7 +60,8 @@ class DetailPanel extends JPanel {
             JPanel stats = new JPanel(new GridLayout(1, 3, 8, 0));
             stats.setOpaque(false);
             stats.setAlignmentX(LEFT_ALIGNMENT);
-            stats.setMaximumSize(new Dimension(Integer.MAX_VALUE, 66));
+            stats.setMaximumSize(new Dimension(Integer.MAX_VALUE, UIScale.scale(66)));
+            stats.setPreferredSize(new Dimension(UIScale.scale(295), UIScale.scale(66)));
             stats.add(stat("Vi phạm", String.valueOf(row.violations())));
             stats.add(stat("Rời cửa sổ", String.valueOf(row.focusLost())));
             stats.add(stat("Bất thường", row.anomalyScore() == null ? "-" : String.format(Locale.ROOT, "%.2f", row.anomalyScore())));
@@ -67,7 +69,7 @@ class DetailPanel extends JPanel {
             body.add(Box.createVerticalStrut(20));
             body.add(text("SỰ KIỆN", 12, true, Palette.MUTED));
             body.add(Box.createVerticalStrut(8));
-            List<ExamLog.Event> notable = new ArrayList<>(events.stream().filter(Roster::notable).toList());
+            List<ExamLog.Event> notable = Roster.notableEvents(events);
             if (notable.isEmpty()) {
                 body.add(text("Chưa có sự kiện", 14, true, Palette.TEXT));
                 body.add(text(wrap("Máy này không có gì đáng chú ý."), 13, false, Palette.MUTED));
@@ -84,9 +86,7 @@ class DetailPanel extends JPanel {
     }
 
     /** Chữ tự xuống dòng trong bề ngang của khung (JLabel không tự ngắt dòng nếu không dùng HTML). */
-    private static String wrap(String s) {
-        return "<html><body style='width:245px'>" + s.replace("&", "&amp;").replace("<", "&lt;") + "</body></html>";
-    }
+    private static String wrap(String s) { return Html.wrap(s, 290); }
 
     private static JLabel text(String text, float size, boolean bold, Color color) {
         JLabel l = new JLabel(text);
@@ -110,7 +110,7 @@ class DetailPanel extends JPanel {
             }
         };
         p.setOpaque(false);
-        p.setBorder(BorderFactory.createEmptyBorder(9, 10, 9, 10));
+        p.setBorder(BorderFactory.createEmptyBorder(8, 9, 8, 9));
         p.add(text(caption, 12, false, Palette.MUTED), BorderLayout.NORTH);
         p.add(text(value, 20, true, Palette.TEXT), BorderLayout.CENTER);
         return p;

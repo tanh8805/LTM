@@ -1,6 +1,7 @@
 // Màn đăng nhập: một khung giữa màn hình, lỗi hiện chữ đỏ dưới form, đang tìm server thì hiện thanh tiến trình (Người 1).
 package exam.client;
 
+import exam.common.Html;
 import java.awt.Dimension;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
@@ -82,5 +83,5 @@ class LoginPanel extends JPanel {
         if (busy) { errorLabel.setText(" "); }
     }
 
-    void setError(String text) { errorLabel.setText("<html><body style='width:340px'>" + text + "</body></html>"); }
+    void setError(String text) { errorLabel.setText(Html.wrap(text, 380)); }
 }

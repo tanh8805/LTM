@@ -10,7 +10,6 @@ import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
-import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
@@ -22,7 +21,7 @@ class StudentScreens {
     private final JFrame frame;
     private final CardLayout cards = new CardLayout();
     private final JPanel root = new JPanel(cards);
-    private final TopBar topBar = new TopBar();
+    private final TopBar topBar;
     private final JPanel banner = new JPanel(new BorderLayout());
     private final JLabel statusBar = Theme.label(" ", 13, false, Theme.MUTED);
     private final LoginPanel login;
@@ -30,17 +29,22 @@ class StudentScreens {
     private final ExamPanel exam;
     private final ResultPanel result;
     private final JPanel header = new JPanel();
-    private final Timer lostTimer = new Timer(LOST_AFTER_MS, e -> topBar.setConnection(TopBar.Conn.LOST));
-    private int unanswered;
+    private final Timer lostTimer;
+    private List<Integer> unanswered = List.of();     // số thứ tự (từ 1) các câu chưa làm
+    private IntConsumer gotoQuestion;
+    private int total;
 
     /** Sự kiện nút bấm gọi ngược về StudentApp qua các callback; mọi phương thức show... gọi trên luồng giao diện. */
     StudentScreens(JFrame frame, Runnable onLogin, Runnable onRecheck, Runnable onPrev, Runnable onNext,
-                   Runnable onSubmit, IntConsumer onAnswer, IntConsumer onGoto, Runnable onNewRound) {
+                   Runnable onSubmit, IntConsumer onAnswer, IntConsumer onGoto, Runnable onNewRound, Runnable onExit) {
         this.frame = frame;
-        result = new ResultPanel(onNewRound);
+        this.gotoQuestion = onGoto;
+        topBar = new TopBar(() -> confirmSubmit(onSubmit));
+        lostTimer = new Timer(LOST_AFTER_MS, e -> topBar.setConnection(TopBar.Conn.LOST));
+        result = new ResultPanel(onNewRound, onExit);
         login = new LoginPanel(onLogin);
         precheck = new PrecheckPanel(onRecheck);
-        exam = new ExamPanel(onGoto, onPrev, onNext, () -> confirmSubmit(onSubmit), onAnswer);
+        exam = new ExamPanel(onGoto, onPrev, onNext, onAnswer);
         lostTimer.setRepeats(false);
         root.add(login, "login");
         root.add(precheck, "precheck");
@@ -68,7 +72,7 @@ class StudentScreens {
         frame.setMinimumSize(new Dimension(1000, 700));
         frame.setSize(1100, 760);
         frame.setLocationRelativeTo(null);
-        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        frame.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);    // StudentApp hỏi xác nhận nếu bài chưa nộp
         show("login");
     }
 
@@ -102,15 +106,17 @@ class StudentScreens {
 
     private void show(String name) {
         cards.show(root, name);
+        precheck.setActive(name.equals("precheck"));
+        topBar.setExamMode(name.equals("exam"));
         header.setVisible(!name.equals("login"));
         frame.getRootPane().setDefaultButton(name.equals("login") ? login.button() : null);
     }
 
     void showLogin() { show("login"); }
 
-    void showPrecheck(List<String> issues) {
+    void showPrecheck(List<String> issues, String server) {
         topBar.setStudent(studentName(), studentId());
-        precheck.setIssues(issues);
+        precheck.setIssues(issues, server);
         show("precheck");
     }
 
@@ -121,21 +127,18 @@ class StudentScreens {
 
     void showExam(String title) {
         topBar.setExamTitle(title);
-        topBar.setTimerVisible(true);
         show("exam");
     }
 
     /** Màn thông báo thay cho kết quả: đang nộp bài, hoặc bài thi đã kết thúc. */
     void showFinished(String text) {
         result.showMessage(text);
-        topBar.setTimerVisible(false);
         show("result");
     }
 
     /** Bài thi đã kết thúc từ trước khi máy này vào: có nút Thi lượt mới. */
     void showEnded(String text) {
         result.showEnded(text);
-        topBar.setTimerVisible(false);
         show("result");
     }
 
@@ -145,13 +148,12 @@ class StudentScreens {
         login.setError(" ");
         setStatus(" ");
         setConnection(TopBar.Conn.NONE);
-        topBar.setTimerVisible(false);
+        topBar.setExamTitle("LTM · Thi trắc nghiệm");
         show("login");
     }
 
-    void showResult(double score, int correct, int total) {
-        result.showResult(score, correct, total);
-        topBar.setTimerVisible(false);
+    void showResult(double score, int correct, int total, String submittedAt) {
+        result.showResult(score, correct, total, submittedAt);
         show("result");
     }
 
@@ -164,21 +166,42 @@ class StudentScreens {
 
     /** answered[i] = câu thứ i+1 đã có đáp án. */
     void setAnswered(boolean[] answered) {
-        unanswered = 0;
-        for (boolean a : answered) { if (!a) { unanswered++; } }
+        total = answered.length;
+        List<Integer> missing = new java.util.ArrayList<>();
+        for (int i = 0; i < answered.length; i++) { if (!answered[i]) { missing.add(i + 1); } }
+        unanswered = missing;
         exam.setAnswered(answered);
     }
 
-    /** Hộp thoại nhận cửa sổ chính làm cha để việc mở nó không bị tính là rời cửa sổ thi. */
+    int answeredCount() { return total - unanswered.size(); }
+
+    /** Hộp xác nhận nộp bài; "Xem câu chưa làm" nhảy tới câu chưa làm đầu tiên rồi quay lại làm bài. */
     private void confirmSubmit(Runnable onSubmit) {
-        String[] buttons = {"Nộp bài", "Quay lại"};        // tự đặt nhãn vì Swing hiện Yes/No bằng tiếng Anh
-        if (JOptionPane.showOptionDialog(frame, submitQuestion(unanswered), "Xác nhận nộp bài", JOptionPane.YES_NO_OPTION,
-                JOptionPane.QUESTION_MESSAGE, null, buttons, buttons[1]) == 0) {
+        boolean missing = !unanswered.isEmpty();
+        Sheet.Choice c = Sheet.ask(frame, "Nộp bài ngay?", submitMessage(total, unanswered),
+            missing ? "Xem câu chưa làm" : "Quay lại", "Nộp bài");
+        if (c == Sheet.Choice.PRIMARY) {
             onSubmit.run();
+        } else if (c == Sheet.Choice.SECONDARY && missing) {
+            gotoQuestion.accept(unanswered.get(0) - 1);
         }
     }
 
-    static String submitQuestion(int unanswered) {
-        return unanswered > 0 ? "Bạn còn " + unanswered + " câu chưa làm. Nộp bài?" : "Nộp bài ngay?";
+    /** Hộp xác nhận khi đóng cửa sổ lúc bài chưa nộp: true = nộp bài rồi thoát, false = tiếp tục làm bài. */
+    boolean confirmExit() {
+        return Sheet.ask(frame, "Thoát khi bài chưa nộp?", exitMessage(answeredCount()), "Nộp bài và thoát", "Tiếp tục làm bài")
+            == Sheet.Choice.SECONDARY;
+    }
+
+    static String submitMessage(int total, List<Integer> unanswered) {
+        String done = "Bạn đã làm " + (total - unanswered.size()) + "/" + total + " câu. ";
+        if (unanswered.isEmpty()) { return done + "Sau khi nộp sẽ không sửa được."; }
+        return done + "Còn " + unanswered.size() + " câu chưa làm: "
+            + unanswered.stream().map(String::valueOf).collect(java.util.stream.Collectors.joining(", "))
+            + ". Sau khi nộp sẽ không sửa được.";
+    }
+
+    static String exitMessage(int done) {
+        return "Đáp án chỉ lưu trong ứng dụng này. Nếu thoát bây giờ, " + done + " câu đã làm sẽ mất. Bạn có thể nộp bài rồi thoát.";
     }
 }

@@ -9,10 +9,11 @@ Mảng của bạn: phần chạy trên máy sinh viên, từ lúc mở app đ�
 | File | Làm gì |
 |---|---|
 | `client/StudentApp.java` | Logic: kết nối, xử lý từng loại tin từ server, chuyển màn hình, lưu đáp án, đồng hồ, nộp bài, gọi `Monitor`. |
-| `client/StudentScreens.java` | Ghép giao diện: `CardLayout` 5 màn hình, thanh trên (`TopBar`), thanh cam "Mất kết nối" và thanh trạng thái; nút bấm gọi ngược về `StudentApp`. |
-| `client/Theme.java` | Màu, font, biểu tượng tự vẽ, `Theme.install()` cài FlatLaf. Mọi màu nằm ở đây. |
-| `client/TopBar.java` | Tên kỳ thi, họ tên - mã SV, đồng hồ (xanh/cam/đỏ), chấm kết nối. |
-| `client/LoginPanel.java`, `PrecheckPanel.java`, `ResultPanel.java` | Màn đăng nhập, PRECHECK + màn chờ, kết quả. |
+| `client/StudentScreens.java` | Ghép giao diện: `CardLayout` 5 màn hình, thanh trên (`TopBar`), thanh cam "Mất kết nối" và thanh trạng thái; hộp xác nhận nộp bài và thoát khi chưa nộp (qua `Sheet`); nút bấm gọi ngược về `StudentApp`. |
+| `client/Theme.java` | Font, `Theme.install()` cài FlatLaf, vài hàm dựng nút/nhãn. Màu và biểu tượng tự vẽ dùng chung với giám thị nằm ở `common/Palette.java` và `common/Icons.java`; điểm hiển thị kiểu Việt Nam (dấu phẩy) ở `common/Format.java`. |
+| `client/TopBar.java` | Tên kỳ thi bên trái; ngoài giờ thi bên phải là mã SV - họ tên; trong giờ thi có đồng hồ ở giữa (đổi cam dưới 5 phút, đỏ dưới 1 phút), chấm kết nối và nút Nộp bài. |
+| `client/LoginPanel.java`, `PrecheckPanel.java`, `ResultPanel.java` | Màn đăng nhập; PRECHECK (danh sách việc cần làm, nút xử lý, dòng đã đạt, tự kiểm tra lại sau 5 giây) + màn chờ; kết quả (giờ nộp, Điểm, Số câu đúng, Thoát ứng dụng, Thi lượt mới). |
+| `client/Sheet.java` | Hộp xác nhận kiểu "tấm" (tiêu đề, nội dung, hai nút) dùng cho Nộp bài ngay? và Thoát khi bài chưa nộp?. |
 | `client/ExamPanel.java`, `NumberButton.java`, `OptionRow.java` | Màn làm bài: lưới số câu, hàng lựa chọn bấm được, phím tắt. |
 | `client/ServerConnection.java` | Kết nối TCP, luồng đọc từng dòng JSON, tự nối lại mỗi 5 giây khi rớt mạng. |
 | `client/ServerFinder.java` | Tìm server trong LAN bằng UDP broadcast. |
@@ -44,7 +45,7 @@ Mảng của bạn: phần chạy trên máy sinh viên, từ lúc mở app đ�
 - **UDP broadcast:** client chưa biết IP server nên gửi gói tới địa chỉ quảng bá; server trả lời thẳng về địa chỉ người gửi. Gửi tới broadcast của **từng card mạng** vì máy có ZeroTier/VPN có nhiều card, chỉ gửi `255.255.255.255` thì Java có thể đẩy gói ra nhầm card.
 - **Vì sao Swing phải cập nhật qua `invokeLater`:** các thành phần Swing không an toàn đa luồng, chỉ luồng giao diện (EDT) được sửa chúng. Mọi tin từ mạng đều đi qua `SwingUtilities.invokeLater` trước khi đụng tới giao diện.
 - **Tự nối lại:** khi luồng đọc kết thúc mà chưa `close()`, `ServerConnection` báo mất kết nối, 5 giây thử `connect()` một lần, thành công thì `onReconnected` gửi lại `LOGIN`; server nhận ra mã SV cũ và cho vào lại. Đáp án nằm trong bộ nhớ nên vẫn còn.
-- **Đếm "rời cửa sổ":** chỉ tính khi `getOppositeWindow() == null` (focus sang app khác). Hộp xác nhận nộp bài được tạo với cửa sổ chính làm cha (`JOptionPane.showOptionDialog(frame, ...)`) nên không bị tính là gian lận.
+- **Đếm "rời cửa sổ":** chỉ tính khi `getOppositeWindow() == null` (focus sang app khác). Hộp xác nhận nộp bài được tạo với cửa sổ chính làm cha (`Sheet.ask(frame, ...)`, một `JDialog` có cửa sổ chính làm cha) nên không bị tính là gian lận. Đóng cửa sổ khi đang thi mà chưa nộp thì `StudentApp.requestExit` hỏi "Thoát khi bài chưa nộp?": Nộp bài và thoát (thoát khi nhận `RESULT`, tối đa 8 giây) hoặc Tiếp tục làm bài.
 - **FlatLaf và `Theme`:** FlatLaf là Look and Feel của Swing; `FlatLightLaf.setup()` phải chạy trước khi tạo cửa sổ. Màu, font, biểu tượng gom về `Theme` để đổi giao diện chỉ sửa một chỗ; các nút số câu, hàng lựa chọn tự vẽ bằng `paintComponent`.
 - **Tách giao diện khỏi logic:** `StudentScreens` và các panel không biết gì về mạng; `StudentApp` gọi `screens.setConnection(...)`, `setAnswered(...)` và nhận sự kiện qua callback (`Runnable`, `IntConsumer`). Nhờ vậy xem giao diện được bằng một harness nhỏ mà không cần server.
 - **Mất kết nối không bật hộp thoại:** thanh cam trên cùng + chấm trạng thái; người dùng vẫn xem câu và chọn đáp án (đáp án nằm trong bộ nhớ).

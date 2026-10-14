@@ -63,6 +63,17 @@ final class Roster {
     /** Khung chi tiết chỉ liệt kê sự kiện đáng chú ý; đăng nhập, PRECHECK đạt, gửi đề, nộp bài đã có ở cột trạng thái. */
     static boolean notable(ExamLog.Event e) { return NOTABLE.contains(e.type()); }
 
+    /** Sự kiện đáng chú ý theo thứ tự thời gian; ngắt kết nối sau khi đã nộp bài là bình thường (client tự đóng) nên bỏ qua. */
+    static List<ExamLog.Event> notableEvents(List<ExamLog.Event> events) {
+        List<ExamLog.Event> result = new java.util.ArrayList<>();
+        boolean submitted = false;
+        for (ExamLog.Event e : events) {
+            submitted |= e.type().equals("SUBMIT");
+            if (notable(e) && !(submitted && e.type().equals("DISCONNECT"))) { result.add(e); }
+        }
+        return result;
+    }
+
     /** Một dòng chữ cho khung chi tiết: loại sự kiện đổi sang tiếng Việt dễ đọc. */
     static String eventText(ExamLog.Event e) {
         return switch (e.type()) {

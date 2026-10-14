@@ -71,6 +71,15 @@ class RosterTest {
     }
 
     @Test
+    void disconnectAfterSubmitIsNotNotable() {
+        LocalDateTime t = LocalDateTime.now();
+        List<ExamLog.Event> events = List.of(
+            new ExamLog.Event(t, "S1", "An", "DISCONNECT", "mạng"), new ExamLog.Event(t, "S1", "An", "RECONNECT", ""),
+            new ExamLog.Event(t, "S1", "An", "SUBMIT", "điểm 10"), new ExamLog.Event(t, "S1", "An", "DISCONNECT", "socket đóng"));
+        assertEquals(List.of("DISCONNECT", "RECONNECT"), Roster.notableEvents(events).stream().map(ExamLog.Event::type).toList());
+    }
+
+    @Test
     void eventTextIsReadableVietnamese() {
         LocalDateTime t = LocalDateTime.now();
         assertEquals("NET: chatgpt.com", Roster.eventText(new ExamLog.Event(t, "S1", "An", "VIOLATION", "NET: chatgpt.com")));

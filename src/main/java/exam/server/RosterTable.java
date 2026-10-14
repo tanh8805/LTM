@@ -33,7 +33,7 @@ class RosterTable extends JScrollPane {
     private static final Color ATTENTION = new Color(0xFFF3E2), SELECTED = new Color(0xDCE8FF);
     private static final String[] COLUMNS = {"", "Mã SV", "Họ tên", "Máy", "Trạng thái", "Vi phạm", "Vi phạm gần nhất", "Mẫu",
         "Bất thường", "Điểm"};
-    private static final int[] WIDTHS = {36, 120, 170, 90, 120, 80, 230, 60, 150, 70};
+    private static final int[] WIDTHS = {36, 135, 165, 80, 120, 80, 220, 60, 150, 70};
 
     private static class Model extends AbstractTableModel {
         List<ExamRoom.Row> rows = new ArrayList<>();

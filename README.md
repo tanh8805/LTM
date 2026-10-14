@@ -30,7 +30,7 @@ Client chỉ phát hiện và báo cáo: không chặn mạng, không kill tiế
 | Người | File | Mảng phụ trách | Cần hiểu |
 |---|---|---|---|
 | Cả nhóm | `exam/common/Protocol.java` | Giao thức chung | - Mỗi tin nhắn là một dòng JSON, luôn có `type`<br>- Gson tự escape ký tự xuống dòng nên không bao giờ vỡ dòng |
-| 1 | `StudentApp`, `StudentScreens` (+ `Theme`, `TopBar`, `LoginPanel`, `PrecheckPanel`, `ExamPanel`, `NumberButton`, `OptionRow`, `ResultPanel`), `ServerConnection`, `ServerFinder` | Client sinh viên: kết nối TCP, tìm server UDP, giao diện làm bài (FlatLaf) | - Luồng màn hình: đăng nhập, PRECHECK, chờ, làm bài, kết quả<br>- `StudentApp` chỉ lo logic, `StudentScreens` ghép các panel; vì sao dùng callback<br>- Tự kết nối lại mỗi 5 giây và đăng nhập lại; vì sao chỉ tính "rời cửa sổ" khi `getOppositeWindow() == null`<br>- Tìm server bằng UDP broadcast tới từng card mạng |
+| 1 | `StudentApp`, `StudentScreens` (+ `Theme`, `TopBar`, `LoginPanel`, `PrecheckPanel`, `ExamPanel`, `NumberButton`, `OptionRow`, `ResultPanel`, `Sheet`), `ServerConnection`, `ServerFinder` | Client sinh viên: kết nối TCP, tìm server UDP, giao diện làm bài (FlatLaf) | - Luồng màn hình: đăng nhập, PRECHECK, chờ, làm bài, kết quả<br>- `StudentApp` chỉ lo logic, `StudentScreens` ghép các panel; vì sao dùng callback<br>- Tự kết nối lại mỗi 5 giây và đăng nhập lại; vì sao chỉ tính "rời cửa sổ" khi `getOppositeWindow() == null`<br>- Tìm server bằng UDP broadcast tới từng card mạng |
 | 2 | `Monitor`, `AppRules`, `WindowsProbe`, `Diagnose`, `TeacherWindow`, `config/rules.json` | Giám sát: phát hiện vi phạm ở client và hiển thị cho giám thị | - Baseline lấy ở PRECHECK, so sánh mỗi 3 giây; vì sao chỉ xét app có cửa sổ và cần `SYSTEM_PROCESSES`<br>- 6 feature mỗi 30 giây và cách reset cửa sổ<br>- `WindowsProbe` chạy lệnh Windows; `Monitor` chỉ chứa luật nên test được trên Linux |
 | 3 | `ExamServer`, `ExamRoom`, `Session`, `ExamFile`, `ClientHandler` | Server: nhận kết nối, luật phòng thi, chấm điểm, lưu kết quả | - `ExamRoom` giữ mọi trạng thái và mọi phương thức đổi trạng thái đều `synchronized`; `trySendExam` là điểm gửi đề duy nhất<br>- Chống nhầm session cũ và mới (so sánh socket); watchdog 90 giây (chỉ tính từ lúc máy nhận đề)<br>- Chấm điểm, `ket-qua/<kỳ thi>/` gồm `results.csv`, `events.csv`, `server.log` (UTF-8 có BOM cho hai file CSV) |
 | 4 | `ml/ml_service.py`, `ml/simulate_clients.py`, `MlClient` | ML: Isolation Forest, giả lập phòng thi, nối Java với Python | - Isolation Forest không giám sát, fit trên chính dữ liệu buổi thi; điểm chuẩn hoá min-max và 3 cửa sổ gần nhất<br>- Vì sao `anomaly` có thêm điều kiện điểm ≥ 0.7 (xem mục 9)<br>- Gọi HTTP ngoài khối `synchronized` để ML chậm không treo server |
@@ -39,10 +39,11 @@ Cấu trúc mã nguồn (mỗi file Java trong `src/main` dài khoảng 280 dòn
 
 ```
 src/main/java/exam/
-  common/   Protocol
-  client/   StudentApp  StudentScreens  Theme  TopBar  LoginPanel  PrecheckPanel  ExamPanel  NumberButton  OptionRow  ResultPanel
+  common/   Protocol  Palette  Icons  Format
+  client/   StudentApp  StudentScreens  Theme  TopBar  LoginPanel  PrecheckPanel  ExamPanel  NumberButton  OptionRow  ResultPanel  Sheet
             ServerConnection  ServerFinder  Monitor  AppRules  WindowsProbe  Diagnose  Debug
-  server/   ExamServer  ExamRoom  ExamLog  Session  ExamFile  ClientHandler  TeacherWindow  HistoryDialog  MlClient
+  server/   ExamServer  ExamRoom  ExamLog  Session  ExamFile  ClientHandler  TeacherWindow  RosterTable  Roster  DetailPanel  HistoryDialog  MlClient
+            Pill  TabButton  LocalAddresses
 ml/         ml_service.py  simulate_clients.py  test_ml_service.py
 config/     rules.json        exams/   sample_exam.json
 ```
@@ -55,7 +56,7 @@ config/     rules.json        exams/   sample_exam.json
 
 | Chiều | type | Trường | Ghi chú |
 |---|---|---|---|
-| C→S | `LOGIN` | `studentId`, `name` | |
+| C→S | `LOGIN` | `studentId`, `name`, `os` | `os` (tên hệ điều hành, tuỳ chọn) hiện ở cột Máy của giám thị |
 | S→C | `LOGIN_OK` | `rules` | Luật do server gửi xuống |
 | S→C | `LOGIN_FAIL` | `reason` | |
 | C→S | `PRECHECK_RESULT` | `ok`, `issues` | Có thể gửi nhiều lần |
@@ -186,7 +187,7 @@ Phím tắt khi làm bài: `1`-`9` hoặc `A`-`I` chọn đáp án, mũi tên tr
 2. Máy A, B, C (Windows) đăng nhập. Máy B để Zalo mở: PRECHECK lỗi, đóng Zalo, Kiểm tra lại, đạt.
 3. Giáo viên bấm Bắt đầu, đề hiện trên cả 3 máy.
 4. Máy A làm bài bình thường.
-5. Máy B cắm USB: dòng của máy B tô đỏ, vi phạm USB.
+5. Máy B cắm USB: dòng của máy B tô cam kèm biểu tượng cảnh báo, vi phạm USB.
 6. Máy C mở Chrome vào chatgpt.com: vi phạm APP và NET.
 7. Máy C chuyển qua lại với Calculator (nằm trong whitelist) liên tục rồi trả lời dồn dập. Không luật nào bắt được, nhưng sau 1-2 phút cột Bất thường của máy C cao hẳn so với cả phòng.
 8. Tắt Wi-Fi máy A: `Mất kết nối`. Bật lại: máy A tự vào lại, làm tiếp với thời gian còn lại.
@@ -207,7 +208,7 @@ Phần quét tiến trình, mạng, USB chỉ chạy trên Windows nên chưa ki
 - [ ] Calculator vẫn dùng được (không vi phạm, cửa sổ UWP nằm dưới `ApplicationFrameHost`).
 - [ ] Cột **Mẫu** của máy Windows tăng đều 30 giây một lần; có điểm Bất thường sau khi cả phòng đủ 20 mẫu (bật `-Dexam.debug=true` để xem thời gian quét).
 - [ ] Giao diện mới hiển thị đúng tiếng Việt có dấu, không vỡ bố cục ở độ phóng to 125%/150% của Windows.
-- [ ] Cắm USB khi đang thi: dòng tô đỏ, vi phạm `USB`.
+- [ ] Cắm USB khi đang thi: dòng tô cam, vi phạm `USB`.
 - [ ] Vào chatgpt.com khi đang thi: vi phạm `NET` (và `APP` nếu mở bằng trình duyệt mới).
 - [ ] Chuyển qua lại với Calculator: không có vi phạm, nhưng đếm `focusLostCount` và `focusLostSeconds`.
 - [ ] Hộp xác nhận "Nộp bài?" **không** bị tính là rời cửa sổ.
