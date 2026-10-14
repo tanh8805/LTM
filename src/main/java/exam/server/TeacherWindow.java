@@ -125,7 +125,7 @@ public class TeacherWindow extends JFrame {
         add(top, BorderLayout.NORTH);
         add(new JSplitPane(JSplitPane.VERTICAL_SPLIT, new JScrollPane(table), new JScrollPane(logArea)),
             BorderLayout.CENTER);
-        setSize(1000, 650);
+        setSize(1260, 680);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
         addWindowListener(new WindowAdapter() {
