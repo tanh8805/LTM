@@ -2,6 +2,14 @@
 
 > Đã cập nhật sau đợt tách file, xem lịch sử commit.
 >
+> **Đợt 3 (sau Task 11 và đợt tách file), tóm tắt thay đổi:**
+> - **Kết thúc thi** dừng đồng hồ; client nộp ngay khi nhận `EXAM_END`; đăng nhập sau khi kết thúc được xử lý rõ ràng (máy đã nộp nhận lại `RESULT`, máy chưa vào bị `LOGIN_FAIL` "Bài thi đã kết thúc").
+> - **Quan sát ML:** cột Mẫu, log `Bất thường`/`Hết bất thường`/`ML: chưa đủ dữ liệu`, cột `samples` và `flaggedCount` trong `results.csv`, cờ `-Dexam.debug=true` ở client; `FEATURES` gửi trên luồng riêng khỏi bị quét chậm làm trễ. Điểm ML cần ít nhất 20 mẫu trong cả phòng.
+> - **Luật app mới:** chỉ kiểm soát app có cửa sổ; tiến trình nền không bao giờ là vi phạm. Thêm `allowedWindowApps`, `ignoreProcesses`, nhiều app AI và tên miền AI bị cấm; so khớp tên không phân biệt hoa thường và bỏ `.exe`. Công cụ `exam.client.Diagnose` để chẩn đoán máy Windows. Luật nằm ở server nên sửa không cần gửi lại jar.
+> - **Giao diện client mới** với FlatLaf (`Theme`, `TopBar`, các panel màn hình), cửa sổ giám thị tô màu hàng; ảnh ở `statics/results/ui/`.
+> - Giới hạn độ dài file Java nới lên khoảng 280 dòng.
+> - Các Task bên dưới là đặc tả gốc, một số chi tiết (giao diện client, luật APP) đã được thay bằng các thay đổi trên.
+>
 > Dành cho agent lập trình. Đọc **toàn bộ** tài liệu trước khi làm. Thực hiện các Task ở Phần 5 **theo đúng thứ tự**. Mỗi Task là **một nhánh Git riêng**, làm xong thì mở Pull Request, merge vào `main`, rồi mới sang Task tiếp theo. Không tự ý thêm tính năng ngoài tài liệu. Gặp điều tài liệu không nói rõ thì chọn cách **đơn giản nhất** và ghi lại lựa chọn đó trong mô tả PR.
 
 Ngày: 2026-10-12 · Repo: `https://github.com/tanh8805/LTM` · Môn: Lập trình mạng (bài tập lớn nhóm 4 người)

@@ -9,7 +9,11 @@ Mảng của bạn: phần chạy trên máy sinh viên, từ lúc mở app đ�
 | File | Làm gì |
 |---|---|
 | `client/StudentApp.java` | Logic: kết nối, xử lý từng loại tin từ server, chuyển màn hình, lưu đáp án, đồng hồ, nộp bài, gọi `Monitor`. |
-| `client/StudentScreens.java` | Chỉ dựng giao diện Swing (5 màn hình trong `CardLayout`) và thanh trạng thái; nút bấm gọi ngược về `StudentApp`. |
+| `client/StudentScreens.java` | Ghép giao diện: `CardLayout` 5 màn hình, thanh trên (`TopBar`), thanh cam "Mất kết nối" và thanh trạng thái; nút bấm gọi ngược về `StudentApp`. |
+| `client/Theme.java` | Màu, font, biểu tượng tự vẽ, `Theme.install()` cài FlatLaf. Mọi màu nằm ở đây. |
+| `client/TopBar.java` | Tên kỳ thi, họ tên - mã SV, đồng hồ (xanh/cam/đỏ), chấm kết nối. |
+| `client/LoginPanel.java`, `PrecheckPanel.java`, `ResultPanel.java` | Màn đăng nhập, PRECHECK + màn chờ, kết quả. |
+| `client/ExamPanel.java`, `NumberButton.java`, `OptionRow.java` | Màn làm bài: lưới số câu, hàng lựa chọn bấm được, phím tắt. |
 | `client/ServerConnection.java` | Kết nối TCP, luồng đọc từng dòng JSON, tự nối lại mỗi 5 giây khi rớt mạng. |
 | `client/ServerFinder.java` | Tìm server trong LAN bằng UDP broadcast. |
 
@@ -21,11 +25,12 @@ Mảng của bạn: phần chạy trên máy sinh viên, từ lúc mở app đ�
 4. `ServerConnection.connect`, `readLoop`, `reconnect`: luồng đọc và vòng nối lại.
 5. `StudentApp.onMessage`: một `switch` theo `type`, mỗi nhánh gọi một phương thức ngắn (`onLoginOk`, `onExamStart`, `onResult`...).
 6. `StudentApp.onExamStart`, `tick`, `submit`: nhận đề, đếm ngược, nộp bài.
-7. `StudentScreens.showQuestion`: dựng một câu hỏi và các `JRadioButton`.
+7. `StudentScreens.showQuestion` → `ExamPanel.showQuestion`: dựng một câu hỏi và các `OptionRow`; `StudentApp.showAnswered` báo câu nào đã làm để tô lưới số câu.
+8. `Theme` rồi từng panel (`LoginPanel`, `PrecheckPanel`, `ExamPanel`): chỉ vẽ, không có logic mạng.
 
 ## 3. Một luồng chạy thật: từ "Đăng nhập" đến khi đề hiện
 
-1. Sinh viên bấm **Đăng nhập**: `StudentScreens.loginPanel` gọi `onLogin` = `StudentApp.login`. Hàm này khoá nút, rồi chạy `connect(host)` trên một luồng mới.
+1. Sinh viên bấm **Đăng nhập**: `LoginPanel` gọi `onLogin` = `StudentApp.login`. Hàm này gọi `screens.setLoginBusy` (khoá nút, hiện thanh tiến trình "Đang tìm server..."), rồi chạy `connect(host)` trên một luồng mới.
 2. `StudentApp.connect`: ô IP trống nên gọi `ServerFinder.find(9999, 3000)`. Hàm này gửi `EXAM_DISCOVER` tới `255.255.255.255`, broadcast từng card mạng và `127.0.0.1`, rồi `waitForReply` nhận `EXAM_SERVER 5000` và trả `InetSocketAddress`.
 3. Tạo `ServerConnection`, gọi `conn.connect()` (timeout 5 giây, bật luồng `readLoop`), rồi `sendLogin` gửi `LOGIN` (một dòng JSON).
 4. Server trả `LOGIN_OK` kèm `rules`. `readLoop` parse dòng JSON và gọi `onMessage` qua `invokeLater` → `onLoginOk` → `runPrecheck`.
@@ -39,7 +44,10 @@ Mảng của bạn: phần chạy trên máy sinh viên, từ lúc mở app đ�
 - **UDP broadcast:** client chưa biết IP server nên gửi gói tới địa chỉ quảng bá; server trả lời thẳng về địa chỉ người gửi. Gửi tới broadcast của **từng card mạng** vì máy có ZeroTier/VPN có nhiều card, chỉ gửi `255.255.255.255` thì Java có thể đẩy gói ra nhầm card.
 - **Vì sao Swing phải cập nhật qua `invokeLater`:** các thành phần Swing không an toàn đa luồng, chỉ luồng giao diện (EDT) được sửa chúng. Mọi tin từ mạng đều đi qua `SwingUtilities.invokeLater` trước khi đụng tới giao diện.
 - **Tự nối lại:** khi luồng đọc kết thúc mà chưa `close()`, `ServerConnection` báo mất kết nối, 5 giây thử `connect()` một lần, thành công thì `onReconnected` gửi lại `LOGIN`; server nhận ra mã SV cũ và cho vào lại. Đáp án nằm trong bộ nhớ nên vẫn còn.
-- **Đếm "rời cửa sổ":** chỉ tính khi `getOppositeWindow() == null` (focus sang app khác), để hộp xác nhận "Nộp bài?" của chính app không bị tính là gian lận.
+- **Đếm "rời cửa sổ":** chỉ tính khi `getOppositeWindow() == null` (focus sang app khác). Hộp xác nhận nộp bài được tạo với cửa sổ chính làm cha (`JOptionPane.showOptionDialog(frame, ...)`) nên không bị tính là gian lận.
+- **FlatLaf và `Theme`:** FlatLaf là Look and Feel của Swing; `FlatLightLaf.setup()` phải chạy trước khi tạo cửa sổ. Màu, font, biểu tượng gom về `Theme` để đổi giao diện chỉ sửa một chỗ; các nút số câu, hàng lựa chọn tự vẽ bằng `paintComponent`.
+- **Tách giao diện khỏi logic:** `StudentScreens` và các panel không biết gì về mạng; `StudentApp` gọi `screens.setConnection(...)`, `setAnswered(...)` và nhận sự kiện qua callback (`Runnable`, `IntConsumer`). Nhờ vậy xem giao diện được bằng một harness nhỏ mà không cần server.
+- **Mất kết nối không bật hộp thoại:** thanh cam trên cùng + chấm trạng thái; người dùng vẫn xem câu và chọn đáp án (đáp án nằm trong bộ nhớ).
 
 ## 5. 3 câu thầy có thể hỏi và cách sửa
 
@@ -54,17 +62,17 @@ private void showUnanswered() {
 // gọi ở cuối onAnswer(...) và showCurrentQuestion()
 ```
 
-**b) "Cảnh báo khi còn 1 phút."** Sửa `StudentApp.tick` và `StudentScreens.setTimer`.
+**b) "Cảnh báo khi còn 1 phút."** Đồng hồ đã tự chuyển cam (dưới 5 phút) và đỏ (dưới 1 phút) nhờ `Theme.timerColor`; muốn thêm dòng chữ cảnh báo thì sửa `StudentApp.tick`, còn đổi ngưỡng màu thì sửa `Theme.timerColor`.
 
 ```java
 // StudentApp.tick(): sau khi tính left
 if (left == 60) { screens.setStatus("Chỉ còn 1 phút!"); }
 
-// StudentScreens.setTimer(int seconds): thêm một dòng để đồng hồ chuyển đỏ
-timerLabel.setForeground(seconds <= 60 ? java.awt.Color.RED : java.awt.Color.BLACK);
+// Theme.timerColor: đổi ngưỡng đỏ từ 60 giây thành 120 giây
+return secondsLeft < 120 ? ERROR : secondsLeft < 300 ? WARNING : SUCCESS;
 ```
 
-**c) "Cho đánh dấu câu để xem lại."** Cần một nút mới trong `StudentScreens.examPanel` và một tập id câu trong `StudentApp`.
+**c) "Cho đánh dấu câu để xem lại."** Cần một nút mới trong `ExamPanel` (phần nút điều hướng ở dưới) và một tập id câu trong `StudentApp`.
 
 ```java
 // StudentApp.java
@@ -74,6 +82,6 @@ private void toggleFlag() {
     if (!flagged.remove(id)) { flagged.add(id); }
     showCurrentQuestion();     // trong đó thêm "★ " trước nội dung nếu flagged.contains(id)
 }
-// StudentScreens.examPanel(): JButton flag = new JButton("Đánh dấu"); flag.addActionListener(e -> onFlag.run());
-// rồi thêm tham số Runnable onFlag vào constructor và truyền this::toggleFlag từ StudentApp.show
+// ExamPanel.main(...): JButton flag = new JButton("Đánh dấu"); flag.addActionListener(e -> onFlag.run());
+// rồi thêm tham số Runnable onFlag vào constructor của ExamPanel và StudentScreens, truyền this::toggleFlag từ StudentApp.show
 ```
