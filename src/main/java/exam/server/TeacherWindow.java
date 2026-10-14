@@ -4,7 +4,10 @@ package exam.server;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
+import java.awt.Desktop;
 import java.awt.FlowLayout;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.File;
@@ -12,6 +15,8 @@ import java.io.IOException;
 import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -65,7 +70,8 @@ public class TeacherWindow extends JFrame {
     private final ExamRoom room;
     private final RowsModel model = new RowsModel();
     private final JLabel examLabel = new JLabel("Chưa chọn đề"), timeLabel = new JLabel("Còn lại: -");
-    private final JButton startBtn = new JButton("Bắt đầu thi"), endBtn = new JButton("Kết thúc thi");
+    private final JButton startBtn = new JButton("Bắt đầu thi"), endBtn = new JButton("Kết thúc thi"),
+        openBtn = new JButton("Mở thư mục kết quả");
     private final JTextArea logArea = new JTextArea(8, 60);
 
     public TeacherWindow(ExamServer server) {
@@ -80,11 +86,13 @@ public class TeacherWindow extends JFrame {
         chooseBtn.addActionListener(e -> chooseExam());
         startBtn.addActionListener(e -> startExam());
         endBtn.addActionListener(e -> endExam());
+        openBtn.addActionListener(e -> openResults());
         JPanel top = new JPanel(new FlowLayout(FlowLayout.LEFT));
         top.add(chooseBtn);
         top.add(examLabel);
         top.add(startBtn);
         top.add(endBtn);
+        top.add(openBtn);
         top.add(timeLabel);
         top.add(new JLabel("IP máy chủ: " + localAddresses()));
 
@@ -99,6 +107,16 @@ public class TeacherWindow extends JFrame {
                 comp.setBackground(sel ? t.getSelectionBackground() : row.anomaly() ? FLAGGED
                     : row.violations() > 0 ? VIOLATED : Color.WHITE);
                 return comp;
+            }
+        });
+        table.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                int r = table.rowAtPoint(e.getPoint());
+                if (e.getClickCount() == 2 && r >= 0) {
+                    ExamRoom.Row row = model.rows.get(table.convertRowIndexToModel(r));
+                    new HistoryDialog(TeacherWindow.this, row.studentId(), row.name(), room.history(row.studentId())).setVisible(true);
+                }
             }
         });
         logArea.setEditable(false);
@@ -145,6 +163,20 @@ public class TeacherWindow extends JFrame {
             refresh();
         } catch (IllegalArgumentException | IllegalStateException | IOException ex) {
             JOptionPane.showMessageDialog(this, ex.getMessage(), "Không nạp được đề", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    /** Mở thư mục của kỳ thi (hoặc thư mục gốc nếu chưa bắt đầu); máy không có trình quản lý file thì hiện đường dẫn. */
+    private void openResults() {
+        Path dir = room.examDir() != null ? room.examDir() : room.resultsRoot();
+        try {
+            Files.createDirectories(dir);
+            if (!Desktop.isDesktopSupported() || !Desktop.getDesktop().isSupported(Desktop.Action.OPEN)) {
+                throw new UnsupportedOperationException();
+            }
+            Desktop.getDesktop().open(dir.toFile());
+        } catch (IOException | UnsupportedOperationException | SecurityException ex) {
+            JOptionPane.showMessageDialog(this, "Không mở được thư mục. Đường dẫn:\n" + dir.toAbsolutePath());
         }
     }
 

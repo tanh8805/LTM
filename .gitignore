@@ -1,5 +1,6 @@
 target/
 results.csv
+ket-qua/
 __pycache__/
 .venv/
 .pytest_cache/

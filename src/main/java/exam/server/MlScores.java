@@ -8,6 +8,7 @@ import exam.common.Protocol;
 import java.util.Collection;
 import java.util.Locale;
 import java.util.Map;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 final class MlScores {
@@ -27,8 +28,8 @@ final class MlScores {
         return samples;
     }
 
-    /** Ghi điểm vào Session và log khi một máy bắt đầu/hết bị cờ; chưa đủ mẫu thì chỉ log (khi số mẫu đổi). */
-    void apply(JsonObject response, Map<String, Session> sessions, Consumer<String> log) {
+    /** Ghi điểm vào Session, log và báo onChange(session, ANOMALY_ON/OFF) khi một máy bắt đầu/hết bị cờ; chưa đủ mẫu thì chỉ log (khi số mẫu đổi). */
+    void apply(JsonObject response, Map<String, Session> sessions, Consumer<String> log, BiConsumer<Session, String> onChange) {
         if (!"ok".equals(Protocol.str(response, "status"))) {
             int n = sessions.values().stream().mapToInt(s -> s.samples.size()).sum();
             if (n != lastShortage) { log.accept("ML: chưa đủ dữ liệu (" + n + "/" + ML_MIN_SAMPLES + " mẫu)"); }
@@ -45,8 +46,8 @@ final class MlScores {
             s.anomalyScore = score;
             s.anomaly = now;
             if (now) { s.flaggedCount++; }
-            if (now && !was) { log.accept(String.format(Locale.ROOT, "Bất thường: %s (%.2f)", s.id, score)); }
-            if (!now && was) { log.accept("Hết bất thường: " + s.id); }
+            if (now && !was) { log.accept(String.format(Locale.ROOT, "Bất thường: %s (%.2f)", s.id, score)); onChange.accept(s, "ANOMALY_ON"); }
+            if (!now && was) { log.accept("Hết bất thường: " + s.id); onChange.accept(s, "ANOMALY_OFF"); }
             s.maxAnomaly = s.maxAnomaly == null ? score : Math.max(s.maxAnomaly, score);
         }
     }

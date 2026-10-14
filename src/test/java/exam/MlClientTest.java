@@ -85,7 +85,7 @@ class MlClientTest {
     /** Server thi thật, một máy S1 đã vào thi và gửi một FEATURES. */
     private void startExamWithFeatures() throws Exception {
         server = new ExamServer(new JsonObject());
-        server.room().setResultsFile(tmp.resolve("results.csv"));
+        server.room().setResultsRoot(tmp.resolve("ket-qua"));
         Path exam = tmp.resolve("exam.json");
         Files.writeString(exam, ExamServerTest.EXAM_JSON, StandardCharsets.UTF_8);
         server.room().loadExam(exam);
@@ -213,7 +213,7 @@ class MlClientTest {
         server.scoreRoomNow();
         server.scoreRoomNow();
         server.room().endExam("test");
-        List<String> csv = Files.readAllLines(tmp.resolve("results.csv"), StandardCharsets.UTF_8);
+        List<String> csv = Files.readAllLines(server.room().examDir().resolve("results.csv"), StandardCharsets.UTF_8);
         assertTrue(csv.get(0).endsWith(",maxAnomaly,status,samples,flaggedCount"), csv.get(0));
         assertTrue(csv.get(1).endsWith(",1,2"), csv.get(1));     // 1 mẫu FEATURES, bị cờ trong 2 lần chấm
     }

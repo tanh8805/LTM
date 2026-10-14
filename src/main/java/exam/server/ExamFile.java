@@ -127,7 +127,7 @@ public final class ExamFile {
     }
 
     /** Giá trị có dấu phẩy, nháy kép hoặc xuống dòng thì bọc nháy kép và nhân đôi nháy kép bên trong. */
-    private static String csv(String v) {
+    static String csv(String v) {
         if (v.contains(",") || v.contains("\"") || v.contains("\n")) {
             return "\"" + v.replace("\"", "\"\"") + "\"";
         }
