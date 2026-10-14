@@ -31,6 +31,7 @@ public class ExamServer {
         return t;
     });
     private final ExamRoom room;
+    private final ExamLog records = new ExamLog();
     private volatile Consumer<String> listener;
     private volatile MlClient mlClient;        // null = không chấm bất thường
     private ServerSocket serverSocket;
@@ -64,7 +65,7 @@ public class ExamServer {
     }
 
     public ExamServer(JsonObject rules) {
-        room = new ExamRoom(rules, scheduler, this::log);
+        room = new ExamRoom(rules, scheduler, this::log, records);
     }
 
     /** Phòng thi: giáo viên và test điều khiển bài thi qua đây. */
@@ -76,7 +77,9 @@ public class ExamServer {
 
     void log(String msg) {
         Consumer<String> sink = listener != null ? listener : System.out::println;    // chưa có cửa sổ thì in ra console
-        sink.accept(LocalTime.now().format(TIME) + " " + msg);
+        String line = LocalTime.now().format(TIME) + " " + msg;
+        records.appendLog(line);               // server.log của kỳ thi có đủ mọi dòng cửa sổ giám thị
+        sink.accept(line);
     }
 
     public void start(int tcpPort) throws IOException {
@@ -112,6 +115,7 @@ public class ExamServer {
             udpSocket.close();
         }
         room.closeAll();
+        records.close();
     }
 
     private static void closeQuietly(Closeable c) {

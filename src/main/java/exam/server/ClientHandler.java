@@ -9,6 +9,8 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.net.Socket;
+import java.util.ArrayList;
+import java.util.List;
 
 class ClientHandler implements Runnable {
     private final ExamServer server;
@@ -68,13 +70,23 @@ class ClientHandler implements Runnable {
         room.touch(session);
         switch (type) {
             case Protocol.PRECHECK_RESULT -> room.precheckResult(session, isTrue(m.get("ok")),
-                m.get("issues") == null ? "" : m.get("issues").toString());
+                issues(m.get("issues")));
             case Protocol.VIOLATION -> violation(m);
             case Protocol.FEATURES -> features(m);
             case Protocol.SUBMIT -> room.submit(session,
                 m.get("answers") instanceof JsonObject a ? a : new JsonObject());
             default -> server.log("Bỏ qua type không biết: " + type);
         }
+    }
+
+    /** Danh sách vấn đề PRECHECK nối bằng "; " cho dễ đọc trong log và events.csv. */
+    private static String issues(JsonElement e) {
+        if (e instanceof JsonArray arr) {
+            List<String> parts = new ArrayList<>();
+            arr.forEach(i -> parts.add(i.isJsonPrimitive() ? i.getAsString() : i.toString()));
+            return String.join("; ", parts);
+        }
+        return e == null ? "" : e.toString();
     }
 
     private static boolean isTrue(JsonElement e) {

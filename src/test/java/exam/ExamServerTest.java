@@ -89,7 +89,6 @@ class ExamServerTest {
 
     @TempDir Path tmp;
     ExamServer server;
-    Path resultsFile;
     final List<TestClient> clients = new ArrayList<>();
 
     @BeforeEach
@@ -99,8 +98,7 @@ class ExamServerTest {
         black.add("zalo.exe");
         rules.add("blacklistApps", black);
         server = new ExamServer(rules);
-        resultsFile = tmp.resolve("results.csv");
-        server.room().setResultsFile(resultsFile);
+        server.room().setResultsRoot(tmp.resolve("ket-qua"));
         Path exam = tmp.resolve("exam.json");
         Files.writeString(exam, EXAM_JSON, StandardCharsets.UTF_8);
         server.room().loadExam(exam);
@@ -288,7 +286,7 @@ class ExamServerTest {
         c.next(Protocol.EXAM_END, 2000);
         JsonObject r = submitCorrect(c);
         assertEquals(10.0, r.get("score").getAsDouble());
-        String csv = Files.readString(resultsFile, StandardCharsets.UTF_8);
+        String csv = Files.readString(server.room().examDir().resolve("results.csv"), StandardCharsets.UTF_8);
         assertTrue(csv.startsWith("\uFEFFstudentId,name,score,correct,total,violations,maxAnomaly,status"));
         assertTrue(csv.contains("S1,Sinh viên S1,10.0,2,2,0,,Đã nộp"), csv);
     }

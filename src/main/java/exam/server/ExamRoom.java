@@ -10,6 +10,7 @@ import java.net.Socket;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.ScheduledExecutorService;
@@ -25,7 +26,8 @@ public class ExamRoom {
     private final ScheduledExecutorService scheduler;
     private final Consumer<String> log;
     private final Map<String, Session> sessions = new TreeMap<>();    // sắp theo mã SV
-    private Path resultsFile = Path.of("results.csv");
+    private final ExamLog records;
+    private Path resultsRoot = Path.of("ket-qua"), examDir;
     private JsonObject exam;
     private JsonArray clientQuestions;         // câu hỏi không có "answer"
     private boolean started, ended;
@@ -34,13 +36,19 @@ public class ExamRoom {
     private long startMillis;
     private ScheduledFuture<?> autoEnd;
 
-    ExamRoom(JsonObject rules, ScheduledExecutorService scheduler, Consumer<String> log) {
+    ExamRoom(JsonObject rules, ScheduledExecutorService scheduler, Consumer<String> log, ExamLog records) {
         this.rules = rules;
         this.scheduler = scheduler;
         this.log = log;
+        this.records = records;
     }
 
-    public synchronized void setResultsFile(Path p) { resultsFile = p; }
+    /** Thư mục gốc chứa thư mục của từng kỳ thi (mặc định ket-qua/). */
+    public synchronized void setResultsRoot(Path p) { resultsRoot = p; }
+    /** Thư mục của kỳ thi hiện tại, null nếu chưa bấm Bắt đầu. */
+    public synchronized Path examDir() { return examDir; }
+    public synchronized Path resultsRoot() { return resultsRoot; }
+    public List<ExamLog.Event> history(String studentId) { return records.history(studentId); }
     public synchronized String examTitle() { return exam == null ? null : exam.get("title").getAsString(); }
     public synchronized boolean isStarted() { return started; }
     public synchronized boolean isEnded() { return ended; }
@@ -55,6 +63,11 @@ public class ExamRoom {
     public synchronized void startExam() {
         if (exam == null) { throw new IllegalStateException("Chưa nạp đề"); }
         if (started) { throw new IllegalStateException("Bài thi đã bắt đầu"); }
+        try {
+            examDir = records.attach(resultsRoot, examTitle());
+        } catch (IOException e) {
+            log.accept("Không tạo được thư mục kết quả " + resultsRoot + ": " + e.getMessage());   // vẫn cho thi, chỉ mất file lưu
+        }
         started = true;
         startMillis = System.currentTimeMillis();
         autoEnd = scheduler.schedule(() -> endExam("Hết giờ"), exam.get("durationMinutes").getAsInt(), TimeUnit.MINUTES);
@@ -70,6 +83,7 @@ public class ExamRoom {
         long done = sessions.values().stream().filter(s -> s.submitted).count();
         sessions.values().stream().filter(s -> s.connected() && !s.submitted).forEach(this::sendEnd);
         log.accept("Kết thúc thi: " + reason + ". Đã nộp " + done + "/" + sessions.size() + " máy");
+        records.record("", "", "EXAM_END", reason + ". Đã nộp " + done + "/" + sessions.size() + " máy");
         writeResults();
     }
 
@@ -89,6 +103,7 @@ public class ExamRoom {
         m.addProperty("remainingSeconds", remainingSeconds());
         m.add("questions", clientQuestions);
         Protocol.send(s.out, m);
+        event(s, "EXAM_SENT", "còn " + remainingSeconds() + " giây");
         s.lastSeen = System.currentTimeMillis();       // thời gian im lặng chỉ tính từ lúc máy nhận đề, không tính từ lúc chờ trước giờ thi
     }
 
@@ -104,6 +119,8 @@ public class ExamRoom {
         Protocol.send(s.out, m);
     }
 
+    private void event(Session s, String type, String detail) { records.record(s.id, s.name, type, detail); }
+
     /** Trả session nếu đăng nhập được; nếu không thì đã gửi LOGIN_FAIL và trả null. */
     synchronized Session login(String id, String name, Socket socket, PrintWriter out) {
         Session s = sessions.get(id);
@@ -114,9 +131,11 @@ public class ExamRoom {
             JsonObject m = Protocol.msg(Protocol.LOGIN_FAIL);
             m.addProperty("reason", fail);
             Protocol.send(out, m);
+            records.record(id, name, "LOGIN_FAIL", fail);
             return null;
         }
-        if (s == null) {                       // máy cũ đã mất kết nối thì giữ nguyên session và chỉ gắn socket mới
+        boolean returning = s != null;         // máy cũ đã mất kết nối thì giữ nguyên session và chỉ gắn socket mới
+        if (!returning) {
             s = new Session(id, name);
             sessions.put(id, s);
         }
@@ -127,6 +146,7 @@ public class ExamRoom {
         ok.add("rules", rules);
         Protocol.send(out, ok);
         log.accept("Đăng nhập: " + id + " - " + s.name);
+        event(s, returning ? "RECONNECT" : "LOGIN", "");
         if (s.submitted) { sendResult(s); } else { trySendExam(s); }   // RESULT có thể đã mất khi rớt mạng
         return s;
     }
@@ -138,6 +158,7 @@ public class ExamRoom {
         s.precheckOk = ok;
         s.precheckFailed = !ok;
         log.accept("PRECHECK " + s.id + (ok ? ": đạt" : ": lỗi - " + issues));
+        if (ok) { event(s, "PRECHECK_OK", ""); } else { event(s, "PRECHECK_FAIL", issues); }
         trySendExam(s);
     }
 
@@ -145,6 +166,7 @@ public class ExamRoom {
         s.violations++;
         s.lastViolation = kind + ": " + detail;
         log.accept("Vi phạm " + s.id + " - " + s.lastViolation);
+        event(s, "VIOLATION", s.lastViolation);
     }
 
     synchronized void submit(Session s, JsonObject answers) {
@@ -153,6 +175,8 @@ public class ExamRoom {
             s.result = ExamFile.grade(exam, answers);
             s.submitted = true;
             log.accept("Nộp bài: " + s.id + " - điểm " + s.result.get("score").getAsString());
+            event(s, "SUBMIT", "điểm " + s.result.get("score").getAsString() + " ("
+                + s.result.get("correct").getAsString() + "/" + s.result.get("total").getAsString() + ")");
             writeResults();
         }
         if (s.connected()) { sendResult(s); }
@@ -160,13 +184,14 @@ public class ExamRoom {
 
     /** Chỉ đánh dấu mất kết nối nếu socket vẫn là socket của luồng đọc vừa kết thúc (tránh đá máy đã vào lại). */
     synchronized void disconnected(Session s, Socket socket) {
-        if (s != null && s.socket == socket) { markDisconnected(s); }
+        if (s != null && s.socket == socket) { markDisconnected(s, "socket đóng"); }
     }
 
-    private void markDisconnected(Session s) {
+    private void markDisconnected(Session s, String why) {
         s.socket = null;
         s.out = null;
         log.accept("Mất kết nối: " + s.id);
+        event(s, "DISCONNECT", why);
     }
 
     /** Máy đang thi mà im lặng quá timeoutMs (mất heartbeat): đánh dấu mất kết nối ngay rồi đóng socket. */
@@ -175,7 +200,7 @@ public class ExamRoom {
         for (Session s : sessions.values()) {
             if (Session.ST_IN_EXAM.equals(s.status(started)) && now - s.lastSeen > timeoutMs) {
                 s.close();                     // đóng trước vì markDisconnected sẽ xoá tham chiếu socket
-                markDisconnected(s);
+                markDisconnected(s, "im lặng quá " + timeoutMs / 1000 + " giây (watchdog)");
             }
         }
     }
@@ -184,7 +209,9 @@ public class ExamRoom {
 
     synchronized JsonArray samplesForMl() { return MlScores.samples(sessions.values()); }
 
-    synchronized void applyScores(JsonObject response) { mlScores.apply(response, sessions, log); }
+    synchronized void applyScores(JsonObject response) {
+        mlScores.apply(response, sessions, log, (s, type) -> event(s, type, String.format(Locale.ROOT, "%.2f", s.anomalyScore)));
+    }
 
     public synchronized List<Row> rows() {
         List<Row> list = new ArrayList<>();
@@ -197,9 +224,10 @@ public class ExamRoom {
 
     private void writeResults() {
         try {
-            ExamFile.writeResults(resultsFile, new ArrayList<>(sessions.values()), s -> s.status(started));
+            if (examDir == null) { return; }
+            ExamFile.writeResults(examDir.resolve("results.csv"), new ArrayList<>(sessions.values()), s -> s.status(started));
         } catch (IOException e) {
-            log.accept("Không ghi được " + resultsFile + ": " + e.getMessage());
+            log.accept("Không ghi được results.csv: " + e.getMessage());
         }
     }
 }
