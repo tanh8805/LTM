@@ -137,7 +137,7 @@ Luật nằm trong `config/rules.json` **ở server** và được gửi xuống
 
 ### Giao diện
 
-Ảnh chụp trong `statics/results/ui/` (chụp bằng Xvfb trên Linux; ảnh PRECHECK, đang tìm server và mất kết nối dùng dữ liệu mẫu).
+Giao diện làm theo bộ ảnh tham khảo của giám thị và sinh viên. Ảnh chụp trong `statics/results/ui/` (chụp bằng Xvfb trên Linux; ảnh PRECHECK, đang tìm server, mất kết nối và các hộp xác nhận dùng dữ liệu mẫu).
 
 | Đăng nhập | PRECHECK không đạt |
 |---|---|
@@ -171,7 +171,7 @@ Các bước kỳ thi nhiều lượt (chụp bằng Xvfb, 15 máy giả + 1 má
 
 Mẫu `events.csv` của lần chạy này: [events-mau.csv](statics/results/events-mau.csv).
 
-Hộp xác nhận nộp bài: [06-xac-nhan-nop-bai.png](statics/results/ui/06-xac-nhan-nop-bai.png). Cửa sổ giám thị (dòng bị gắn cờ tô đỏ nhạt, dòng có vi phạm tô cam nhạt): [08-giam-thi.png](statics/results/ui/08-giam-thi.png).
+Hộp xác nhận nộp bài và hộp thoát khi bài chưa nộp: [06-xac-nhan-nop-bai.png](statics/results/ui/06-xac-nhan-nop-bai.png), [06b-thoat-khi-chua-nop.png](statics/results/ui/06b-thoat-khi-chua-nop.png). Cửa sổ giám thị (dòng cần chú ý, tức có vi phạm hoặc bị ML gắn cờ, tô cam nhạt kèm biểu tượng cảnh báo; khung chi tiết bên phải): [08-giam-thi.png](statics/results/ui/08-giam-thi.png).
 Phím tắt khi làm bài: `1`-`9` hoặc `A`-`I` chọn đáp án, mũi tên trái/phải chuyển câu.
 
 ## 6. Mạng
