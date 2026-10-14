@@ -30,6 +30,8 @@ public class StudentApp {
     private int current;
     private long deadlineMillis;
     private boolean loggedInOnce, examActive, submitted, finished;   // finished: đã hiện màn kết thúc/kết quả
+    private boolean exitAfterResult;           // "Nộp bài và thoát": thoát ngay khi nhận RESULT
+    private String serverText = "", submittedAt = "";
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
@@ -40,10 +42,13 @@ public class StudentApp {
 
     private void show() {
         screens = new StudentScreens(frame, this::login, this::runPrecheck, () -> goTo(current - 1),
-            () -> goTo(current + 1), this::submit, this::onAnswer, this::goTo, this::newRound);
+            () -> goTo(current + 1), this::submit, this::onAnswer, this::goTo, this::newRound, this::exitNow);
         frame.addWindowFocusListener(new WindowAdapter() {
             @Override public void windowGainedFocus(WindowEvent e) { if (otherApp(e)) { monitor.focusGained(); } }
             @Override public void windowLostFocus(WindowEvent e) { if (otherApp(e)) { monitor.focusLost(); } }
+        });
+        frame.addWindowListener(new WindowAdapter() {
+            @Override public void windowClosing(WindowEvent e) { requestExit(); }
         });
         countdown = new Timer(1000, e -> tick());
         frame.setVisible(true);
@@ -70,6 +75,7 @@ public class StudentApp {
             () -> { screens.setStatus("Đã kết nối lại"); screens.setConnection(TopBar.Conn.CONNECTED); sendLogin(); });
         try {
             conn.connect();
+            serverText = address.getHostString() + ":" + address.getPort();
             screens.setStatus("Đã kết nối " + address.getHostString() + ":" + address.getPort());
             screens.setConnection(TopBar.Conn.CONNECTED);
             sendLogin();
@@ -90,6 +96,7 @@ public class StudentApp {
         JsonObject m = Protocol.msg(Protocol.LOGIN);
         m.addProperty("studentId", studentId);
         m.addProperty("name", studentName);
+        m.addProperty("os", System.getProperty("os.name", ""));
         conn.send(m);
     }
 
@@ -134,7 +141,7 @@ public class StudentApp {
             // EXAM_START về ngay sau đó và phải được xử lý sau, không bị màn "Chờ" đè lên màn làm bài.
             SwingUtilities.invokeLater(() -> {
                 if (questions == null && !finished) {
-                    if (issues.isEmpty()) { screens.showWaiting(); } else { screens.showPrecheck(issues); }
+                    if (issues.isEmpty()) { screens.showWaiting(); } else { screens.showPrecheck(issues, serverText); }
                 }
             });
             conn.send(m);
@@ -166,7 +173,8 @@ public class StudentApp {
         rules = null;
         current = 0;
         deadlineMillis = 0;
-        loggedInOnce = examActive = submitted = finished = false;
+        loggedInOnce = examActive = submitted = finished = exitAfterResult = false;
+        submittedAt = "";
         screens.resetForNewRound();
     }
 
@@ -227,6 +235,7 @@ public class StudentApp {
         submitted = true;
         finished = true;
         examActive = false;
+        submittedAt = java.time.LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss"));
         monitor.stop();
         countdown.stop();
         screens.showFinished(message);
@@ -244,9 +253,29 @@ public class StudentApp {
 
     private void onResult(JsonObject m) {
         finished = true;
-        screens.showResult(m.get("score").getAsDouble(), m.get("correct").getAsInt(), m.get("total").getAsInt());
+        if (submittedAt.isEmpty()) { submittedAt = java.time.LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss")); }
+        screens.showResult(m.get("score").getAsDouble(), m.get("correct").getAsInt(), m.get("total").getAsInt(), submittedAt);
         conn.close();
         screens.setConnection(TopBar.Conn.NONE);
         screens.setStatus("Đã hoàn thành");
+        if (exitAfterResult) { exitNow(); }
+    }
+
+    /** Đóng cửa sổ: đang thi mà chưa nộp thì hỏi (nộp rồi thoát hoặc tiếp tục làm), còn lại thoát luôn. */
+    private void requestExit() {
+        if (!examActive || submitted) { exitNow(); return; }
+        if (screens.confirmExit()) {
+            exitAfterResult = true;
+            submit();
+            Timer fallback = new Timer(8000, e -> exitNow());     // không có RESULT (mất mạng) thì vẫn thoát được
+            fallback.setRepeats(false);
+            fallback.start();
+        }
+    }
+
+    private void exitNow() {
+        if (conn != null) { conn.close(); }
+        monitor.stop();
+        System.exit(0);
     }
 }

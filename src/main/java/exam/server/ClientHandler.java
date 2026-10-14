@@ -60,7 +60,7 @@ class ClientHandler implements Runnable {
         String type = Protocol.type(m);
         if (type.equals(Protocol.LOGIN)) {
             if (session == null) {
-                session = room.login(Protocol.str(m, "studentId"), Protocol.str(m, "name"), socket, out);
+                session = room.login(Protocol.str(m, "studentId"), Protocol.str(m, "name"), Protocol.str(m, "os"), socket, out);
             }
             return;
         }

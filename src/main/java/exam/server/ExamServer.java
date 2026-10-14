@@ -21,6 +21,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import javax.swing.SwingUtilities;
+import javax.swing.UIManager;
 
 public class ExamServer {
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm:ss");
@@ -53,6 +54,10 @@ public class ExamServer {
         server.setMlClient(new MlClient("http://localhost:8000"));
         SwingUtilities.invokeLater(() -> {
             FlatLightLaf.setup();                           // phải cài giao diện trước khi tạo cửa sổ
+            UIManager.put("defaultFont", UIManager.getFont("defaultFont").deriveFont(14f));
+            UIManager.put("Button.arc", 12);
+            UIManager.put("Component.arc", 10);
+            UIManager.put("TextComponent.arc", 10);
             new TeacherWindow(server).setVisible(true);     // tạo cửa sổ trước để log lúc khởi động hiện được
             try {
                 server.start(Protocol.TCP_PORT);

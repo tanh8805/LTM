@@ -13,7 +13,8 @@ Mảng của bạn: phát hiện vi phạm trên máy sinh viên và hiển th�
 | `client/WindowsProbe.java` | Nói chuyện với Windows: chạy `tasklist` (tên + PID), `netstat`, PowerShell (app có cửa sổ), phân giải DNS. Không biết gì về luật. |
 | `client/Diagnose.java` | Công cụ chẩn đoán chạy tay trên máy Windows, ghi `chan-doan-<tên máy>.txt`. |
 | `client/Debug.java` | Log gỡ lỗi khi chạy với `-Dexam.debug=true` (thời gian mỗi lần quét, nội dung `FEATURES`). |
-| `server/TeacherWindow.java` | Cửa sổ giám thị (FlatLaf): chọn đề, bắt đầu/kết thúc, bảng sinh viên (cột Mẫu, Bất thường; dòng gắn cờ ML tô đỏ nhạt, dòng có vi phạm tô cam nhạt), ô log. |
+| `server/TeacherWindow.java` | Cửa sổ giám thị (FlatLaf): thanh trên (Mở đề, đồng hồ, địa chỉ, nút Bắt đầu/Kết thúc/Kỳ thi mới), tab lọc và ô tìm kiếm, nhật ký; nhấp đúp một dòng mở lịch sử. |
+| `server/RosterTable.java`, `Roster.java`, `DetailPanel.java` | Bảng thí sinh (biểu tượng cảnh báo, nhãn trạng thái, thanh Bất thường, dòng cần chú ý tô cam nhạt), logic thuần của bảng (lọc theo tab, tìm kiếm không dấu, chữ hiển thị, sự kiện đáng chú ý) và khung chi tiết bên phải. |
 | `config/rules.json` | Luật: `blacklistApps`, `whitelistApps`, `allowedWindowApps`, `ignoreProcesses`, `blockedDomains`. Nằm ở server, gửi xuống client khi đăng nhập, nên chỉnh không cần build lại hay gửi lại jar. |
 
 ## 2. Thứ tự đọc
@@ -26,16 +27,16 @@ Mảng của bạn: phát hiện vi phạm trên máy sinh viên và hiển th�
 6. `WindowsProbe.parseTasklistProcs`, `parseWindows`, `parseNetstat`, `run`: đọc kết quả lệnh và chạy lệnh có timeout 10 giây.
 7. `Monitor.start` rồi `scan`: hai luồng riêng, quét 3 giây và gửi `FEATURES` 30 giây.
 8. `Diagnose.processSections`: các mục báo cáo chẩn đoán.
-9. `TeacherWindow.refresh` cùng bộ tô màu dòng trong constructor.
+9. `TeacherWindow.refresh` cùng `Roster.filter` và các lớp vẽ trong `RosterTable`.
 
-## 3. Một luồng chạy thật: cắm USB đến khi dòng tô đỏ
+## 3. Một luồng chạy thật: cắm USB đến khi dòng được tô cam
 
 1. Lúc PRECHECK, `Monitor.precheck` gọi `WindowsProbe.roots()` và lưu vào `baselineRoots` (ví dụ chỉ có `C:\`).
 2. Trong giờ thi, `Monitor.start` hẹn `scan` chạy mỗi 3 giây trên luồng `monitor-scan` (còn `FEATURES` có luồng `monitor-features` riêng). `scan` gọi `processSnapshot(WindowsProbe.processList(), WindowsProbe.roots(), WindowsProbe.remoteIps())`.
 3. Sinh viên cắm USB nên `roots()` có thêm `E:\`. Trong `processSnapshot`, `E:\` không có trong `baselineRoots` → `violate("USB", "E:\")`.
 4. `violate` kiểm tra `sentViolations` (chưa gửi cặp này), tăng `violationsInWindow`, tạo tin `{"type":"VIOLATION","kind":"USB","detail":"E:\\","time":"..."}` và gọi `sender` = `conn::send` của `StudentApp`.
 5. Trên server, `ClientHandler.handle` nhận tin, gọi `ClientHandler.violation` rồi `ExamRoom.violation`: tăng `Session.violations`, đặt `lastViolation = "USB: E:\"`.
-6. `TeacherWindow` có `Timer` 1 giây gọi `refresh`: lấy `room.rows()`, nạp vào bảng. Bộ tô màu thấy `row.violations() > 0` nên tô nền cam nhạt dòng đó (dòng bị ML gắn cờ thì đỏ nhạt).
+6. `TeacherWindow` có `Timer` 1 giây gọi `refresh`: lấy `room.rows()`, nạp vào bảng. `Roster.needsAttention(row)` đúng (có vi phạm hoặc bị ML gắn cờ) nên `RosterTable` tô nền cam nhạt dòng đó, hiện biểu tượng cảnh báo và đếm vào tab "Cần chú ý"; cột "Vi phạm gần nhất" hiện `USB E:\ · 09:41`.
 
 ## 4. Kiến thức cần giải thích được với thầy
 
@@ -65,8 +66,8 @@ int focusLostSeconds;
 // ExamRoom.features(Session s, JsonObject sample): cộng dồn giá trị thứ 3
 s.focusLostSeconds += sample.getAsJsonArray("values").get(2).getAsInt();
 // ExamRoom.Row: thêm trường int focusLostSeconds ở cuối; trong rows() truyền s.focusLostSeconds
-// TeacherWindow: thêm "Rời cửa sổ (giây)" vào COLUMNS và trong getValueAt:
-case 7 -> row.focusLostSeconds();   // nhớ đổi default hiện tại (điểm) thành case 6
+// RosterTable: thêm "Rời cửa sổ (giây)" vào COLUMNS và WIDTHS, rồi thêm một nhánh vào Model.getValueAt:
+case 10 -> row.focusLostSeconds();   // cột mới nằm sau "Điểm" (chỉ số 9)
 ```
 
 **c) "Đổi chu kỳ quét từ 3 giây thành 5 giây."** Sửa `Monitor.start`:

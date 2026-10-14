@@ -2,16 +2,15 @@
 package exam.client;
 
 import com.formdev.flatlaf.FlatLaf;
+import exam.common.Icons;
+import exam.common.Palette;
 import com.formdev.flatlaf.FlatLightLaf;
-import java.awt.BasicStroke;
 import java.awt.Color;
-import java.awt.Component;
 import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Insets;
 import java.awt.RenderingHints;
-import java.awt.geom.Path2D;
 import java.util.Map;
 import javax.swing.BorderFactory;
 import javax.swing.Icon;
@@ -21,10 +20,9 @@ import javax.swing.JPanel;
 import javax.swing.UIManager;
 
 final class Theme {
-    static final Color PRIMARY = new Color(0x1F6FEB), PRIMARY_SOFT = new Color(0xE4EEFF), WARNING = new Color(0xE67700),
-        WARNING_SOFT = new Color(0xFFF1DB), ERROR = new Color(0xD92D20), SUCCESS = new Color(0x1E9E50),
-        BACKGROUND = new Color(0xF4F6FA), CARD = Color.WHITE, TEXT = new Color(0x1F2937), MUTED = new Color(0x6B7280),
-        BORDER = new Color(0xD3D9E3);
+    static final Color PRIMARY = Palette.PRIMARY, PRIMARY_SOFT = Palette.PRIMARY_SOFT, WARNING = Palette.WARNING,
+        WARNING_SOFT = Palette.WARNING_SOFT, ERROR = Palette.ERROR, SUCCESS = Palette.SUCCESS,
+        BACKGROUND = Palette.BACKGROUND, CARD = Palette.CARD, TEXT = Palette.TEXT, MUTED = Palette.MUTED, BORDER = Palette.BORDER;
     static final float BASE_SIZE = 15f;
 
     private Theme() {}
@@ -87,44 +85,8 @@ final class Theme {
         }
     }
 
-    /** Biểu tượng tự vẽ để không phụ thuộc font có ký tự đặc biệt hay không. */
-    static Icon warningIcon(int size) { return new Glyph(size, WARNING, true); }
+    /** Biểu tượng tự vẽ nằm ở exam.common.Icons để giám thị dùng chung. */
+    static Icon warningIcon(int size) { return Icons.warning(size); }
 
-    static Icon checkIcon(int size) { return new Glyph(size, SUCCESS, false); }
-
-    private record Glyph(int size, Color color, boolean warning) implements Icon {
-        @Override public int getIconWidth() { return size; }
-        @Override public int getIconHeight() { return size; }
-
-        @Override
-        public void paintIcon(Component c, Graphics g, int x, int y) {
-            Graphics2D g2 = (Graphics2D) g.create();
-            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            g2.translate(x, y);
-            g2.setColor(color);
-            float s = size, w = Math.max(2f, s / 10);
-            if (warning) {                                           // tam giác cảnh báo có dấu chấm than
-                Path2D tri = new Path2D.Float();
-                tri.moveTo(s / 2, s * 0.06);
-                tri.lineTo(s * 0.97, s * 0.92);
-                tri.lineTo(s * 0.03, s * 0.92);
-                tri.closePath();
-                g2.fill(tri);
-                g2.setColor(Color.WHITE);
-                g2.setStroke(new BasicStroke(w, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-                g2.drawLine(size / 2, (int) (s * 0.35), size / 2, (int) (s * 0.62));
-                g2.fillOval((int) (s / 2 - w / 2), (int) (s * 0.72), (int) w, (int) w);
-            } else {                                                 // hình tròn xanh có dấu tích
-                g2.fillOval(0, 0, size, size);
-                g2.setColor(Color.WHITE);
-                g2.setStroke(new BasicStroke(w, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-                Path2D tick = new Path2D.Float();
-                tick.moveTo(s * 0.27, s * 0.52);
-                tick.lineTo(s * 0.44, s * 0.68);
-                tick.lineTo(s * 0.74, s * 0.33);
-                g2.draw(tick);
-            }
-            g2.dispose();
-        }
-    }
+    static Icon checkIcon(int size) { return Icons.check(size); }
 }

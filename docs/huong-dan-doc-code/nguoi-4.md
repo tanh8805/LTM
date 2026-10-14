@@ -31,7 +31,7 @@ Mảng của bạn: phát hiện máy "khác số đông" bằng Isolation Fores
 3. `MlClient.score` gửi `POST http://localhost:8000/score` với `{"samples": [...]}` (không giữ khoá nào của phòng trong lúc chờ).
 4. `ml_service.score` gọi `score_samples`: dưới 20 mẫu **trong cả phòng** thì trả `not_enough_data` (server log `ML: chưa đủ dữ liệu (n/20 mẫu)`, cột Mẫu của từng máy cho biết đang ở đâu); ngược lại fit `IsolationForest`, tính điểm thô `-model.score_samples(x)`, chuẩn hoá min–max về 0–1, rồi với mỗi sinh viên lấy tối đa trong **3 cửa sổ gần nhất** và đặt `anomaly` theo quy tắc ở mục 4.
 5. Trả `{"status": "ok", "results": [...]}`. `ExamRoom.applyScores` cập nhật `Session` (`status` khác `ok` thì bỏ qua).
-6. `TeacherWindow.refresh` (mỗi giây) đọc `room.rows()` và hiện cột "Mẫu" (số `FEATURES` đã nhận) và "Bất thường" (`%.2f`); dòng có `anomaly` bị tô đỏ nhạt. `results.csv` có thêm cột `samples` và `flaggedCount` (số lần chấm máy bị gắn cờ).
+6. `TeacherWindow.refresh` (mỗi giây) đọc `room.rows()` và hiện cột "Mẫu" (số `FEATURES` đã nhận) và "Bất thường" (`%.2f`); dòng có `anomaly` bị tô cam nhạt, kèm biểu tượng cảnh báo và thanh điểm màu cam; khung chi tiết bên phải hiện điểm này. `results.csv` có thêm cột `samples` và `flaggedCount` (số lần chấm máy bị gắn cờ).
 
 ## 4. Kiến thức cần giải thích được với thầy
 

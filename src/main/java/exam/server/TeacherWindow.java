@@ -1,25 +1,29 @@
-// Giao diện giám thị (Swing): chọn đề, bắt đầu/kết thúc thi, bảng sinh viên làm mới mỗi giây và ô log (Người 2).
+// Giao diện giám thị (Swing + FlatLaf, theo ảnh tham khảo): thanh trên, tab lọc và ô tìm kiếm, bảng thí sinh, khung chi tiết, nhật ký (Người 2).
 package exam.server;
 
+import exam.common.Icons;
+import exam.common.Palette;
+import exam.common.Protocol;
 import java.awt.BorderLayout;
 import java.awt.Color;
-import java.awt.Component;
 import java.awt.Desktop;
+import java.awt.Dimension;
+import java.awt.Font;
 import java.awt.FlowLayout;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
+import java.awt.Insets;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.File;
 import java.io.IOException;
-import java.net.Inet4Address;
-import java.net.InetAddress;
-import java.net.NetworkInterface;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Collections;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
+import javax.swing.BorderFactory;
+import javax.swing.ButtonGroup;
 import javax.swing.JButton;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
@@ -27,53 +31,25 @@ import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
-import javax.swing.JSplitPane;
-import javax.swing.JTable;
 import javax.swing.JTextArea;
-import javax.swing.SwingConstants;
+import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
 import javax.swing.Timer;
-import javax.swing.table.AbstractTableModel;
-import javax.swing.table.DefaultTableCellRenderer;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 
 public class TeacherWindow extends JFrame {
-    private static final Color FLAGGED = new Color(255, 218, 218), VIOLATED = new Color(255, 236, 204);   // bị gắn cờ ML: đỏ nhạt; có vi phạm: cam nhạt
-    private static final java.util.Set<Integer> CENTERED_COLUMNS = java.util.Set.of(3, 5, 6, 7);   // các cột số
-    private static final String[] COLUMNS = {"Mã SV", "Họ tên", "Trạng thái", "Số vi phạm", "Vi phạm gần nhất",
-        "Mẫu", "Bất thường", "Điểm"};
-
-    /** Bảng dữ liệu lấy từ room.rows(); mỗi giây thay cả danh sách cho đơn giản. */
-    private static class RowsModel extends AbstractTableModel {
-        List<ExamRoom.Row> rows = new ArrayList<>();
-
-        @Override public int getRowCount() { return rows.size(); }
-        @Override public int getColumnCount() { return COLUMNS.length; }
-        @Override public String getColumnName(int c) { return COLUMNS[c]; }
-
-        @Override
-        public Object getValueAt(int r, int c) {
-            ExamRoom.Row row = rows.get(r);
-            return switch (c) {
-                case 0 -> row.studentId();
-                case 1 -> row.name();
-                case 2 -> row.status();
-                case 3 -> row.violations();
-                case 4 -> row.lastViolation();
-                case 5 -> row.samples();
-                case 6 -> row.anomalyScore() == null ? "-" : String.format("%.2f", row.anomalyScore());
-                default -> row.score() == null ? "-" : row.score().toString();
-            };
-        }
-    }
-
     private final ExamServer server;
     private final ExamRoom room;
-    private final RowsModel model = new RowsModel();
-    private final JLabel examLabel = new JLabel("Chưa chọn đề"), timeLabel = new JLabel("Còn lại: -");
-    private final JButton startBtn = new JButton("Bắt đầu thi"), endBtn = new JButton("Kết thúc thi"),
-        openBtn = new JButton("Mở thư mục kết quả"), newBtn = new JButton("Kỳ thi mới"),
-        chooseBtn = new JButton("Chọn file đề...");
-    private final JTextArea logArea = new JTextArea(8, 60);
+    private final JButton chooseBtn = new JButton("Mở đề..."), folderBtn = new JButton("Thư mục kết quả"), actionBtn = new JButton();
+    private final JLabel titleLabel = label("Chưa chọn đề", 15, true, Palette.TEXT), subLabel = label(" ", 12, false, Palette.MUTED),
+        timeValue = label("-", 15, true, Palette.TEXT);
+    private final JTextArea logArea = new JTextArea();
+    private final DetailPanel detail = new DetailPanel();
+    private final JTextField search = new JTextField(22);
+    private final Map<Roster.Tab, TabButton> tabs = new EnumMap<>(Roster.Tab.class);
+    private final RosterTable table = new RosterTable(row -> showDetail(row), this::openHistory);
+    private Roster.Tab tab = Roster.Tab.ALL;
 
     public TeacherWindow(ExamServer server) {
         super("Giám thị - Server thi");
@@ -84,48 +60,37 @@ public class TeacherWindow extends JFrame {
             logArea.setCaretPosition(logArea.getDocument().getLength());    // tự cuộn xuống dòng mới nhất
         }));
         chooseBtn.addActionListener(e -> chooseExam());
-        startBtn.addActionListener(e -> startExam());
-        endBtn.addActionListener(e -> endExam());
-        newBtn.addActionListener(e -> newSession());
-        openBtn.addActionListener(e -> openResults());
-        JPanel top = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        top.add(chooseBtn);
-        top.add(examLabel);
-        top.add(startBtn);
-        top.add(endBtn);
-        top.add(newBtn);
-        top.add(openBtn);
-        top.add(timeLabel);
-        top.add(new JLabel("IP máy chủ: " + localAddresses()));
+        folderBtn.addActionListener(e -> openResults());
+        actionBtn.addActionListener(e -> onAction());
+        actionBtn.setForeground(Color.WHITE);
+        actionBtn.setFont(actionBtn.getFont().deriveFont(Font.BOLD));
+        actionBtn.setMargin(new Insets(7, 18, 7, 18));
+        getContentPane().setBackground(Palette.BACKGROUND);
+        add(topBar(), BorderLayout.NORTH);
 
-        JTable table = new JTable(model);
-        table.setRowHeight(26);
-        table.setDefaultRenderer(Object.class, new DefaultTableCellRenderer() {
-            @Override
-            public Component getTableCellRendererComponent(JTable t, Object v, boolean sel, boolean focus, int r, int c) {
-                Component comp = super.getTableCellRendererComponent(t, v, sel, focus, r, c);
-                ExamRoom.Row row = model.rows.get(t.convertRowIndexToModel(r));
-                setHorizontalAlignment(CENTERED_COLUMNS.contains(c) ? SwingConstants.CENTER : SwingConstants.LEFT);
-                comp.setBackground(sel ? t.getSelectionBackground() : row.anomaly() ? FLAGGED
-                    : row.violations() > 0 ? VIOLATED : Color.WHITE);
-                return comp;
-            }
-        });
-        table.addMouseListener(new MouseAdapter() {
-            @Override
-            public void mouseClicked(MouseEvent e) {
-                int r = table.rowAtPoint(e.getPoint());
-                if (e.getClickCount() == 2 && r >= 0) {
-                    ExamRoom.Row row = model.rows.get(table.convertRowIndexToModel(r));
-                    new HistoryDialog(TeacherWindow.this, row.studentId(), row.name(), room.history(row.studentId())).setVisible(true);
-                }
-            }
-        });
+        JPanel left = new JPanel(new BorderLayout());
+        left.setBackground(Color.WHITE);
+        left.add(filterBar(), BorderLayout.NORTH);
         logArea.setEditable(false);
-        add(top, BorderLayout.NORTH);
-        add(new JSplitPane(JSplitPane.VERTICAL_SPLIT, new JScrollPane(table), new JScrollPane(logArea)),
-            BorderLayout.CENTER);
-        setSize(1260, 680);
+        logArea.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
+        logArea.setBorder(BorderFactory.createEmptyBorder(0, 14, 8, 14));
+        logArea.setBackground(Color.WHITE);
+        JScrollPane logScroll = new JScrollPane(logArea);
+        logScroll.setBorder(null);
+        logScroll.setPreferredSize(new Dimension(0, 150));
+        JPanel logBox = new JPanel(new BorderLayout());
+        logBox.setBackground(Color.WHITE);
+        logBox.add(label("Nhật ký", 13, true, Palette.MUTED), BorderLayout.NORTH);
+        ((JLabel) logBox.getComponent(0)).setBorder(BorderFactory.createEmptyBorder(8, 14, 4, 14));
+        logBox.add(logScroll, BorderLayout.CENTER);
+        JPanel center = new JPanel(new BorderLayout());
+        center.add(table, BorderLayout.CENTER);
+        center.add(logBox, BorderLayout.SOUTH);
+        left.add(center, BorderLayout.CENTER);
+        add(left, BorderLayout.CENTER);
+        add(detail, BorderLayout.EAST);
+
+        setSize(1320, 780);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
         addWindowListener(new WindowAdapter() {
@@ -139,31 +104,143 @@ public class TeacherWindow extends JFrame {
         refresh();
     }
 
+    private static JLabel label(String text, float size, boolean bold, Color color) {
+        JLabel l = new JLabel(text);
+        l.setFont(l.getFont().deriveFont(bold ? Font.BOLD : Font.PLAIN, size));
+        l.setForeground(color);
+        return l;
+    }
+
+    /** Hàng trên cùng: Mở đề + tên kỳ thi, đồng hồ ở giữa, địa chỉ + nút hành động bên phải. */
+    private JPanel topBar() {
+        JPanel bar = new JPanel(new GridBagLayout());
+        bar.setBackground(Color.WHITE);
+        bar.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, Palette.BORDER),
+            BorderFactory.createEmptyBorder(10, 16, 10, 16)));
+        JPanel left = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 0));
+        left.setOpaque(false);
+        JPanel titles = new JPanel(new BorderLayout());
+        titles.setOpaque(false);
+        titles.add(titleLabel, BorderLayout.NORTH);
+        titles.add(subLabel, BorderLayout.SOUTH);
+        left.add(chooseBtn);
+        left.add(titles);
+        Pill clock = new Pill(Color.WHITE, Palette.BORDER, 18, 6);
+        clock.add(label("Còn lại", 13, false, Palette.MUTED));
+        clock.add(timeValue);
+        Pill address = new Pill(new Color(0xF0F2F6), null, 12, 6);
+        String ips = LocalAddresses.list();
+        address.setToolTipText("IP máy chủ: " + ips);
+        address.add(label("Địa chỉ", 13, false, Palette.MUTED));
+        JLabel ip = label(ips.split(",")[0].trim() + ":" + Protocol.TCP_PORT, 13, true, Palette.TEXT);
+        ip.setFont(new Font(Font.MONOSPACED, Font.BOLD, 13));
+        address.add(ip);
+        JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
+        right.setOpaque(false);
+        right.add(address);
+        right.add(folderBtn);
+        right.add(actionBtn);
+        GridBagConstraints c = new GridBagConstraints();
+        c.weightx = 1; c.anchor = GridBagConstraints.WEST;
+        bar.add(left, c);
+        c.weightx = 0; c.anchor = GridBagConstraints.CENTER;
+        bar.add(clock, c);
+        c.weightx = 1; c.anchor = GridBagConstraints.EAST;
+        bar.add(right, c);
+        return bar;
+    }
+
+    /** Hàng tab lọc bên trái và ô tìm kiếm bên phải. */
+    private JPanel filterBar() {
+        JPanel bar = new JPanel(new BorderLayout());
+        bar.setBackground(Color.WHITE);
+        bar.setBorder(BorderFactory.createEmptyBorder(10, 14, 10, 14));
+        Pill group = new Pill(new Color(0xEBEEF3), null, 4, 3);
+        group.setLayout(new FlowLayout(FlowLayout.LEFT, 2, 0));
+        ButtonGroup buttons = new ButtonGroup();
+        for (Roster.Tab t : Roster.Tab.values()) {
+            TabButton b = new TabButton();
+            b.setSelected(t == tab);
+            b.addActionListener(e -> { tab = t; refresh(); });
+            buttons.add(b);
+            tabs.put(t, b);
+            group.add(b);
+        }
+        search.putClientProperty("JTextField.placeholderText", "Tìm mã SV hoặc tên");
+        search.putClientProperty("JTextField.leadingIcon", Icons.search(16, Palette.MUTED));
+        search.getDocument().addDocumentListener(new DocumentListener() {
+            @Override public void insertUpdate(DocumentEvent e) { refresh(); }
+            @Override public void removeUpdate(DocumentEvent e) { refresh(); }
+            @Override public void changedUpdate(DocumentEvent e) { refresh(); }
+        });
+        JPanel searchBox = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
+        searchBox.setOpaque(false);
+        searchBox.add(search);
+        bar.add(group, BorderLayout.WEST);
+        bar.add(searchBox, BorderLayout.EAST);
+        return bar;
+    }
+
     private void refresh() {
-        String title = room.examTitle();
-        examLabel.setText(title == null ? "Chưa chọn đề" : "Đề: " + title);
-        model.rows = room.rows();
-        model.fireTableDataChanged();
-        boolean started = room.isStarted();
-        startBtn.setEnabled(room.examTitle() != null && !started);
-        endBtn.setEnabled(started && !room.isEnded());
+        ExamRoom.Summary sum = room.summary();
+        boolean started = room.isStarted(), ended = room.isEnded();
+        titleLabel.setText(sum == null ? "Chưa chọn đề" : sum.title());
+        subLabel.setText(sum == null ? "Bấm Mở đề... để chọn file đề"
+            : sum.questions() + " câu · " + sum.minutes() + " phút · " + (started ? "bắt đầu " + sum.startedAt() : "chưa bắt đầu"));
+        List<ExamRoom.Row> all = room.rows();
+        for (Roster.Tab t : Roster.Tab.values()) { tabs.get(t).setText(t.label + " " + Roster.count(all, t)); }
+        table.setRows(Roster.filter(all, tab, search.getText()));
+        showDetail(table.selected());
         chooseBtn.setEnabled(!started);                    // chỉ đổi được đề khi bài thi chưa bắt đầu (kể cả sau Kỳ thi mới)
-        newBtn.setEnabled(room.isEnded());
-        if (room.isEnded()) {
-            timeLabel.setText("Đã kết thúc");
+        if (ended) {
+            timeValue.setText("Đã kết thúc");
         } else if (started) {
             int s = room.remainingSeconds();
-            timeLabel.setText(String.format("Còn lại: %02d:%02d", s / 60, s % 60));
+            timeValue.setText(String.format("%02d:%02d", s / 60, s % 60));
         } else {
-            timeLabel.setText("Còn lại: -");
+            timeValue.setText("-");
         }
+        actionBtn.setText(ended ? "Kỳ thi mới" : started ? "Kết thúc thi" : "Bắt đầu thi");
+        actionBtn.setEnabled(ended || started || sum != null);
+        actionBtn.setBackground(!actionBtn.isEnabled() ? new Color(0xA9B4C6) : started && !ended ? new Color(0xC9302C) : Palette.PRIMARY);
+    }
+
+    private void showDetail(ExamRoom.Row row) { detail.show(row, row == null ? List.of() : room.history(row.studentId())); }
+
+    private void openHistory(ExamRoom.Row row) {
+        if (row != null) { new HistoryDialog(this, row.studentId(), row.name(), room.history(row.studentId())).setVisible(true); }
+    }
+
+    /** Một nút duy nhất đổi nghĩa theo trạng thái: Bắt đầu thi, Kết thúc thi, Kỳ thi mới. */
+    private void onAction() {
+        if (room.isEnded()) {
+            confirm("Bắt đầu kỳ thi mới?\nMọi máy còn lại sẽ bị ngắt kết nối và danh sách thí sinh bị xoá.\n"
+                + "Kết quả kỳ này vẫn nằm trong thư mục riêng của nó.", room::newSession);
+        } else if (room.isStarted()) {
+            confirm("Kết thúc bài thi ngay?", () -> room.endExam("Giáo viên kết thúc"));
+        } else {
+            try {
+                room.startExam();
+            } catch (IllegalStateException ex) {
+                JOptionPane.showMessageDialog(this, ex.getMessage());
+            }
+            refresh();
+        }
+    }
+
+    private void confirm(String question, Runnable action) {
+        if (JOptionPane.showConfirmDialog(this, question, "Xác nhận", JOptionPane.YES_NO_OPTION) != JOptionPane.YES_OPTION) { return; }
+        try {
+            action.run();
+        } catch (IllegalStateException ex) {
+            JOptionPane.showMessageDialog(this, ex.getMessage());
+        }
+        refresh();
     }
 
     private void chooseExam() {
         JFileChooser chooser = new JFileChooser(new File("exams"));
-        if (chooser.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) {
-            return;
-        }
+        if (chooser.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) { return; }
         try {
             room.loadExam(chooser.getSelectedFile().toPath());
             refresh();
@@ -184,54 +261,5 @@ public class TeacherWindow extends JFrame {
         } catch (IOException | UnsupportedOperationException | SecurityException ex) {
             JOptionPane.showMessageDialog(this, "Không mở được thư mục. Đường dẫn:\n" + dir.toAbsolutePath());
         }
-    }
-
-    private void startExam() {
-        try {
-            room.startExam();
-        } catch (IllegalStateException ex) {
-            JOptionPane.showMessageDialog(this, ex.getMessage());
-        }
-        refresh();
-    }
-
-    private void newSession() {
-        if (JOptionPane.showConfirmDialog(this, "Bắt đầu kỳ thi mới?\nMọi máy còn lại sẽ bị ngắt kết nối và danh sách thí sinh bị xoá.\n"
-                + "Kết quả kỳ này vẫn nằm trong thư mục riêng của nó.", "Xác nhận", JOptionPane.YES_NO_OPTION) == JOptionPane.YES_OPTION) {
-            try {
-                room.newSession();
-            } catch (IllegalStateException ex) {
-                JOptionPane.showMessageDialog(this, ex.getMessage());
-            }
-            refresh();
-        }
-    }
-
-    private void endExam() {
-        if (JOptionPane.showConfirmDialog(this, "Kết thúc bài thi ngay?", "Xác nhận", JOptionPane.YES_NO_OPTION)
-                == JOptionPane.YES_OPTION) {
-            room.endExam("Giáo viên kết thúc");
-            refresh();
-        }
-    }
-
-    /** IPv4 không phải loopback của mọi card đang bật, để sinh viên biết nhập IP nào. */
-    private static String localAddresses() {
-        List<String> ips = new ArrayList<>();
-        try {
-            for (NetworkInterface card : Collections.list(NetworkInterface.getNetworkInterfaces())) {
-                if (!card.isUp()) {
-                    continue;
-                }
-                for (InetAddress a : Collections.list(card.getInetAddresses())) {
-                    if (a instanceof Inet4Address && !a.isLoopbackAddress()) {
-                        ips.add(a.getHostAddress());
-                    }
-                }
-            }
-        } catch (IOException e) {
-            return "(không đọc được)";
-        }
-        return ips.isEmpty() ? "(không có)" : String.join(", ", ips);
     }
 }
