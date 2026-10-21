@@ -282,21 +282,6 @@ public class Monitor {
         return m;
     }
 
-    /** Lượt thi mới: quên vi phạm đã báo và bộ đếm của lượt trước (baseline lấy lại ở PRECHECK kế tiếp). */
-    public synchronized void reset() {
-        sentViolations.clear();
-        flaggedWindowApps.clear();
-        watching.clear();
-        newProcesses.clear();
-        newHosts.clear();
-        seenProcesses.clear();
-        seenHosts.clear();
-        window = 1;
-        focusLostCount = violationsInWindow = answers = 0;
-        focusLostMillis = 0;
-        lostSince = -1;
-    }
-
     public synchronized void recordAnswer() { answers++; }
 
     public synchronized void focusLost() {

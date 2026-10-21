@@ -12,7 +12,7 @@
 > **Đợt 4, tóm tắt thay đổi:**
 > - **Watchdog** chỉ tính 90 giây im lặng từ lúc máy nhận đề (`trySendExam` đặt lại `lastSeen`), nên máy chờ lâu trước giờ thi không bị đá khi bấm Bắt đầu.
 > - **Hồ sơ kỳ thi:** mỗi kỳ có thư mục `ket-qua/<yyyyMMdd-HHmmss>_<tên đề không dấu>/` gồm `results.csv`, `events.csv` (sự kiện từng thí sinh, ghi ngay) và `server.log`; không còn `results.csv` ở thư mục gốc, `setResultsFile` thay bằng `setResultsRoot`. Nhấp đúp một dòng ở cửa sổ giám thị để xem lịch sử thí sinh.
-> - **Kỳ thi mới** (`ExamRoom.newSession`) làm mới phòng sau khi kết thúc mà không tắt server; client có nút **Thi lượt mới** ở màn kết quả.
+> - **Kỳ thi mới** (`ExamRoom.newSession`) làm mới phòng sau khi kết thúc mà không tắt server; client muốn thi kỳ mới thì tắt app rồi mở lại (đã bỏ nút Thi lượt mới).
 > - Các Task bên dưới là đặc tả gốc, một số chi tiết (giao diện client, luật APP) đã được thay bằng các thay đổi trên.
 >
 > Dành cho agent lập trình. Đọc **toàn bộ** tài liệu trước khi làm. Thực hiện các Task ở Phần 5 **theo đúng thứ tự**. Mỗi Task là **một nhánh Git riêng**, làm xong thì mở Pull Request, merge vào `main`, rồi mới sang Task tiếp theo. Không tự ý thêm tính năng ngoài tài liệu. Gặp điều tài liệu không nói rõ thì chọn cách **đơn giản nhất** và ghi lại lựa chọn đó trong mô tả PR.

@@ -46,20 +46,6 @@ class MonitorTest {
     }
 
     @Test
-    void resetForNewRoundForgetsOldViolationsAndCounters() {
-        snapshot(Set.of("explorer.exe", "chrome.exe"), Set.of("C:\\"), Set.of());
-        monitor.recordAnswer();
-        assertEquals(1, sent.size());
-        monitor.reset();
-        sent.clear();
-        snapshot(Set.of("explorer.exe", "chrome.exe"), Set.of("C:\\"), Set.of());
-        assertEquals(1, sent.size(), "Lượt mới phải báo lại được cùng một vi phạm");
-        JsonObject f = monitor.buildFeatures();
-        assertEquals(1, f.get("window").getAsInt(), "Cửa sổ đếm lại từ 1");
-        assertEquals(0, values(f)[5], "Số câu trả lời của lượt trước không được cộng dồn");
-    }
-
-    @Test
     void newBlacklistedProcessIsViolation() {
         snapshot(Set.of("explorer.exe", "chrome.exe"), Set.of("C:\\"), Set.of());
         assertEquals(1, sent.size());
