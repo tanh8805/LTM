@@ -74,6 +74,22 @@ class MonitorTest {
     }
 
     @Test
+    void sameNewProcessCountedOnlyOnce() {
+        snapshot(Set.of("explorer.exe", "calculatorapp.exe"), Set.of("C:\\"), Set.of());
+        assertEquals(1, values(monitor.buildFeatures())[0]);
+        snapshot(Set.of("explorer.exe", "calculatorapp.exe"), Set.of("C:\\"), Set.of());
+        assertEquals(0, values(monitor.buildFeatures())[0], "Tiến trình đã đếm ở cửa sổ trước thì không đếm lại");
+    }
+
+    @Test
+    void sameNewHostCountedOnlyOnce() {
+        snapshot(Set.of("explorer.exe"), Set.of("C:\\"), Set.of("1.2.3.4"));
+        assertEquals(1, values(monitor.buildFeatures())[3]);
+        snapshot(Set.of("explorer.exe"), Set.of("C:\\"), Set.of("1.2.3.4"));
+        assertEquals(0, values(monitor.buildFeatures())[3], "IP đã đếm ở cửa sổ trước thì không đếm lại");
+    }
+
+    @Test
     void systemProcessesNeverCount() {
         snapshot(Set.of("explorer.exe", "tasklist.exe", "conhost.exe", "runtimebroker.exe"), Set.of("C:\\"), Set.of());
         assertTrue(sent.isEmpty());
