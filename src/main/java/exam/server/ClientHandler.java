@@ -1,4 +1,3 @@
-// Một luồng cho mỗi kết nối: đọc từng dòng JSON, kiểm tra trường rồi chuyển cho ExamServer xử lý (Người 3).
 package exam.server;
 
 import com.google.gson.JsonArray;
@@ -9,14 +8,13 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.net.Socket;
-import java.util.ArrayList;
-import java.util.List;
 
 class ClientHandler implements Runnable {
     private final ExamServer server;
     private final ExamRoom room;
     private final Socket socket;
-    private Session session;        // null cho tới khi LOGIN thành công
+    private PrintWriter out;
+    private Session session;
 
     ClientHandler(ExamServer server, Socket socket) {
         this.server = server;
@@ -27,15 +25,11 @@ class ClientHandler implements Runnable {
     @Override
     public void run() {
         try (BufferedReader in = Protocol.reader(socket)) {
-            PrintWriter out = Protocol.writer(socket);
-            String line;
-            while ((line = in.readLine()) != null) {
-                try {
-                    handle(line, out);
-                } catch (RuntimeException e) {
-                    // một tin xấu không được làm rớt kết nối của cả máy
-                    server.log("Lỗi xử lý tin nhắn: " + e);
-                }
+            out = Protocol.writer(socket);
+            String line = in.readLine();
+            while (line != null) {
+                handleLine(line);
+                line = in.readLine();
             }
         } catch (IOException e) {
             // socket đóng hoặc lỗi đọc: coi như mất kết nối, xử lý ở finally
@@ -49,51 +43,88 @@ class ClientHandler implements Runnable {
         }
     }
 
-    private void handle(String line, PrintWriter out) {
+    private void handleLine(String line) {
+        try {
+            handleMessage(line);
+        } catch (RuntimeException e) {
+            // một tin xấu không được làm rớt kết nối của cả máy
+            server.log("Lỗi xử lý tin nhắn: " + e);
+        }
+    }
+
+    private void handleMessage(String line) {
         JsonObject m;
         try {
             m = Protocol.parse(line);
         } catch (IllegalArgumentException e) {
-            server.log("Bỏ qua dòng không phải JSON: " + (line.length() > 60 ? line.substring(0, 60) + "..." : line));
-            return;
-        }
-        String type = Protocol.type(m);
-        if (type.equals(Protocol.LOGIN)) {
-            if (session == null) {
-                session = room.login(Protocol.str(m, "studentId"), Protocol.str(m, "name"), Protocol.str(m, "os"), socket, out);
+            String shown = line;
+            if (line.length() > 60) {
+                shown = line.substring(0, 60) + "...";
             }
+            server.log("Bỏ qua dòng không phải JSON: " + shown);
             return;
         }
-        if (session == null) {
-            return;                            // chưa đăng nhập thì bỏ qua mọi tin khác
+
+        String type = Protocol.type(m);
+        // chưa đăng nhập thì chỉ nhận LOGIN, bỏ qua mọi tin khác
+        if (session == null && !type.equals(Protocol.LOGIN)) {
+            return;
         }
-        room.touch(session);
+        if (session != null) {
+            room.touch(session);
+        }
+
         switch (type) {
-            case Protocol.PRECHECK_RESULT -> room.precheckResult(session, isTrue(m.get("ok")),
-                issues(m.get("issues")));
-            case Protocol.VIOLATION -> violation(m);
-            case Protocol.FEATURES -> features(m);
-            case Protocol.SUBMIT -> room.submit(session,
-                m.get("answers") instanceof JsonObject a ? a : new JsonObject());
+            case Protocol.LOGIN -> handleLogin(m);
+            case Protocol.PRECHECK_RESULT -> handlePrecheckResult(m);
+            case Protocol.VIOLATION -> handleViolation(m);
+            case Protocol.FEATURES -> handleFeatures(m);
+            case Protocol.SUBMIT -> handleSubmit(m);
             default -> server.log("Bỏ qua type không biết: " + type);
         }
     }
 
-    /** Danh sách vấn đề PRECHECK nối bằng "; " cho dễ đọc trong log và events.csv. */
-    private static String issues(JsonElement e) {
-        if (e instanceof JsonArray arr) {
-            List<String> parts = new ArrayList<>();
-            arr.forEach(i -> parts.add(i.isJsonPrimitive() ? i.getAsString() : i.toString()));
-            return String.join("; ", parts);
+    private void handleLogin(JsonObject m) {
+        if (session != null) {
+            return;
         }
-        return e == null ? "" : e.toString();
+        String studentId = Protocol.str(m, "studentId");
+        String name = Protocol.str(m, "name");
+        String os = Protocol.str(m, "os");
+        // login trả null nếu bị từ chối (đã gửi LOGIN_FAIL), khi đó máy được đăng nhập lại
+        session = room.login(studentId, name, os, socket, out);
     }
 
-    private static boolean isTrue(JsonElement e) {
-        return e != null && e.isJsonPrimitive() && e.getAsJsonPrimitive().isBoolean() && e.getAsBoolean();
+    private void handlePrecheckResult(JsonObject m) {
+        JsonElement okField = m.get("ok");
+        boolean ok = okField != null && okField.isJsonPrimitive()
+            && okField.getAsJsonPrimitive().isBoolean() && okField.getAsBoolean();
+        room.precheckResult(session, ok, issuesToText(m.get("issues")));
     }
 
-    private void violation(JsonObject m) {
+    private String issuesToText(JsonElement issues) {
+        if (issues == null) {
+            return "";
+        }
+        if (!issues.isJsonArray()) {
+            return issues.toString();
+        }
+        // nối bằng "; " cho dễ đọc trong log và events.csv
+        StringBuilder text = new StringBuilder();
+        for (JsonElement issue : issues.getAsJsonArray()) {
+            if (text.length() > 0) {
+                text.append("; ");
+            }
+            if (issue.isJsonPrimitive()) {
+                text.append(issue.getAsString());
+            } else {
+                text.append(issue.toString());
+            }
+        }
+        return text.toString();
+    }
+
+    private void handleViolation(JsonObject m) {
         String kind = Protocol.str(m, "kind");
         if (kind.isEmpty()) {
             server.log("Bỏ qua VIOLATION thiếu kind");
@@ -102,22 +133,40 @@ class ClientHandler implements Runnable {
         room.violation(session, kind, Protocol.str(m, "detail"));
     }
 
-    /** Chỉ nhận FEATURES có window nguyên và đúng 6 số; sai định dạng thì bỏ qua. */
-    private void features(JsonObject m) {
+    private void handleFeatures(JsonObject m) {
         Integer window = ExamFile.asInt(m.get("window"));
-        boolean valid = window != null && m.get("values") instanceof JsonArray arr && arr.size() == 6;
-        if (valid) {
-            for (JsonElement e : m.getAsJsonArray("values")) {
-                valid &= e.isJsonPrimitive() && e.getAsJsonPrimitive().isNumber();
-            }
-        }
-        if (!valid) {
+        JsonElement values = m.get("values");
+        if (window == null || !isSixNumbers(values)) {
             server.log("Bỏ qua FEATURES sai định dạng từ " + session.id);
             return;
         }
         JsonObject sample = new JsonObject();
         sample.addProperty("window", window);
-        sample.add("values", m.getAsJsonArray("values"));
+        sample.add("values", values);
         room.features(session, sample);
+    }
+
+    private boolean isSixNumbers(JsonElement values) {
+        if (values == null || !values.isJsonArray()) {
+            return false;
+        }
+        JsonArray array = values.getAsJsonArray();
+        if (array.size() != 6) {
+            return false;
+        }
+        for (JsonElement value : array) {
+            if (!value.isJsonPrimitive() || !value.getAsJsonPrimitive().isNumber()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private void handleSubmit(JsonObject m) {
+        JsonObject answers = new JsonObject();
+        if (m.get("answers") instanceof JsonObject given) {
+            answers = given;
+        }
+        room.submit(session, answers);
     }
 }
