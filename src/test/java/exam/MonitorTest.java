@@ -247,4 +247,15 @@ class MonitorTest {
         monitor.sendAppsIfChanged(sent::add);
         assertEquals(3, sent.size(), "sau forgetApps thì gửi lại dù không đổi");
     }
+
+    @Test
+    void newlyBlacklistedRunningAppViolates() {
+        snapshot(Set.of("explorer.exe", "notepad.exe"), Set.of("C:\\"), Set.of("10.0.0.5"));
+        monitor.updateRules(JsonParser.parseString("{\"blacklistApps\":[\"notepad.exe\"]}").getAsJsonObject());
+        assertTrue(sent.stream().noneMatch(m -> Protocol.type(m).equals(Protocol.VIOLATION)));
+        snapshot(Set.of("explorer.exe", "notepad.exe"), Set.of("C:\\"), Set.of("10.0.0.5"));
+        assertEquals(1, sent.stream().filter(m -> Protocol.type(m).equals(Protocol.VIOLATION)).count());
+        assertEquals("APP", Protocol.str(sent.get(0), "kind"));
+        assertEquals("notepad.exe", Protocol.str(sent.get(0), "detail"));
+    }
 }

@@ -628,4 +628,22 @@ class ExamServerTest {
         assertEquals(ExamRoom.AppKind.BLOCKED, view.apps().get(0).kind());      // zalo.exe nằm trong blacklistApps của setUp
         assertEquals(ExamRoom.AppKind.OTHER, view.apps().get(1).kind());
     }
+
+    @Test
+    void rulesUpdateSentToConnectedClients() throws IOException {
+        TestClient connected = login("S1");
+        TestClient gone = login("S2");
+        gone.close();
+        JsonObject updated = new JsonObject();
+        JsonArray black = new JsonArray();
+        black.add("notepad.exe");
+        updated.add("blacklistApps", black);
+        server.applyRules(updated);
+        JsonObject m = connected.next(Protocol.RULES_UPDATE, 2000);
+        assertEquals("notepad.exe", m.getAsJsonObject("rules").getAsJsonArray("blacklistApps").get(0).getAsString());
+        TestClient later = connect();                        // máy đăng nhập sau nhận luật mới ngay trong LOGIN_OK
+        later.send(loginMsg("S3", "Ba"));
+        JsonObject ok = later.next(Protocol.LOGIN_OK, 2000);
+        assertEquals("notepad.exe", ok.getAsJsonObject("rules").getAsJsonArray("blacklistApps").get(0).getAsString());
+    }
 }

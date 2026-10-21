@@ -42,7 +42,7 @@ src/main/java/exam/
   common/   Protocol  Palette  Icons  Format
   client/   StudentApp  StudentScreens  Theme  TopBar  LoginPanel  PrecheckPanel  ExamPanel  NumberButton  OptionRow  ResultPanel  Sheet
             ServerConnection  ServerFinder  Monitor  AppRules  WindowsProbe  Diagnose  Debug
-  server/   ExamServer  ExamRoom  ExamLog  Session  ExamFile  StudentList  ClientHandler  TeacherWindow  RosterTable  Roster  DetailPanel  HistoryDialog  MlClient
+  server/   ExamServer  ExamRoom  ExamLog  Session  ExamFile  StudentList  RulesFile  RulesDialog  ListEditor  ClientHandler  TeacherWindow  RosterTable  Roster  DetailPanel  HistoryDialog  MlClient
             Pill  TabButton  LocalAddresses
 ml/         ml_service.py  simulate_clients.py  test_ml_service.py
 config/     rules.json  students.csv        exams/   sample_exam.json
@@ -63,6 +63,7 @@ config/     rules.json  students.csv        exams/   sample_exam.json
 | S→C | `EXAM_START` | `title`, `remainingSeconds`, `questions` | Câu hỏi không có `answer` |
 | C→S | `VIOLATION` | `kind` (`APP`/`NET`/`USB`), `detail`, `time` | |
 | C→S | `FEATURES` | `window`, `values` (đúng 6 số) | Mỗi `featureIntervalSeconds` giây (server cấp trong `LOGIN_OK`, mặc định 30), đồng thời là heartbeat |
+| S→C | `RULES_UPDATE` | `rules` (toàn bộ luật mới) | Gửi cho mọi máy đang kết nối khi giám thị lưu luật; client áp dụng ngay, KHÔNG lấy lại baseline |
 | C→S | `APPS` | `apps` (danh sách `{name, title}` các app có cửa sổ) | Gửi lúc PRECHECK, rồi cứ 15 giây kiểm tra một lần và chỉ gửi khi danh sách đổi; Linux gửi danh sách rỗng. Server giữ bản mới nhất kèm giờ cập nhật (tối đa 100 dòng) |
 | C→S | `SUBMIT` | `answers` | Khoá = id câu, giá trị = chỉ số lựa chọn từ 0 |
 | S→C | `EXAM_END` | `reason` | Client nhận được thì tự `SUBMIT` |
@@ -138,6 +139,8 @@ Client chỉ kiểm soát **app có cửa sổ**; tiến trình nền không bao
 | Mọi lúc | Thuộc `ignoreProcesses` hoặc `SYSTEM_PROCESSES` | Bỏ qua hoàn toàn |
 
 Luật nằm trong `config/rules.json` **ở server** và được gửi xuống client lúc đăng nhập, nên chỉnh luật **không cần build lại hay gửi lại jar**; chỉ cần khởi động lại server. Các khoá: `blacklistApps`, `whitelistApps`, `allowedWindowApps`, `ignoreProcesses`, `blockedDomains`.
+
+**Sửa luật ngay trên giao diện giám thị:** nút **Quản lý ứng dụng...** mở hộp thoại 4 tab (`Được phép` = `whitelistApps`, `Bị cấm` = `blacklistApps`, `Tên miền bị cấm` = `blockedDomains`, `Nâng cao` = `allowedWindowApps` và `ignoreProcesses`). Bấm Lưu thì ghi lại `config/rules.json` (các khoá khác giữ nguyên, file được định dạng lại mỗi mục một dòng) và gửi `RULES_UPDATE` cho các máy đang kết nối: client đổi luật ngay, app vừa bị cấm mà đang mở sẽ bị báo vi phạm `APP` ở lần quét kế tiếp. Chuột phải vào một app trong phần "Ứng dụng đang mở" có menu `Cho phép ứng dụng này` / `Cấm ứng dụng này` (tên được gỡ khỏi các danh sách app khác rồi thêm vào `whitelistApps` hoặc `blacklistApps`). `featureIntervalSeconds` chỉ đọc lúc khởi động server.
 
 **Khi bị báo vi phạm oan:**
 1. Trên máy Windows bị báo, chạy `java -cp exam.jar exam.client.Diagnose` (khi máy đang ở trạng thái thi bình thường). Công cụ ghi file `chan-doan-<tên máy>.txt`.
