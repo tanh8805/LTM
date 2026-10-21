@@ -1,4 +1,4 @@
-# Tài liệu giao việc cho agent: Hệ thống thi trắc nghiệm có giám sát
+# Tài liệu giao việc cho agent: Hệ thống giám sát thi trắc nghiệm qua mạng LAN
 
 > Đã cập nhật sau đợt tách file, xem lịch sử commit.
 >
@@ -282,7 +282,7 @@ Vector feature mỗi 30 giây, **đúng thứ tự**, sau khi gửi thì reset b
 
 ### 2.10 Giao diện
 
-**StudentApp** (Swing, `CardLayout`, cửa sổ 800×600, tiêu đề `Thi trắc nghiệm`):
+**StudentApp** (Swing, `CardLayout`, cửa sổ 800×600, tiêu đề `Hệ thống giám sát thi trắc nghiệm qua mạng LAN`):
 1. **Đăng nhập:** ô Mã SV, ô Họ tên, ô `IP server (để trống = tự tìm)`, nút Đăng nhập. Kết nối chạy ngoài luồng giao diện. Không tìm thấy server → thông báo `Không tìm thấy server, hãy nhập IP`.
 2. **PRECHECK:** danh sách vấn đề + nút Kiểm tra lại.
 3. **Chờ:** `Đã sẵn sàng. Chờ giáo viên bắt đầu...`
@@ -294,7 +294,7 @@ Vector feature mỗi 30 giây, **đúng thứ tự**, sau khi gửi thì reset b
 - Nhận `EXAM_START` khi **đã** có đề (trường hợp vào lại): chỉ cập nhật thời gian còn lại, **giữ nguyên** đáp án đã chọn và câu đang xem.
 - Nhận `LOGIN_OK` khi chưa có đề: chạy PRECHECK. Khi đã có đề (vào lại giữa giờ): không làm gì, server sẽ gửi lại `EXAM_START`.
 
-**TeacherWindow** (Swing, tiêu đề `Giám thị - Server thi`):
+**TeacherWindow** (Swing, tiêu đề `Giám thị - Hệ thống giám sát thi trắc nghiệm qua mạng LAN`):
 - Hàng nút: `Chọn file đề...` (`JFileChooser` mở sẵn thư mục `exams`), nhãn tên đề, `Bắt đầu thi` (chỉ bật khi đã nạp đề và chưa bắt đầu), `Kết thúc thi` (chỉ bật khi đang thi), nhãn thời gian còn lại, nhãn địa chỉ IP của máy server (liệt kê IPv4 không phải loopback).
 - `JTable` các cột: Mã SV · Họ tên · Trạng thái · Số vi phạm · Vi phạm gần nhất · Bất thường (0–1, hiện `-` khi chưa có) · Điểm (hiện `-` khi chưa nộp). Sắp xếp theo mã SV. Dòng có vi phạm > 0 hoặc `anomaly = true` tô nền đỏ nhạt.
 - Ô log (`JTextArea`, chỉ đọc, tự cuộn) ở dưới, mỗi dòng có giờ `HH:mm:ss`.

@@ -16,6 +16,7 @@ import java.nio.charset.StandardCharsets;
 public final class Protocol {
     public static final int TCP_PORT = 5000, UDP_PORT = 9999;
     public static final String DISCOVER = "EXAM_DISCOVER", SERVER_REPLY = "EXAM_SERVER";
+    public static final String TOPIC = "Hệ thống giám sát thi trắc nghiệm qua mạng LAN";
 
     public static final String LOGIN = "LOGIN", LOGIN_OK = "LOGIN_OK", LOGIN_FAIL = "LOGIN_FAIL",
             PRECHECK_RESULT = "PRECHECK_RESULT", EXAM_START = "EXAM_START", VIOLATION = "VIOLATION",

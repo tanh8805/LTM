@@ -2,6 +2,7 @@
 package exam.client;
 
 import exam.common.Html;
+import exam.common.Protocol;
 import java.awt.Dimension;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
@@ -35,7 +36,7 @@ class LoginPanel extends JPanel {
         card.setBorder(BorderFactory.createEmptyBorder(32, 40, 32, 40));
         card.setPreferredSize(new Dimension(460, 470));
         add(card, new GridBagConstraints());
-        card.add(left(Theme.label("Thi trắc nghiệm", 26, true, Theme.PRIMARY)));
+        card.add(left(Theme.label(Html.wrap(Protocol.TOPIC, 380), 22, true, Theme.PRIMARY)));
         card.add(left(Theme.label("Đăng nhập để vào phòng thi", Theme.BASE_SIZE, false, Theme.MUTED)));
         card.add(Box.createVerticalStrut(22));
         field(card, "Mã sinh viên", idField);

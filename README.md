@@ -1,6 +1,6 @@
-# LTM - Hệ thống thi trắc nghiệm có giám sát
+# LTM - Hệ thống giám sát thi trắc nghiệm qua mạng LAN
 
-Ứng dụng thi trắc nghiệm trong mạng LAN (bài tập lớn môn Lập trình mạng). Giáo viên chọn file đề và bắt đầu thi, sinh viên làm bài trên client Windows.
+Ứng dụng thi trắc nghiệm trong mạng LAN (bài tập lớn môn Lập trình mạng). Hệ thống chạy trong mạng LAN; khi làm từ xa thì dùng ZeroTier để tạo LAN ảo. Giáo viên chọn file đề và bắt đầu thi, sinh viên làm bài trên client Windows.
 Trong giờ thi, client giám sát bằng luật (app ngoài whitelist, kết nối tới địa chỉ bị cấm, cắm USB, rời cửa sổ thi) và gửi dữ liệu về server.
 Server gửi dữ liệu cả phòng sang service Python dùng Isolation Forest để tìm máy có hành vi khác biệt so với số đông; giám thị là người quyết định có gian lận hay không.
 
@@ -172,7 +172,7 @@ Phím tắt khi làm bài: `1`-`9` hoặc `A`-`I` chọn đáp án, mũi tên tr
 
 ## 6. Mạng
 
-- **Làm ở nhà:** ZeroTier (gói Personal miễn phí), 4 máy join cùng một network. Không dùng Tailscale (không hỗ trợ broadcast) hay Radmin VPN (không có bản Linux). Nếu UDP không tìm được server, nhập IP của máy server (hiện ở thanh trên cùng của cửa sổ giám thị).
+- **Làm ở nhà:** ZeroTier (gói Personal miễn phí), 4 máy join cùng một network. Không dùng Tailscale (không hỗ trợ broadcast) hay Radmin VPN (không có bản Linux). Nếu UDP không tìm được server, nhập một trong các IP LAN của máy server (nhãn `IP LAN` ở thanh trên cùng của cửa sổ giám thị, có cả IP của card ZeroTier).
 - **Hôm demo:** cả 4 máy bắt chung một hotspot điện thoại.
 - **Firewall Fedora:** `sudo firewall-cmd --add-port=5000/tcp --add-port=9999/udp` (thêm `--permanent` rồi `--reload` nếu muốn giữ).
 - **Firewall Windows:** cho phép Java qua tường lửa (cả mạng Private và Public) khi được hỏi.

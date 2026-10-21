@@ -52,7 +52,7 @@ public class TeacherWindow extends JFrame {
     private Roster.Tab tab = Roster.Tab.ALL;
 
     public TeacherWindow(ExamServer server) {
-        super("Giám thị - Server thi");
+        super("Giám thị - " + Protocol.TOPIC);
         this.server = server;
         this.room = server.room();
         server.setListener(line -> SwingUtilities.invokeLater(() -> {
@@ -130,9 +130,9 @@ public class TeacherWindow extends JFrame {
         clock.add(timeValue);
         Pill address = new Pill(new Color(0xF0F2F6), null, 12, 6);
         String ips = LocalAddresses.list();
-        address.setToolTipText("IP máy chủ: " + ips);
-        address.add(label("Địa chỉ", 13, false, Palette.MUTED));
-        JLabel ip = label(ips.split(",")[0].trim() + ":" + Protocol.TCP_PORT, 13, true, Palette.TEXT);
+        address.setToolTipText("Các IP LAN của máy chủ (kể cả card ZeroTier): " + ips);
+        address.add(label("IP LAN", 13, false, Palette.MUTED));
+        JLabel ip = label(ips + " · cổng " + Protocol.TCP_PORT, 13, true, Palette.TEXT);
         ip.setFont(new Font(Font.MONOSPACED, Font.BOLD, 13));
         address.add(ip);
         JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
