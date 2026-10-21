@@ -48,6 +48,8 @@ public class Monitor {
     // Bộ đếm của cửa sổ 30 giây hiện tại
     private int window = 1, focusLostCount, violationsInWindow, answers;
     private final Set<String> newProcesses = new HashSet<>(), newHosts = new HashSet<>();
+    // Đã từng được đếm trong buổi thi: mỗi tiến trình/IP mới chỉ tính vào cửa sổ đầu tiên nó xuất hiện
+    private final Set<String> seenProcesses = new HashSet<>(), seenHosts = new HashSet<>();
     private long focusLostMillis;
     private long lostSince = -1;                                  // -1 = đang ở trong cửa sổ thi
 
@@ -182,7 +184,7 @@ public class Monitor {
         for (Proc p : procs) {
             String n = AppRules.norm(p.name());
             if (appRules.skip(n) || baselineProcesses.contains(n)) { continue; }
-            newProcesses.add(n);
+            if (seenProcesses.add(n)) { newProcesses.add(n); }
             if (appRules.blacklisted(n)) {
                 violate("APP", p.name().toLowerCase());
             } else if (p.pid() >= 0) {
@@ -196,7 +198,7 @@ public class Monitor {
         for (String ip : remoteIps) {
             String domain = blockedIpToDomain.get(ip);
             if (domain != null) { violate("NET", domain + " (" + ip + ")"); }
-            if (!baselineIps.contains(ip)) { newHosts.add(ip); }
+            if (!baselineIps.contains(ip) && seenHosts.add(ip)) { newHosts.add(ip); }
         }
         watching.keySet().retainAll(alive);
         List<Integer> toCheck = new ArrayList<>();
@@ -255,6 +257,8 @@ public class Monitor {
         watching.clear();
         newProcesses.clear();
         newHosts.clear();
+        seenProcesses.clear();
+        seenHosts.clear();
         window = 1;
         focusLostCount = violationsInWindow = answers = 0;
         focusLostMillis = 0;
