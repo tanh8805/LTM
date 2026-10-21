@@ -13,11 +13,13 @@ import javax.swing.JButton;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.JPasswordField;
 import javax.swing.JProgressBar;
 import javax.swing.JTextField;
 
 class LoginPanel extends JPanel {
-    private final JTextField idField = new JTextField(), nameField = new JTextField(), hostField = new JTextField();
+    private final JTextField idField = new JTextField(), hostField = new JTextField();
+    private final JPasswordField passwordField = new JPasswordField();
     private final JButton loginBtn = Theme.primaryButton("Đăng nhập");
     private final JLabel errorLabel = Theme.label(" ", Theme.BASE_SIZE, false, Theme.ERROR);
     private final JLabel busyLabel = Theme.label(" ", Theme.BASE_SIZE, false, Theme.MUTED);
@@ -34,13 +36,13 @@ class LoginPanel extends JPanel {
         Theme.Card card = new Theme.Card();
         card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
         card.setBorder(BorderFactory.createEmptyBorder(32, 40, 32, 40));
-        card.setPreferredSize(new Dimension(460, 470));
+        card.setPreferredSize(new Dimension(460, 500));
         add(card, new GridBagConstraints());
         card.add(left(Theme.label(Html.wrap(Protocol.TOPIC, 380), 22, true, Theme.PRIMARY)));
         card.add(left(Theme.label("Đăng nhập để vào phòng thi", Theme.BASE_SIZE, false, Theme.MUTED)));
         card.add(Box.createVerticalStrut(22));
         field(card, "Mã sinh viên", idField);
-        field(card, "Họ và tên", nameField);
+        field(card, "Mật khẩu", passwordField);
         field(card, "IP server", hostField);
         card.add(Box.createVerticalStrut(6));
         loginBtn.setAlignmentX(LEFT_ALIGNMENT);
@@ -70,7 +72,7 @@ class LoginPanel extends JPanel {
 
     String studentId() { return idField.getText().trim(); }
 
-    String studentName() { return nameField.getText().trim(); }
+    String password() { return new String(passwordField.getPassword()).trim(); }
 
     String host() { return hostField.getText().trim(); }
 

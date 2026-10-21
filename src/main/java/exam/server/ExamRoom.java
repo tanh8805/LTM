@@ -48,6 +48,7 @@ public class ExamRoom {
     private final int featureIntervalSeconds;
     private MlScores mlScores;
     private int epoch;
+    private StudentList students = StudentList.empty();
 
     ExamRoom(JsonObject rules, ScheduledExecutorService scheduler, Consumer<String> log, ExamLog records) {
         this.rules = rules;
@@ -142,18 +143,23 @@ public class ExamRoom {
     // ---------- Tin nhắn từ máy sinh viên (ClientHandler gọi) ----------
 
     synchronized Session login(String id, String name, Socket socket, PrintWriter out) {
-        return login(id, name, "", socket, out);
+        return login(id, name, "", "", socket, out);
     }
 
-    synchronized Session login(String id, String name, String os, Socket socket, PrintWriter out) {
+    synchronized Session login(String id, String name, String password, String os, Socket socket, PrintWriter out) {
+        StudentList.Account account = students.find(id);
+        if (students.size() > 0 && account != null && account.password().equals(password)) {
+            id = account.id();          // mã SV và họ tên lấy từ danh sách
+            name = account.name();
+        } else if (students.size() > 0 && !id.isEmpty()) {
+            return loginFailed(id, "Sai mã sinh viên hoặc mật khẩu", out);
+        } else if (name.isEmpty()) {
+            name = id;                  // chưa nạp danh sách: client không gửi họ tên
+        }
         Session s = sessions.get(id);
-        String error = loginError(id, name, s);
+        String error = loginError(id, s);
         if (error != null) {
-            JsonObject fail = Protocol.msg(Protocol.LOGIN_FAIL);
-            fail.addProperty("reason", error);
-            Protocol.send(out, fail);
-            records.record(id, name, "LOGIN_FAIL", error);
-            return null;
+            return loginFailed(id, error, out);
         }
 
         // máy cũ đã mất kết nối thì giữ nguyên session, chỉ gắn socket mới
@@ -169,6 +175,7 @@ public class ExamRoom {
 
         JsonObject ok = Protocol.msg(Protocol.LOGIN_OK);
         ok.add("rules", rules);
+        ok.addProperty("name", name);
         ok.addProperty("featureIntervalSeconds", featureIntervalSeconds);
         Protocol.send(out, ok);
         log.accept("Đăng nhập: " + id + " - " + s.name);
@@ -187,9 +194,25 @@ public class ExamRoom {
         return s;
     }
 
-    private String loginError(String id, String name, Session existing) {
-        if (id.isEmpty() || name.isEmpty()) {
-            return "Thiếu mã SV hoặc họ tên";
+    private Session loginFailed(String id, String reason, PrintWriter out) {
+        JsonObject fail = Protocol.msg(Protocol.LOGIN_FAIL);
+        fail.addProperty("reason", reason);
+        Protocol.send(out, fail);
+        records.record(id, "", "LOGIN_FAIL", reason);
+        return null;
+    }
+
+    /** Giám thị nạp danh sách mới (null hoặc rỗng nghĩa là bỏ danh sách, ai cũng vào được). */
+    public synchronized void setStudents(StudentList list) {
+        students = list == null ? StudentList.empty() : list;
+        log.accept(students.size() == 0 ? "Chưa nạp danh sách sinh viên" : "Đã nạp danh sách: " + students.size() + " sinh viên");
+    }
+
+    public synchronized int studentCount() { return students.size(); }
+
+    private String loginError(String id, Session existing) {
+        if (id.isEmpty()) {
+            return "Thiếu mã SV";
         }
         if (existing != null && existing.connected()) {
             return "Mã SV này đang đăng nhập ở máy khác";

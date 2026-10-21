@@ -90,9 +90,10 @@ class ClientHandler implements Runnable {
         }
         String studentId = Protocol.str(m, "studentId");
         String name = Protocol.str(m, "name");
+        String password = Protocol.str(m, "password");
         String os = Protocol.str(m, "os");
         // login trả null nếu bị từ chối (đã gửi LOGIN_FAIL), khi đó máy được đăng nhập lại
-        session = room.login(studentId, name, os, socket, out);
+        session = room.login(studentId, name, password, os, socket, out);
     }
 
     private void handlePrecheckResult(JsonObject m) {

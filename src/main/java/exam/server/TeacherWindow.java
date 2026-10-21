@@ -41,9 +41,11 @@ import javax.swing.event.DocumentListener;
 public class TeacherWindow extends JFrame {
     private final ExamServer server;
     private final ExamRoom room;
-    private final JButton chooseBtn = new JButton("Mở đề..."), folderBtn = new JButton("Thư mục kết quả"), actionBtn = new JButton();
+    private final JButton chooseBtn = new JButton("Mở đề..."), folderBtn = new JButton("Thư mục kết quả"),
+        studentsBtn = new JButton("Nhập danh sách SV..."), actionBtn = new JButton();
     private final JLabel titleLabel = label("Chưa chọn đề", 15, true, Palette.TEXT), subLabel = label(" ", 12, false, Palette.MUTED),
-        timeValue = label("-", 15, true, Palette.TEXT);
+        timeValue = label("-", 15, true, Palette.TEXT), studentsLabel = label(" ", 13, false, Palette.MUTED),
+        noListWarning = label("Chưa nạp danh sách sinh viên: ai cũng đăng nhập được", 13, true, new Color(0x7A5B00));
     private final JTextArea logArea = new JTextArea();
     private final DetailPanel detail = new DetailPanel();
     private final JTextField search = new JTextField(22);
@@ -61,12 +63,19 @@ public class TeacherWindow extends JFrame {
         }));
         chooseBtn.addActionListener(e -> chooseExam());
         folderBtn.addActionListener(e -> openResults());
+        studentsBtn.addActionListener(e -> importStudents());
         actionBtn.addActionListener(e -> onAction());
         actionBtn.setForeground(Color.WHITE);
         actionBtn.setFont(actionBtn.getFont().deriveFont(Font.BOLD));
         actionBtn.setMargin(new Insets(7, 18, 7, 18));
         getContentPane().setBackground(Palette.BACKGROUND);
-        add(topBar(), BorderLayout.NORTH);
+        noListWarning.setOpaque(true);
+        noListWarning.setBackground(new Color(0xFFF3CD));
+        noListWarning.setBorder(BorderFactory.createEmptyBorder(6, 16, 6, 16));
+        JPanel north = new JPanel(new BorderLayout());
+        north.add(topBar(), BorderLayout.NORTH);
+        north.add(noListWarning, BorderLayout.SOUTH);
+        add(north, BorderLayout.NORTH);
 
         JPanel left = new JPanel(new BorderLayout());
         left.setBackground(Color.WHITE);
@@ -138,6 +147,8 @@ public class TeacherWindow extends JFrame {
         JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
         right.setOpaque(false);
         right.add(address);
+        right.add(studentsLabel);
+        right.add(studentsBtn);
         right.add(folderBtn);
         right.add(actionBtn);
         GridBagConstraints c = new GridBagConstraints();
@@ -191,6 +202,9 @@ public class TeacherWindow extends JFrame {
         for (Roster.Tab t : Roster.Tab.values()) { tabs.get(t).setText(t.label + " " + Roster.count(all, t)); }
         table.setRows(Roster.filter(all, tab, search.getText()));
         showDetail(table.selected());
+        int students = room.studentCount();
+        studentsLabel.setText(students == 0 ? " " : "Đã nạp " + students + " SV");
+        noListWarning.setVisible(students == 0);
         chooseBtn.setEnabled(!started);                    // chỉ đổi được đề khi bài thi chưa bắt đầu (kể cả sau Kỳ thi mới)
         if (ended) {
             timeValue.setText("Đã kết thúc");
@@ -246,6 +260,22 @@ public class TeacherWindow extends JFrame {
             refresh();
         } catch (IllegalArgumentException | IllegalStateException | IOException ex) {
             JOptionPane.showMessageDialog(this, ex.getMessage(), "Không nạp được đề", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    /** Chọn file CSV, kiểm tra từng dòng; đạt thì nạp vào phòng và lưu thành config/students.csv. */
+    private void importStudents() {
+        JFileChooser chooser = new JFileChooser(".");
+        if (chooser.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) { return; }
+        try {
+            StudentList list = StudentList.load(chooser.getSelectedFile().toPath());
+            list.save(StudentList.FILE);
+            room.setStudents(list);
+            refresh();
+        } catch (IllegalArgumentException ex) {
+            JOptionPane.showMessageDialog(this, ex.getMessage(), "Danh sách sinh viên có lỗi", JOptionPane.ERROR_MESSAGE);
+        } catch (IOException ex) {
+            JOptionPane.showMessageDialog(this, ex.getMessage(), "Không đọc hoặc ghi được danh sách", JOptionPane.ERROR_MESSAGE);
         }
     }
 
