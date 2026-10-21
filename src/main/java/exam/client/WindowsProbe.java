@@ -23,6 +23,9 @@ public final class WindowsProbe {
     /** Một tiến trình trong `tasklist`: tên chữ thường (có .exe) và PID. */
     public record Proc(String name, int pid) {}
 
+    /** Một kết nối TCP trong `netstat -no`: IP đích và PID của tiến trình giữ kết nối (-1 nếu không đọc được). */
+    public record Conn(String ip, int pid) {}
+
     /** Một tiến trình có cửa sổ nhìn thấy được (PowerShell Get-Process): tên không có .exe, PID, tiêu đề cửa sổ. */
     public record Win(String name, int pid, String title) {}
 
@@ -56,6 +59,11 @@ public final class WindowsProbe {
     /** IP đích của các kết nối TCP đang có. */
     public static Set<String> remoteIps() {
         return parseNetstat(run("netstat", "-no"));
+    }
+
+    /** Như remoteIps() nhưng giữ cả PID để biết chương trình nào đang kết nối. */
+    public static List<Conn> remoteConnections() {
+        return parseNetstatConnections(run("netstat", "-no"));
     }
 
     /** Ổ đĩa rời (USB) đang cắm, ví dụ "E:". Dùng PowerShell vì wmic đã bị gỡ trên Windows 11 bản mới. */
@@ -148,6 +156,15 @@ public final class WindowsProbe {
      */
     public static Set<String> parseNetstat(String output) {
         Set<String> ips = new HashSet<>();
+        for (Conn conn : parseNetstatConnections(output)) {
+            ips.add(conn.ip());
+        }
+        return ips;
+    }
+
+    /** Như parseNetstat nhưng giữ PID ở cột cuối; PID không đọc được thì là -1. */
+    public static List<Conn> parseNetstatConnections(String output) {
+        List<Conn> conns = new ArrayList<>();
         for (String line : output.split("\\R")) {
             String[] cols = line.trim().split("\\s+");
             if (cols.length < 3 || !cols[0].equals("TCP") || cols[2].lastIndexOf(':') < 0) {
@@ -161,11 +178,20 @@ public final class WindowsProbe {
             }
             boolean ignored = ip.isEmpty() || ip.equals("0.0.0.0") || ip.equals("::") || ip.equals("*")
                 || ip.startsWith("127.") || ip.equals("::1") || port.equals("0");
-            if (!ignored) {
-                ips.add(ip);
+            if (ignored) {
+                continue;
             }
+            int pid = -1;
+            if (cols.length >= 5) {
+                try {
+                    pid = Integer.parseInt(cols[4]);
+                } catch (NumberFormatException e) {
+                    // PID hỏng thì để -1
+                }
+            }
+            conns.add(new Conn(ip, pid));
         }
-        return ips;
+        return conns;
     }
 
     /** PowerShell đã được ép xuất UTF-8 (UTF8 ở trên) nên tiêu đề cửa sổ tiếng Việt không bị lỗi font. */
