@@ -252,7 +252,12 @@ public class StudentApp {
         monitor.stop();
         countdown.stop();
         if (submittedAt.isEmpty()) { submittedAt = java.time.LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss")); }
-        screens.showResult(m.get("score").getAsDouble(), m.get("correct").getAsInt(), m.get("total").getAsInt(), submittedAt);
+        if (m.has("terminated") && m.get("terminated").getAsBoolean()) {
+            submitted = true;                  // đình chỉ coi như đã nộp: không còn gì để hỏi khi thoát
+            screens.showTerminated(Protocol.str(m, "reason"), m.get("total").getAsInt());
+        } else {
+            screens.showResult(m.get("score").getAsDouble(), m.get("correct").getAsInt(), m.get("total").getAsInt(), submittedAt);
+        }
         conn.close();
         screens.setConnection(TopBar.Conn.NONE);
         screens.setStatus("Đã hoàn thành");

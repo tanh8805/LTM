@@ -54,6 +54,7 @@ Trong `src/main/java/exam/server/` trừ khi ghi khác.
 | Đổi màu dòng hoặc nhãn trạng thái | `common/Palette`, `RosterTable` (renderer) | Đổi hằng màu trong `Palette`; nhãn trạng thái theo chuỗi `Session.ST_*` ở `RosterTable.StatusRenderer`. |
 | Đổi cách chấm điểm | `ExamFile.grade` | Sửa dòng `score = Math.round(correct * 1000.0 / total) / 100.0` (thang 10, 2 số lẻ). Sửa luôn `GradingTest`. |
 | Thêm cột vào `results.csv` | `ExamFile.RESULTS_HEADER`, `resultsRow` | Thêm tên cột và giá trị cùng thứ tự; dữ liệu lấy từ `Session` (nhờ Server 1 thêm trường). |
+| Đổi màu nhãn `Đình chỉ` | `RosterTable.StatusRenderer`, `common/Palette` | Dòng `case Session.ST_TERMINATED -> style(...)`; tab Cần chú ý lấy từ `Roster.needsAttention`. |
 | Đổi định dạng file đề | `ExamFile.validate`, `validateQuestion`, `questionsForClient` | Thêm trường mới vào kiểm tra, và vào bản sao gửi sinh viên nếu client cần thấy. |
 | Đổi cách kiểm tra mật khẩu (vd băm) | `StudentList.Account`, `StudentList.parse` | Lưu băm trong `Account`; chỗ so sánh nằm ở `ExamRoom.login` (Server 1), đổi cùng lúc. |
 | Đổi tên hiển thị của loại sự kiện trong Lịch sử | `Roster.typeText` | Sửa chuỗi tiếng Việt; `events.csv` vẫn giữ mã tiếng Anh. |

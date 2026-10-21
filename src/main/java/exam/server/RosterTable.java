@@ -193,6 +193,7 @@ class RosterTable extends JScrollPane {
                 case Session.ST_DISCONNECTED -> style(Palette.WARNING_SOFT, Palette.WARNING_TEXT);
                 case Session.ST_SUBMITTED -> style(Palette.NEUTRAL_SOFT, Palette.NEUTRAL_TEXT);
                 case Session.ST_PRECHECK_FAIL -> style(Palette.ERROR_SOFT, Palette.ERROR_TEXT);
+                case Session.ST_TERMINATED -> style(Palette.ERROR_TEXT, Color.WHITE);
                 default -> style(Palette.PRIMARY_SOFT, Palette.PRIMARY_TEXT);
             }
         }

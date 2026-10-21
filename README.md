@@ -67,7 +67,7 @@ config/     rules.json  students.csv        exams/   sample_exam.json        src
 | C→S | `APPS` | `apps` (danh sách `{name, title}` các app có cửa sổ) | Gửi lúc PRECHECK, rồi cứ 15 giây kiểm tra một lần và chỉ gửi khi danh sách đổi; Linux gửi danh sách rỗng. Server giữ bản mới nhất kèm giờ cập nhật (tối đa 100 dòng) |
 | C→S | `SUBMIT` | `answers` | Khoá = id câu, giá trị = chỉ số lựa chọn từ 0 |
 | S→C | `EXAM_END` | `reason` | Client nhận được thì tự `SUBMIT` |
-| S→C | `RESULT` | `score`, `correct`, `total` | |
+| S→C | `RESULT` | `score`, `correct`, `total`; khi bị đình chỉ có thêm `terminated: true` và `reason` (vi phạm cuối cùng, vd `Vi phạm APP: zalo.exe`) | Gửi lại đúng tin này mỗi khi đăng nhập lại |
 
 Dòng không phải JSON object, `type` lạ, và mọi tin (trừ `LOGIN`) trước khi đăng nhập đều bị bỏ qua, không đóng kết nối.
 
@@ -122,6 +122,14 @@ Nút **Quản lý đề...** (chỉ bấm được khi bài thi chưa bắt đ�
 
 Sau khi bấm **Kết thúc thi**, nút **Kỳ thi mới** (có hộp xác nhận) đóng kết nối các máy còn lại (máy chưa nộp được gửi `EXAM_END` trước), xoá phiên, mẫu ML và bộ đếm, đưa phòng về trạng thái ban đầu nhưng **giữ đề đang nạp**. Nút **Chọn file đề...** dùng được bất cứ lúc nào bài thi chưa bắt đầu (kể cả sau Kỳ thi mới). Kết quả và lịch sử kỳ trước vẫn nằm nguyên trong thư mục `ket-qua/` riêng của nó; kỳ mới tạo thư mục mới khi bấm Bắt đầu.
 Ở client, màn kết quả chỉ có điểm, lời cảm ơn và nút **Thoát ứng dụng** (không còn nút Thi lượt mới). Muốn thi kỳ mới thì **tắt app rồi mở lại** (nhấp đúp `chay-thi.bat`). Đăng nhập lại cùng mã SV khi đã nộp trong kỳ hiện tại thì server gửi `LOGIN_OK` rồi `RESULT` cũ ngay (không cần PRECHECK, không gửi đề); sau **Kỳ thi mới** phòng trống nên mã SV cũ là người mới. Cần gửi `exam.jar` mới (kèm `chay-thi.bat`) cho các máy Windows.
+
+### Đình chỉ khi vi phạm
+
+- Chỉ **vi phạm luật** (tin `VIOLATION` loại APP, NET, USB) mới bị đình chỉ. PRECHECK lỗi trước giờ thi không tính. Điểm Bất thường của ML **không bao giờ** kết thúc bài thi của ai, chỉ hiện cảnh báo trên cửa sổ giám thị.
+- Khoá `maxViolations` trong `config/rules.json` (mặc định `1`): vi phạm đủ số lần này thì bị đình chỉ ngay. `0` (hoặc thiếu) là tắt đình chỉ, chỉ cảnh báo. Đổi được giữa giờ qua `RULES_UPDATE`.
+- Khi bị đình chỉ: trạng thái `Đình chỉ` (đỏ đậm, nằm trong tab Cần chú ý), coi như đã nộp với 0 điểm (`correct` = 0, `total` = số câu), gửi `RESULT` có `terminated: true` và `reason`, ghi sự kiện `TERMINATED` vào `events.csv`, `results.csv` có `status` = `Đình chỉ` và `score` = 0, log `Đình chỉ: <mã SV> – <lý do>`.
+- Sau đó mọi `SUBMIT`, `FEATURES` và `VIOLATION` của phiên bị bỏ qua. Đăng nhập lại thì chỉ nhận lại đúng `RESULT` đó. Không có chức năng gỡ đình chỉ hay cho thi tiếp. Client hiện màn đỏ `Bài thi bị đình chỉ`, lý do, điểm `0 / 10` và dừng giám sát.
+- **Lý do thiết kế:** luật dựa trên bằng chứng rõ ràng (mở app bị cấm, vào tên miền cấm, cắm USB) nên tự đình chỉ được. ML chỉ cho biết máy khác số đông (có thể chỉ vì học khác cách), không phải bằng chứng, nên chỉ cảnh báo để giám thị quyết định.
 
 ### Watchdog chỉ tính sau khi nhận đề
 

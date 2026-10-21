@@ -1,5 +1,6 @@
 {
   "featureIntervalSeconds": 20,
+  "maxViolations": 1,
   "blacklistApps": [
     "chrome.exe", "msedge.exe", "firefox.exe", "opera.exe", "brave.exe",
     "zalo.exe", "discord.exe", "teams.exe", "ms-teams.exe", "telegram.exe", "messenger.exe",

@@ -42,7 +42,7 @@ Phát hiện máy "khác số đông" bằng Isolation Forest, nối Java với 
 | Đổi chu kỳ chấm | `config/rules.json` → `featureIntervalSeconds` | 10 đến 60; ML chấm cùng chu kỳ. Chuỗi "Trong ... gần nhất" tự tính theo chu kỳ. |
 | Thay thuật toán (vd LOF, z-score) | `ml_service.score_samples` | Thay đoạn tạo `raw`; giữ nguyên dạng trả về `{studentId, score, anomaly, reasons}` thì Java không phải đổi. |
 | Đổi địa chỉ service ML | `ExamServer.main` (`new MlClient("http://localhost:8000")`) | Đổi URL; `MlClientTest` dùng server giả. |
-| Cho ML tự đình chỉ | Không làm | Quy tắc của nhóm: ML chỉ cảnh báo; chỉ vi phạm luật rõ ràng mới bị đình chỉ. |
+| Cho ML tự đình chỉ | Không làm | Quy tắc của nhóm: ML chỉ cảnh báo; chỉ vi phạm luật rõ ràng mới bị đình chỉ (`ExamRoom.violation`, README mục Đình chỉ). `applyScores` không gọi `terminate`. |
 
 ## 4. Câu hỏi thường gặp
 

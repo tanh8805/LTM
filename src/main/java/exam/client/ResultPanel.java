@@ -4,6 +4,7 @@ package exam.client;
 import exam.common.Card;
 import exam.common.Format;
 import exam.common.Icons;
+import exam.common.Palette;
 import java.awt.BorderLayout;
 import java.awt.FlowLayout;
 import java.awt.GridBagConstraints;
@@ -28,7 +29,11 @@ class ResultPanel extends JPanel {
         add(box, new GridBagConstraints());
     }
 
+    static final String TERMINATED_TITLE = "Bài thi bị đình chỉ";
+
     static String submittedText(String time) { return "Đã nộp bài lúc " + time; }
+
+    static String reasonText(String reason) { return "Lý do: " + reason; }
 
     /** Thông báo ngắn khi đang nộp bài: chưa có nút vì kết nối còn đang dùng. */
     void showMessage(String text) {
@@ -42,6 +47,16 @@ class ResultPanel extends JPanel {
         cards.add(card("Số câu đúng", String.valueOf(correct), "/ " + total));
         fill(new JLabel(Icons.bigCheck(64)), Theme.label(submittedText(submittedAt), 28, true, Theme.TEXT),
             Theme.label("Cảm ơn bạn đã làm bài.", Theme.BASE_SIZE, false, Theme.MUTED), cards, exitBtn);
+    }
+
+    /** Bị đình chỉ vì vi phạm luật: màn đỏ, nêu lý do, điểm 0. */
+    void showTerminated(String reason, int total) {
+        JPanel cards = new JPanel(new FlowLayout(FlowLayout.CENTER, 20, 0));
+        cards.setOpaque(false);
+        cards.add(card("Điểm", Format.score(0), "/ 10"));
+        cards.add(card("Số câu đúng", "0", "/ " + total));
+        fill(new JLabel(Icons.bigCross(64)), Theme.label(TERMINATED_TITLE, 28, true, Palette.ERROR),
+            Theme.label(reasonText(reason), Theme.BASE_SIZE, false, Palette.ERROR_TEXT), cards, exitBtn);
     }
 
     private static JComponent card(String caption, String value, String suffix) {

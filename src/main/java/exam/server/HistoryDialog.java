@@ -74,7 +74,7 @@ class HistoryDialog extends JDialog {
             String type = events.get(row).type();
             if (type.equals("VIOLATION")) {
                 setBackground(Palette.WARNING_SOFT);
-            } else if (type.equals("ANOMALY_ON")) {
+            } else if (type.equals("ANOMALY_ON") || type.equals("TERMINATED")) {
                 setBackground(ANOMALY_ROW);
             }
             return this;

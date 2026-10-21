@@ -26,6 +26,7 @@ Tất cả trong `src/main/java/exam/server/`, trừ `Protocol`.
 - `PRECHECK_RESULT`: `ClientHandler.handlePrecheckResult` → `ExamRoom.precheckResult` → `ExamRoom.trySendExam` (gửi `EXAM_START` nếu giám thị đã bấm Bắt đầu)
 - Giám thị bấm Bắt đầu: `TeacherWindow` → `ExamRoom.startExam` → `ExamLog.attach` → `ExamRoom.trySendExam` cho từng máy đã PRECHECK đạt
 - `VIOLATION`: `ClientHandler.handleViolation` → `ExamRoom.violation` → `ExamLog.record(VIOLATION)`
+- Đủ `maxViolations` vi phạm thì `ExamRoom.violation` gọi `ExamRoom.terminate`: `Session.terminated` và `submitted` = true, `RESULT` có `terminated` và `reason`, sự kiện `TERMINATED`, `writeResults`. Sau đó `violation`, `features`, `submit` của phiên đó đều bỏ qua; đăng nhập lại chỉ nhận lại `RESULT` (nhánh `s.submitted` trong `ExamRoom.login`). Điểm ML đi đường `applyScores` nên không bao giờ đình chỉ.
 - `FEATURES` (mỗi `featureIntervalSeconds` giây, cũng là heartbeat): `ClientHandler.handleFeatures` → `ExamRoom.features`
 - `APPS`: `ClientHandler.handleApps` (bỏ phần tử sai, tối đa 100 dòng) → `ExamRoom.apps` lưu vào `Session.apps` kèm giờ; giám thị đọc bằng `ExamRoom.appsOf`
 - `SUBMIT`: `ClientHandler.handleSubmit` → `ExamRoom.submit` → `ExamFile.grade` → `ExamRoom.writeResults` → `ExamFile.writeResults` → `ExamRoom.sendResult`
@@ -55,6 +56,7 @@ Tất cả trong `src/main/java/exam/server/`, trừ `Protocol`.
 | Giới hạn số máy | `ExamRoom.loginError` | Thêm: `if (existing == null && sessions.size() >= MAX) return "Phòng đã đủ máy";`. |
 | Thêm cột vào `results.csv` | `Session` + `ExamRoom` (Server 1), `ExamFile.RESULTS_HEADER` + `resultsRow` (Server 2) | Thêm trường ở `Session`, gán ở `ExamRoom` (vd `submit`); Server 2 thêm tên cột và giá trị cùng thứ tự. |
 | Thêm loại sự kiện vào `events.csv` | `ExamRoom` (chỗ xảy ra sự kiện) | Gọi `event(s, "LOAI_MOI", "chi tiết")`; `ExamLog.record` tự ghi file. Muốn hiện trong nhật ký bên giám thị thì Server 2 thêm tên vào `Roster.NOTABLE` và `Roster.eventText`. |
+| Đổi số vi phạm bị đình chỉ, hoặc tắt đình chỉ | `config/rules.json` → `maxViolations`; `ExamRoom.maxViolations`, `terminate` | Đổi số (0 là tắt). Muốn đổi lý do hoặc điểm của người bị đình chỉ thì sửa `ExamRoom.terminate`. Không có chức năng gỡ đình chỉ, cố ý. |
 | Gửi thông báo tới mọi máy | `ExamRoom` (hàm mới `broadcast`) | `synchronized`, `Protocol.msg("NOTICE")` rồi vòng `for` qua `sessions.values()`, máy `connected()` thì `Protocol.send(s.out, m)`. Thêm nút ở `TeacherWindow` (Server 2); client xử lý `NOTICE` như một loại tin mới. |
 | Tự kết thúc khi mọi máy đã nộp | `ExamRoom.submit` | Cuối nhánh chấm bài, nếu không còn session nào `!s.submitted` thì `endExam("Mọi máy đã nộp")`. |
 | Kick một máy | `ExamRoom` (hàm mới `kick`) | `synchronized`; lấy `Session s = sessions.get(id)`; `s.close(); markDisconnected(s, "giám thị đá");`. Client sẽ tự vào lại, muốn chặn thì thêm `Set<String> kicked` và kiểm tra trong `loginError`. |

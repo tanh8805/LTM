@@ -410,6 +410,117 @@ class ExamServerTest {
         assertEquals(Session.ST_IN_EXAM, row("S1").status());
     }
 
+    private void setMaxViolations(int n) {
+        JsonObject rules = server.room().rules();
+        rules.addProperty("maxViolations", n);
+        server.room().updateRules(rules);
+    }
+
+    private void sendViolation(TestClient c, String kind, String detail) {
+        JsonObject v = Protocol.msg(Protocol.VIOLATION);
+        v.addProperty("kind", kind);
+        v.addProperty("detail", detail);
+        c.send(v);
+    }
+
+    private JsonObject terminate(TestClient c) throws IOException {
+        sendViolation(c, "APP", "zalo.exe");
+        return c.next(Protocol.RESULT, 2000);
+    }
+
+    @Test
+    void violationTerminatesWithZeroScore() throws IOException {
+        setMaxViolations(1);
+        TestClient c = loginAndStart("S1");
+        JsonObject result = terminate(c);
+        assertTrue(result.get("terminated").getAsBoolean());
+        assertEquals("Vi phạm APP: zalo.exe", result.get("reason").getAsString());
+        assertEquals(0.0, result.get("score").getAsDouble());
+        assertEquals(0, result.get("correct").getAsInt());
+        assertEquals(2, result.get("total").getAsInt());
+        assertEquals(Session.ST_TERMINATED, row("S1").status());
+        assertTrue(server.room().history("S1").stream().anyMatch(e -> e.type().equals("TERMINATED")));
+        String csv = Files.readString(server.room().examDir().resolve("results.csv"), StandardCharsets.UTF_8);
+        assertTrue(csv.contains("S1,Sinh viên S1,0.0,0,2,1,,Đình chỉ,"), csv);
+    }
+
+    @Test
+    void violationsBelowTheLimitDoNotTerminate() throws IOException {
+        setMaxViolations(2);
+        TestClient c = loginAndStart("S1");
+        sendViolation(c, "APP", "zalo.exe");
+        assertNull(c.tryNext(Protocol.RESULT, 300));
+        assertEquals(Session.ST_IN_EXAM, row("S1").status());
+        sendViolation(c, "USB", "E:\\");
+        assertTrue(c.next(Protocol.RESULT, 2000).get("terminated").getAsBoolean());
+    }
+
+    @Test
+    void maxViolationsZeroDisablesTermination() throws IOException {
+        setMaxViolations(0);
+        TestClient c = loginAndStart("S1");
+        sendViolation(c, "APP", "zalo.exe");
+        sendViolation(c, "NET", "chatgpt.com (1.2.3.4)");
+        assertNull(c.tryNext(Protocol.RESULT, 300));
+        assertEquals(Session.ST_IN_EXAM, row("S1").status());
+        assertEquals(2, row("S1").violations());
+    }
+
+    @Test
+    void precheckFailureIsNotAViolation() throws IOException {
+        setMaxViolations(1);
+        TestClient c = login("S1");
+        precheck(c, false);
+        server.room().startExam();
+        assertNull(c.tryNext(Protocol.RESULT, 300));
+        assertEquals(Session.ST_PRECHECK_FAIL, row("S1").status());
+    }
+
+    @Test
+    void terminatedStudentLoginGetsSameResult() throws IOException {
+        setMaxViolations(1);
+        TestClient first = loginAndStart("S1");
+        JsonObject result = terminate(first);
+        TestClient again = reconnect(first, "S1");
+        JsonObject back = again.next(Protocol.RESULT, 2000);
+        assertEquals(result.get("reason").getAsString(), back.get("reason").getAsString());
+        assertTrue(back.get("terminated").getAsBoolean());
+        assertEquals(0.0, back.get("score").getAsDouble());
+        assertNull(again.tryNext(Protocol.EXAM_START, 300), "Đình chỉ thì không gửi đề lại");
+    }
+
+    @Test
+    void messagesIgnoredAfterTermination() throws IOException {
+        setMaxViolations(1);
+        TestClient c = loginAndStart("S1");
+        terminate(c);
+        submitCorrectNoWait(c);
+        JsonObject f = Protocol.msg(Protocol.FEATURES);
+        f.addProperty("window", 1);
+        JsonArray values = new JsonArray();
+        for (int i = 0; i < 6; i++) {
+            values.add(0);
+        }
+        f.add("values", values);
+        c.send(f);
+        sendViolation(c, "NET", "chatgpt.com (1.2.3.4)");
+        assertNull(c.tryNext(Protocol.RESULT, 500), "SUBMIT sau đình chỉ không được chấm hay gửi lại kết quả");
+        ExamRoom.Row r = row("S1");
+        assertEquals(Session.ST_TERMINATED, r.status());
+        assertEquals(0.0, r.score());
+        assertEquals(0, r.samples());
+        assertEquals(1, r.violations());
+    }
+
+    private void submitCorrectNoWait(TestClient c) {
+        JsonObject answers = new JsonObject();
+        answers.addProperty("1", 1);
+        answers.addProperty("2", 0);
+        JsonObject m = Protocol.msg(Protocol.SUBMIT);
+        m.add("answers", answers);
+        c.send(m);
+    }
+
     @Test
     void remainingIsZeroAfterEnd() throws IOException {
         loginAndStart("S1");

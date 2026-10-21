@@ -15,6 +15,7 @@ public class Session {
     public static final String ST_IN_EXAM = "Đang thi";
     public static final String ST_SUBMITTED = "Đã nộp";
     public static final String ST_DISCONNECTED = "Mất kết nối";
+    public static final String ST_TERMINATED = "Đình chỉ";
 
     final String id;
     final String name;
@@ -25,6 +26,7 @@ public class Session {
     boolean precheckOk;
     boolean precheckFailed;
     boolean submitted;
+    boolean terminated;
     JsonObject result;
 
     int violations;
@@ -64,6 +66,9 @@ public class Session {
 
     String status(boolean examStarted) {
         // suy ra từ các cờ nên không bao giờ lệch với dữ liệu thật
+        if (terminated) {
+            return ST_TERMINATED;
+        }
         if (submitted) {
             return ST_SUBMITTED;
         }
