@@ -49,6 +49,17 @@ def test_outlier_flagged():
     assert results["SV-X"]["anomaly"] is True
     assert results["SV-X"]["score"] == max(r["score"] for r in results.values())
 
+    # máy gian lận rời cửa sổ nhiều (feature 1 và 2) nên phải nằm trong lý do
+    reasons = results["SV-X"]["reasons"]
+    assert 1 <= len(reasons) <= 3
+    assert {r["feature"] for r in reasons} & {1, 2}
+    assert all(r["value"] > r["room"] for r in reasons)
+
+
+def test_normal_student_has_no_strong_reasons():
+    body = score(room(deviant_windows=[1, 2, 3, 4, 5]))
+    assert by_student(body)["SV1"]["reasons"] == []
+
 
 def test_identical_room_no_anomaly():
     body = score([sample(f"SV{i}", w, [0, 0, 1, 0, 0, 2]) for i in range(5) for w in range(1, 6)])
