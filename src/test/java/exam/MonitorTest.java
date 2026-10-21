@@ -7,6 +7,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import exam.client.Monitor;
+import exam.client.WindowsProbe;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -111,6 +112,49 @@ class MonitorTest {
         assertEquals("NET", sent.get(0).get("kind").getAsString());
         assertTrue(sent.get(0).get("detail").getAsString().contains("chatgpt.com"));
         assertEquals(1, values(monitor.buildFeatures())[3]);   // IP lạ cũng là host mới; 10.0.0.5 nằm trong baseline
+    }
+
+    private void netSnapshot(Monitor m, List<WindowsProbe.Proc> procs, WindowsProbe.Conn... conns) {
+        m.processSnapshot(procs, Set.of("C:\\"), List.of(conns));
+    }
+
+    private Monitor monitorWithBlockedIps(List<JsonObject> out) {
+        Monitor m = new Monitor();
+        m.setBaselineForTest(Set.of("explorer.exe"), Set.of("C:\\"), Set.of(), RULES,
+            Map.of("104.18.1.1", "chatgpt.com", "104.18.1.2", "chatgpt.com"), out::add);
+        m.setWindowLookupForTest(pids -> List.of());
+        return m;
+    }
+
+    @Test
+    void netViolationNamesTheProcessFromSampleOutput() {
+        List<WindowsProbe.Proc> procs = WindowsProbe.parseTasklistProcs(
+            "\"explorer.exe\",\"88\",\"Console\",\"1\",\"5 K\"\r\n\"Notepad.exe\",\"1234\",\"Console\",\"1\",\"9 K\"\r\n");
+        monitor.setWindowLookupForTest(pids -> List.of());
+        List<WindowsProbe.Conn> conns = WindowsProbe.parseNetstatConnections(
+            "  TCP    192.168.1.5:50123      104.18.1.1:443      ESTABLISHED     1234\r\n");
+        monitor.processSnapshot(procs, Set.of("C:\\"), conns);
+        assertEquals(1, sent.size());
+        assertEquals("chatgpt.com (104.18.1.1) – notepad.exe", sent.get(0).get("detail").getAsString());
+    }
+
+    @Test
+    void netViolationWithUnknownProcessShowsPid() {
+        monitor.setWindowLookupForTest(pids -> List.of());
+        netSnapshot(monitor, List.of(new WindowsProbe.Proc("explorer.exe", 88)), new WindowsProbe.Conn("104.18.1.1", 999));
+        assertEquals("chatgpt.com (104.18.1.1) – PID 999", sent.get(0).get("detail").getAsString());
+    }
+
+    @Test
+    void sameDomainAndProgramReportedOnceEvenWithDifferentIps() {
+        List<JsonObject> out = new ArrayList<>();
+        Monitor m = monitorWithBlockedIps(out);
+        List<WindowsProbe.Proc> procs = List.of(new WindowsProbe.Proc("notepad.exe", 10), new WindowsProbe.Proc("calc.exe", 20));
+        netSnapshot(m, procs, new WindowsProbe.Conn("104.18.1.1", 10), new WindowsProbe.Conn("104.18.1.2", 10));
+        assertEquals(1, out.size());
+        netSnapshot(m, procs, new WindowsProbe.Conn("104.18.1.2", 20));
+        assertEquals(2, out.size(), "Cùng tên miền nhưng chương trình khác thì vẫn báo");
+        assertTrue(out.get(1).get("detail").getAsString().endsWith("– calc.exe"));
     }
 
     @Test

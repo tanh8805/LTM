@@ -49,6 +49,16 @@ class WindowsProbeTest {
     }
 
     @Test
+    void parseNetstatConnectionsReadsPidColumn() {
+        String out = "  TCP    192.168.1.5:50123      142.250.4.100:443      ESTABLISHED     1234\r\n"
+            + "  TCP    0.0.0.0:135            0.0.0.0:0              LISTENING       4\r\n"
+            + "  TCP    192.168.1.5:50127      8.8.8.8:443            TIME_WAIT       0\r\n"
+            + "  TCP    192.168.1.5:50128      1.1.1.1:443            ESTABLISHED     abc\r\n";
+        assertEquals(List.of(new WindowsProbe.Conn("142.250.4.100", 1234), new WindowsProbe.Conn("8.8.8.8", 0),
+            new WindowsProbe.Conn("1.1.1.1", -1)), WindowsProbe.parseNetstatConnections(out));
+    }
+
+    @Test
     void parseTasklistProcsReadsNameAndPid() {
         String out = "\"Chrome.exe\",\"1234\",\"Console\",\"1\",\"100,000 K\"\r\n"
             + "\"System Idle Process\",\"0\",\"Services\",\"0\",\"8 K\"\r\n"
