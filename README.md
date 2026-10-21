@@ -42,7 +42,7 @@ src/main/java/exam/
   common/   Protocol  Palette  Icons  Format
   client/   StudentApp  StudentScreens  Theme  TopBar  LoginPanel  PrecheckPanel  ExamPanel  NumberButton  OptionRow  ResultPanel  Sheet
             ServerConnection  ServerFinder  Monitor  AppRules  WindowsProbe  Diagnose  Debug
-  server/   ExamServer  ExamRoom  ExamLog  Session  ExamFile  StudentList  RulesFile  RulesDialog  ListEditor  ClientHandler  TeacherWindow  RosterTable  Roster  DetailPanel  HistoryDialog  MlClient
+  server/   ExamServer  ExamRoom  ExamLog  Session  ExamFile  StudentList  RulesFile  RulesDialog  ListEditor  ExamBank  ExamBankDialog  QuestionDialog  ClientHandler  TeacherWindow  RosterTable  Roster  DetailPanel  HistoryDialog  MlClient
             Pill  TabButton  LocalAddresses
 ml/         ml_service.py  simulate_clients.py  test_ml_service.py
 config/     rules.json  students.csv        exams/   sample_exam.json
@@ -112,6 +112,11 @@ Sinh viên đăng nhập bằng **mã SV và mật khẩu** (không còn ô Họ
 - So khớp mã SV không phân biệt hoa thường và bỏ khoảng trắng. Sai mã SV hoặc mật khẩu: `LOGIN_FAIL` kèm sự kiện `LOGIN_FAIL` trong `events.csv`.
 - Chưa nạp danh sách (dev): ai cũng đăng nhập được, giao diện hiện cảnh báo vàng `Chưa nạp danh sách sinh viên: ai cũng đăng nhập được`.
 - Giả lập: `python simulate_clients.py --password 123456` (mặc định `123456`).
+
+### Quản lý đề
+
+Nút **Quản lý đề...** (chỉ bấm được khi bài thi chưa bắt đầu) mở hộp thoại: bên trái là các file `exams/*.json` kèm **Tạo đề mới**, **Nhân bản**, **Xoá** (có hỏi xác nhận); bên phải là tên đề, thời gian (phút) và bảng câu hỏi với **Thêm**, **Sửa**, **Xoá**, **Lên**, **Xuống**. Mỗi câu có nội dung, 2 đến 6 lựa chọn (ô trống bị bỏ qua) và một đáp án đúng. **Lưu** ghi file JSON đúng định dạng cũ, `id` tự đánh số lại từ 1; file được ghi ra file tạm và kiểm tra bằng `ExamFile.load` rồi mới thay file thật, nên đề sai không làm hỏng file cũ. **Dùng đề này** nạp đề đã lưu vào phòng thi.
+**Nhập từ CSV...** thêm câu hỏi vào đề đang soạn từ file UTF-8 có dòng đầu `question,optionA,optionB,optionC,optionD,answer` (`answer` là A-D, ô có dấu phẩy thì bọc nháy kép, C và D có thể để trống); dòng lỗi được báo `Dòng n: lý do`.
 
 ### Kỳ thi mới không cần tắt server
 
