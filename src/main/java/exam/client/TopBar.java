@@ -2,6 +2,7 @@
 package exam.client;
 
 import exam.common.Icons;
+import exam.common.Protocol;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
@@ -20,7 +21,7 @@ class TopBar extends JPanel {
     /** Trạng thái kết nối hiện ở chấm màu; NONE = ẩn (chưa đăng nhập hoặc đã xong). */
     enum Conn { NONE, CONNECTED, RECONNECTING, LOST }
 
-    private final JLabel examLabel = Theme.label("LTM · Thi trắc nghiệm", 15, true, Theme.TEXT);
+    private final JLabel examLabel = Theme.label(Protocol.TOPIC, 15, true, Theme.TEXT);
     private final JLabel studentLabel = Theme.label(" ", 14, false, Theme.MUTED);
     private final JLabel timerLabel = Theme.label(" ", 16, true, Theme.TEXT);
     private final JLabel connLabel = Theme.label(" ", 14, false, Theme.TEXT);

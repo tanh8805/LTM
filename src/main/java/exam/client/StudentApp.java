@@ -17,7 +17,7 @@ import javax.swing.SwingUtilities;
 import javax.swing.Timer;
 
 public class StudentApp {
-    private final JFrame frame = new JFrame("Thi trắc nghiệm");
+    private final JFrame frame = new JFrame(Protocol.TOPIC);
     private final Monitor monitor = new Monitor();
     private final Map<Integer, Integer> answers = new HashMap<>();   // id câu hỏi -> chỉ số lựa chọn (chỉ nằm trong bộ nhớ)
     private StudentScreens screens;
