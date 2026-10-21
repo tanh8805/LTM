@@ -30,10 +30,9 @@ import javax.swing.table.JTableHeader;
 import javax.swing.table.TableCellRenderer;
 
 class RosterTable extends JScrollPane {
-    private static final Color ATTENTION = new Color(0xFFF3E2), SELECTED = new Color(0xDCE8FF);
     private static final String[] COLUMNS = {"", "Mã SV", "Họ tên", "Máy", "Trạng thái", "Vi phạm", "Vi phạm gần nhất",
         "Bất thường", "Điểm"};
-    private static final int[] WIDTHS = {36, 135, 165, 80, 120, 80, 220, 150, 70};
+    private static final int[] WIDTHS = {36, 100, 160, 60, 120, 84, 170, 200, 64};
 
     private static class Model extends AbstractTableModel {
         List<ExamRoom.Row> rows = new ArrayList<>();
@@ -64,7 +63,7 @@ class RosterTable extends JScrollPane {
     private boolean updating;
 
     RosterTable(Consumer<ExamRoom.Row> onSelect, Consumer<ExamRoom.Row> onOpen) {
-        table.setRowHeight(40);
+        table.setRowHeight(Palette.GAP * 6);
         table.setShowVerticalLines(false);
         table.setShowHorizontalLines(true);
         table.setGridColor(Palette.SEPARATOR);
@@ -91,7 +90,7 @@ class RosterTable extends JScrollPane {
             }
         });
         setViewportView(table);
-        setBorder(BorderFactory.createMatteBorder(1, 0, 1, 0, Palette.SEPARATOR));
+        setBorder(BorderFactory.createMatteBorder(1, 0, 0, 0, Palette.SEPARATOR));
         getViewport().setBackground(Color.WHITE);
     }
 
@@ -115,9 +114,9 @@ class RosterTable extends JScrollPane {
     }
 
     private static Color background(JTable t, int row, boolean selected) {
-        if (selected) { return SELECTED; }
+        if (selected) { return Palette.SELECTED; }
         ExamRoom.Row r = ((Model) t.getModel()).rows.get(row);
-        return Roster.needsAttention(r) ? ATTENTION : Color.WHITE;
+        return Roster.needsAttention(r) ? Palette.ATTENTION : Color.WHITE;
     }
 
     private static class HeaderRenderer extends DefaultTableCellRenderer {
@@ -190,11 +189,11 @@ class RosterTable extends JScrollPane {
         void set(String text, String status) {
             setText(text);
             switch (status) {
-                case Session.ST_IN_EXAM -> style(Palette.SUCCESS_SOFT, new Color(0x17653A));
-                case Session.ST_DISCONNECTED -> style(Palette.WARNING_SOFT, new Color(0x8A4B00));
-                case Session.ST_SUBMITTED -> style(Palette.NEUTRAL_SOFT, new Color(0x4B5563));
-                case Session.ST_PRECHECK_FAIL -> style(new Color(0xFDE8E6), new Color(0xA12A20));
-                default -> style(Palette.PRIMARY_SOFT, new Color(0x1F4FA8));
+                case Session.ST_IN_EXAM -> style(Palette.SUCCESS_SOFT, Palette.SUCCESS_TEXT);
+                case Session.ST_DISCONNECTED -> style(Palette.WARNING_SOFT, Palette.WARNING_TEXT);
+                case Session.ST_SUBMITTED -> style(Palette.NEUTRAL_SOFT, Palette.NEUTRAL_TEXT);
+                case Session.ST_PRECHECK_FAIL -> style(Palette.ERROR_SOFT, Palette.ERROR_TEXT);
+                default -> style(Palette.PRIMARY_SOFT, Palette.PRIMARY_TEXT);
             }
         }
 
@@ -222,7 +221,7 @@ class RosterTable extends JScrollPane {
 
         AnomalyRenderer() {
             cell.setBorder(BorderFactory.createEmptyBorder(0, 8, 0, 8));
-            bar.setPreferredSize(new Dimension(64, 6));
+            bar.setPreferredSize(new Dimension(Palette.GAP * 9, Palette.GAP));
             JPanel barBox = new JPanel(new java.awt.GridBagLayout());
             barBox.setOpaque(false);
             barBox.add(bar);
@@ -239,7 +238,7 @@ class RosterTable extends JScrollPane {
             bar.value = score == null ? 0 : score;
             bar.flagged = row.anomaly();
             text.setText(score == null ? "-" : String.format(Locale.ROOT, "%.2f", score));
-            text.setForeground(row.anomaly() ? new Color(0x8A4B00) : Palette.TEXT);
+            text.setForeground(row.anomaly() ? Palette.WARNING_TEXT : Palette.TEXT);
             text.setFont(text.getFont().deriveFont(row.anomaly() ? Font.BOLD : Font.PLAIN));
             return cell;
         }
@@ -253,9 +252,9 @@ class RosterTable extends JScrollPane {
         protected void paintComponent(Graphics g) {
             Graphics2D g2 = (Graphics2D) g.create();
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            g2.setColor(new Color(0xE6E9EF));
+            g2.setColor(Palette.TRACK);
             g2.fillRoundRect(0, 0, getWidth(), getHeight(), getHeight(), getHeight());
-            g2.setColor(flagged ? new Color(0xC25E00) : new Color(0x8E95A3));
+            g2.setColor(flagged ? Palette.WARNING : Palette.BAR);
             g2.fillRoundRect(0, 0, (int) Math.max(getHeight(), getWidth() * Math.min(1, value)), getHeight(), getHeight(), getHeight());
             g2.dispose();
         }

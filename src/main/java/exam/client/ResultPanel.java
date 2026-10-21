@@ -1,6 +1,7 @@
 // Màn kết quả cuối cùng (dấu tích, giờ nộp, hai ô Điểm và Số câu đúng, lời cảm ơn, nút Thoát), hoặc thông báo ngắn (Người 1).
 package exam.client;
 
+import exam.common.Card;
 import exam.common.Format;
 import exam.common.Icons;
 import java.awt.BorderLayout;
@@ -44,7 +45,7 @@ class ResultPanel extends JPanel {
     }
 
     private static JComponent card(String caption, String value, String suffix) {
-        Theme.Card card = new Theme.Card();
+        Card card = new Card();
         card.setLayout(new BorderLayout(0, 6));
         card.setPreferredSize(new java.awt.Dimension(230, 104));
         card.add(Theme.label(caption, 13, false, Theme.MUTED), BorderLayout.NORTH);

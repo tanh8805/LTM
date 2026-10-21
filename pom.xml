@@ -36,6 +36,9 @@
   <build>
     <finalName>exam</finalName>
     <resources>
+      <resource>
+        <directory>src/main/resources</directory>
+      </resource>
       <!-- Chép config/rules.json vào jar làm bản luật mặc định cho công cụ Diagnose; client thật vẫn nhận luật từ server -->
       <resource>
         <directory>config</directory>

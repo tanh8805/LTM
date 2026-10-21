@@ -34,7 +34,7 @@ class NumberButton extends JButton {
         g2.setColor(done ? Theme.PRIMARY : Color.WHITE);
         g2.fillRoundRect(1, 1, getWidth() - 3, getHeight() - 3, 9, 9);
         g2.setStroke(new BasicStroke(current ? 2.5f : 1f));
-        g2.setColor(current ? new Color(0x111827) : done ? Theme.PRIMARY : Theme.BORDER);
+        g2.setColor(current ? Theme.TEXT : done ? Theme.PRIMARY : Theme.BORDER);
         g2.drawRoundRect(1, 1, getWidth() - 3, getHeight() - 3, 9, 9);
         g2.dispose();
         setForeground(done ? Color.WHITE : Theme.TEXT);

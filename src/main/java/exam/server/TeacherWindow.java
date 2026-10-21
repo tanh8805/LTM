@@ -1,6 +1,7 @@
 // Giao diện giám thị (Swing + FlatLaf, theo ảnh tham khảo): thanh trên, tab lọc và ô tìm kiếm, bảng thí sinh, khung chi tiết, nhật ký (Người 2).
 package exam.server;
 
+import exam.common.Card;
 import exam.common.Icons;
 import exam.common.Palette;
 import exam.common.Protocol;
@@ -26,6 +27,7 @@ import javax.swing.BorderFactory;
 import javax.swing.ButtonGroup;
 import javax.swing.JButton;
 import javax.swing.JFileChooser;
+import javax.swing.JComponent;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
@@ -41,12 +43,11 @@ import javax.swing.event.DocumentListener;
 public class TeacherWindow extends JFrame {
     private final ExamServer server;
     private final ExamRoom room;
-    private final JButton chooseBtn = new JButton("Mở đề..."), folderBtn = new JButton("Thư mục kết quả"),
-        studentsBtn = new JButton("Nhập danh sách SV..."), rulesBtn = new JButton("Quản lý ứng dụng..."),
-        examsBtn = new JButton("Quản lý đề..."), actionBtn = new JButton();
-    private final JLabel titleLabel = label("Chưa chọn đề", 15, true, Palette.TEXT), subLabel = label(" ", 12, false, Palette.MUTED),
-        timeValue = label("-", 15, true, Palette.TEXT), studentsLabel = label(" ", 13, false, Palette.MUTED),
-        noListWarning = label("Chưa nạp danh sách sinh viên: ai cũng đăng nhập được", 13, true, new Color(0x7A5B00));
+    private final JButton chooseBtn = new JButton("Mở đề..."), actionBtn = new JButton();
+    private final JLabel titleLabel = label(Protocol.TOPIC, 16, true, Palette.PRIMARY), subLabel = label(" ", 12.5f, false, Palette.MUTED),
+        timeValue = label("-", 15, true, Palette.TEXT),
+        noListWarning = label("Chưa nạp danh sách sinh viên: ai cũng đăng nhập được", 13, true, Palette.WARNING_TEXT);
+    private final SideBar sideBar = new SideBar();
     private final JTextArea logArea = new JTextArea();
     private final DetailPanel detail = new DetailPanel(this::setAppAllowed);
     private final JTextField search = new JTextField(22);
@@ -63,46 +64,28 @@ public class TeacherWindow extends JFrame {
             logArea.setCaretPosition(logArea.getDocument().getLength());    // tự cuộn xuống dòng mới nhất
         }));
         chooseBtn.addActionListener(e -> chooseExam());
-        folderBtn.addActionListener(e -> openResults());
-        studentsBtn.addActionListener(e -> importStudents());
-        examsBtn.addActionListener(e -> { new ExamBankDialog(this, room, ExamBank.DIR).setVisible(true); refresh(); });
-        rulesBtn.addActionListener(e -> new RulesDialog(this, server).setVisible(true));
         actionBtn.addActionListener(e -> onAction());
         actionBtn.setForeground(Color.WHITE);
         actionBtn.setFont(actionBtn.getFont().deriveFont(Font.BOLD));
         actionBtn.setMargin(new Insets(7, 18, 7, 18));
         getContentPane().setBackground(Palette.BACKGROUND);
+
         noListWarning.setOpaque(true);
-        noListWarning.setBackground(new Color(0xFFF3CD));
+        noListWarning.setBackground(Palette.WARNING_SOFT);
         noListWarning.setBorder(BorderFactory.createEmptyBorder(6, 16, 6, 16));
         JPanel north = new JPanel(new BorderLayout());
         north.add(topBar(), BorderLayout.NORTH);
         north.add(noListWarning, BorderLayout.SOUTH);
         add(north, BorderLayout.NORTH);
+        sideBar.addItem("monitor", "Giám sát", true, () -> { });
+        sideBar.addItem("students", "Sinh viên", false, this::importStudents);
+        sideBar.addItem("exams", "Đề thi", false, () -> { new ExamBankDialog(this, room, ExamBank.DIR).setVisible(true); refresh(); });
+        sideBar.addItem("rules", "Ứng dụng", false, () -> new RulesDialog(this, server).setVisible(true));
+        sideBar.addItem("results", "Kết quả", false, this::openResults);
+        add(sideBar, BorderLayout.WEST);
+        add(content(), BorderLayout.CENTER);
 
-        JPanel left = new JPanel(new BorderLayout());
-        left.setBackground(Color.WHITE);
-        left.add(filterBar(), BorderLayout.NORTH);
-        logArea.setEditable(false);
-        logArea.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
-        logArea.setBorder(BorderFactory.createEmptyBorder(0, 14, 8, 14));
-        logArea.setBackground(Color.WHITE);
-        JScrollPane logScroll = new JScrollPane(logArea);
-        logScroll.setBorder(null);
-        logScroll.setPreferredSize(new Dimension(0, 150));
-        JPanel logBox = new JPanel(new BorderLayout());
-        logBox.setBackground(Color.WHITE);
-        logBox.add(label("Nhật ký", 13, true, Palette.MUTED), BorderLayout.NORTH);
-        ((JLabel) logBox.getComponent(0)).setBorder(BorderFactory.createEmptyBorder(8, 14, 4, 14));
-        logBox.add(logScroll, BorderLayout.CENTER);
-        JPanel center = new JPanel(new BorderLayout());
-        center.add(table, BorderLayout.CENTER);
-        center.add(logBox, BorderLayout.SOUTH);
-        left.add(center, BorderLayout.CENTER);
-        add(left, BorderLayout.CENTER);
-        add(detail, BorderLayout.EAST);
-
-        setSize(1320, 780);
+        setSize(1440, 820);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
         addWindowListener(new WindowAdapter() {
@@ -123,7 +106,48 @@ public class TeacherWindow extends JFrame {
         return l;
     }
 
-    /** Hàng trên cùng: Mở đề + tên kỳ thi, đồng hồ ở giữa, địa chỉ + nút hành động bên phải. */
+    /** Thẻ trắng viền mảnh bọc một thành phần. */
+    private static JPanel card(JComponent inner) {
+        Card card = new Card();
+        card.setLayout(new BorderLayout());
+        card.setBorder(BorderFactory.createEmptyBorder(1, 1, 1, 1));
+        card.add(inner, BorderLayout.CENTER);
+        return card;
+    }
+
+    /** Vùng nội dung trên nền xám: thẻ bảng thí sinh, thẻ nhật ký bên dưới, thẻ chi tiết bên phải. */
+    private JPanel content() {
+        int gap = Palette.GAP * 2;
+        logArea.setEditable(false);
+        logArea.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
+        logArea.setBorder(BorderFactory.createEmptyBorder(0, 14, 8, 14));
+        JScrollPane logScroll = new JScrollPane(logArea);
+        logScroll.setBorder(null);
+        logScroll.setPreferredSize(new Dimension(0, 150));
+        JLabel logTitle = label("Nhật ký", 13, true, Palette.MUTED);
+        logTitle.setBorder(BorderFactory.createEmptyBorder(8, 14, 4, 14));
+        JPanel logBox = new JPanel(new BorderLayout());
+        logBox.setOpaque(false);
+        logBox.add(logTitle, BorderLayout.NORTH);
+        logBox.add(logScroll, BorderLayout.CENTER);
+        JPanel tableBox = new JPanel(new BorderLayout());
+        tableBox.setOpaque(false);
+        tableBox.add(filterBar(), BorderLayout.NORTH);
+        tableBox.add(table, BorderLayout.CENTER);
+
+        JPanel left = new JPanel(new BorderLayout(0, gap));
+        left.setOpaque(false);
+        left.add(card(tableBox), BorderLayout.CENTER);
+        left.add(card(logBox), BorderLayout.SOUTH);
+        JPanel content = new JPanel(new BorderLayout(gap, 0));
+        content.setOpaque(false);
+        content.setBorder(BorderFactory.createEmptyBorder(gap, gap, gap, gap));
+        content.add(left, BorderLayout.CENTER);
+        content.add(card(detail), BorderLayout.EAST);
+        return content;
+    }
+
+    /** Thanh trên cùng: tên đề tài và đề đang mở, đồng hồ ở giữa, IP LAN và nút Bắt đầu/Kết thúc bên phải. */
     private JPanel topBar() {
         JPanel bar = new JPanel(new GridBagLayout());
         bar.setBackground(Color.WHITE);
@@ -135,13 +159,12 @@ public class TeacherWindow extends JFrame {
         titles.setOpaque(false);
         titles.add(titleLabel, BorderLayout.NORTH);
         titles.add(subLabel, BorderLayout.SOUTH);
-        left.add(chooseBtn);
-        left.add(examsBtn);
         left.add(titles);
+        left.add(chooseBtn);
         Pill clock = new Pill(Color.WHITE, Palette.BORDER, 18, 6);
         clock.add(label("Còn lại", 13, false, Palette.MUTED));
         clock.add(timeValue);
-        Pill address = new Pill(new Color(0xF0F2F6), null, 12, 6);
+        Pill address = new Pill(Palette.NEUTRAL_SOFT, null, 12, 6);
         String ips = LocalAddresses.list();
         address.setToolTipText("Các IP LAN của máy chủ (kể cả card ZeroTier): " + ips);
         address.add(label("IP LAN", 13, false, Palette.MUTED));
@@ -151,10 +174,6 @@ public class TeacherWindow extends JFrame {
         JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
         right.setOpaque(false);
         right.add(address);
-        right.add(studentsLabel);
-        right.add(studentsBtn);
-        right.add(rulesBtn);
-        right.add(folderBtn);
         right.add(actionBtn);
         GridBagConstraints c = new GridBagConstraints();
         c.weightx = 1; c.anchor = GridBagConstraints.WEST;
@@ -169,9 +188,9 @@ public class TeacherWindow extends JFrame {
     /** Hàng tab lọc bên trái và ô tìm kiếm bên phải. */
     private JPanel filterBar() {
         JPanel bar = new JPanel(new BorderLayout());
-        bar.setBackground(Color.WHITE);
+        bar.setOpaque(false);
         bar.setBorder(BorderFactory.createEmptyBorder(10, 14, 10, 14));
-        Pill group = new Pill(new Color(0xEBEEF3), null, 4, 3);
+        Pill group = new Pill(Palette.NEUTRAL_SOFT, null, 4, 3);
         group.setLayout(new FlowLayout(FlowLayout.LEFT, 2, 0));
         ButtonGroup buttons = new ButtonGroup();
         for (Roster.Tab t : Roster.Tab.values()) {
@@ -200,17 +219,17 @@ public class TeacherWindow extends JFrame {
     private void refresh() {
         ExamRoom.Summary sum = room.summary();
         boolean started = room.isStarted(), ended = room.isEnded();
-        titleLabel.setText(sum == null ? "Chưa chọn đề" : sum.title());
-        subLabel.setText(sum == null ? "Bấm Mở đề... để chọn file đề"
-            : sum.questions() + " câu · " + sum.minutes() + " phút · " + (started ? "bắt đầu " + sum.startedAt() : "chưa bắt đầu"));
+        subLabel.setText(sum == null ? "Đề thi: chưa chọn (bấm Mở đề... hoặc mục Đề thi)"
+            : "Đề thi: " + sum.title() + " · " + sum.questions() + " câu · " + sum.minutes() + " phút · "
+            + (started ? "bắt đầu " + sum.startedAt() : "chưa bắt đầu"));
         List<ExamRoom.Row> all = room.rows();
         for (Roster.Tab t : Roster.Tab.values()) { tabs.get(t).setText(t.label + " " + Roster.count(all, t)); }
         table.setRows(Roster.filter(all, tab, search.getText()));
         showDetail(table.selected());
         int students = room.studentCount();
-        studentsLabel.setText(students == 0 ? " " : "Đã nạp " + students + " SV");
+        sideBar.setText("students", students == 0 ? "Sinh viên" : "Sinh viên (" + students + ")");
         noListWarning.setVisible(students == 0);
-        examsBtn.setEnabled(!started);
+        sideBar.setEnabled("exams", !started);
         chooseBtn.setEnabled(!started);                    // chỉ đổi được đề khi bài thi chưa bắt đầu (kể cả sau Kỳ thi mới)
         if (ended) {
             timeValue.setText("Đã kết thúc");
@@ -222,7 +241,7 @@ public class TeacherWindow extends JFrame {
         }
         actionBtn.setText(ended ? "Kỳ thi mới" : started ? "Kết thúc thi" : "Bắt đầu thi");
         actionBtn.setEnabled(ended || started || sum != null);
-        actionBtn.setBackground(!actionBtn.isEnabled() ? new Color(0xA9B4C6) : started && !ended ? new Color(0xC9302C) : Palette.PRIMARY);
+        actionBtn.setBackground(!actionBtn.isEnabled() ? Palette.DISABLED : started && !ended ? Palette.ERROR : Palette.PRIMARY);
     }
 
     /** Chuột phải vào một app trong khung chi tiết: cho phép hoặc cấm app đó cho cả phòng. */

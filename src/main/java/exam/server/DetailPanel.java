@@ -32,9 +32,8 @@ class DetailPanel extends JPanel {
     DetailPanel(BiConsumer<String, Boolean> onAppRule) {
         super(new BorderLayout());
         this.onAppRule = onAppRule;
-        setBackground(Color.WHITE);
+        setOpaque(false);
         setPreferredSize(new Dimension(UIScale.scale(340), 0));    // chữ HTML tự co giãn theo màn hình nên kích thước cũng phải co giãn
-        setBorder(BorderFactory.createMatteBorder(0, 1, 0, 0, Palette.SEPARATOR));
         body.setLayout(new BoxLayout(body, BoxLayout.Y_AXIS));
         body.setOpaque(false);
         body.setBorder(BorderFactory.createEmptyBorder(22, 20, 12, 20));

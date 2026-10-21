@@ -1,8 +1,8 @@
 package exam.server;
 
-import com.formdev.flatlaf.FlatLightLaf;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import exam.common.Look;
 import exam.common.Protocol;
 import java.io.IOException;
 import java.net.DatagramPacket;
@@ -19,7 +19,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import javax.swing.SwingUtilities;
-import javax.swing.UIManager;
 
 public class ExamServer {
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm:ss");
@@ -69,11 +68,7 @@ public class ExamServer {
 
     private static void openTeacherWindow(ExamServer server) {
         // phải cài giao diện trước khi tạo bất kỳ cửa sổ nào
-        FlatLightLaf.setup();
-        UIManager.put("defaultFont", UIManager.getFont("defaultFont").deriveFont(14f));
-        UIManager.put("Button.arc", 12);
-        UIManager.put("Component.arc", 10);
-        UIManager.put("TextComponent.arc", 10);
+        Look.install(14f);
 
         // tạo cửa sổ trước để log lúc khởi động hiện được
         new TeacherWindow(server).setVisible(true);

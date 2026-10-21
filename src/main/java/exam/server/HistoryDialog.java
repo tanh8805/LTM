@@ -17,7 +17,7 @@ import javax.swing.table.TableCellRenderer;
 
 class HistoryDialog extends JDialog {
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm:ss");
-    private static final Color ANOMALY_ROW = new Color(0xFDE8E6);
+    private static final Color ANOMALY_ROW = Palette.ERROR_SOFT;
 
     private final List<ExamLog.Event> events;
 
