@@ -31,9 +31,9 @@ import javax.swing.table.TableCellRenderer;
 
 class RosterTable extends JScrollPane {
     private static final Color ATTENTION = new Color(0xFFF3E2), SELECTED = new Color(0xDCE8FF);
-    private static final String[] COLUMNS = {"", "Mã SV", "Họ tên", "Máy", "Trạng thái", "Vi phạm", "Vi phạm gần nhất", "Mẫu",
+    private static final String[] COLUMNS = {"", "Mã SV", "Họ tên", "Máy", "Trạng thái", "Vi phạm", "Vi phạm gần nhất",
         "Bất thường", "Điểm"};
-    private static final int[] WIDTHS = {36, 135, 165, 80, 120, 80, 220, 60, 150, 70};
+    private static final int[] WIDTHS = {36, 135, 165, 80, 120, 80, 220, 150, 70};
 
     private static class Model extends AbstractTableModel {
         List<ExamRoom.Row> rows = new ArrayList<>();
@@ -53,8 +53,7 @@ class RosterTable extends JScrollPane {
                 case 4 -> row.status();
                 case 5 -> row.violations();
                 case 6 -> Roster.lastViolationText(row);
-                case 7 -> row.samples();
-                case 8 -> row;
+                case 7 -> row;
                 default -> Roster.scoreText(row.score());
             };
         }
@@ -77,7 +76,7 @@ class RosterTable extends JScrollPane {
         table.setDefaultRenderer(Object.class, new CellRenderer());
         table.getColumnModel().getColumn(0).setCellRenderer(new IconRenderer());
         table.getColumnModel().getColumn(4).setCellRenderer(new StatusRenderer());
-        table.getColumnModel().getColumn(8).setCellRenderer(new AnomalyRenderer());
+        table.getColumnModel().getColumn(7).setCellRenderer(new AnomalyRenderer());
         JTableHeader header = table.getTableHeader();
         header.setReorderingAllowed(false);
         header.setDefaultRenderer(new HeaderRenderer());
@@ -129,7 +128,7 @@ class RosterTable extends JScrollPane {
             setForeground(Palette.MUTED);
             setFont(getFont().deriveFont(Font.BOLD, 12.5f));
             setBorder(BorderFactory.createEmptyBorder(0, 8, 0, 8));
-            setHorizontalAlignment(c == 5 || c == 7 || c == 9 ? SwingConstants.RIGHT : SwingConstants.LEFT);
+            setHorizontalAlignment(c == 5 || c == 8 ? SwingConstants.RIGHT : SwingConstants.LEFT);
             return this;
         }
     }
@@ -142,7 +141,7 @@ class RosterTable extends JScrollPane {
             setForeground(c == 6 && "-".equals(v) ? Palette.MUTED : Palette.TEXT);
             setFont(getFont().deriveFont(c == 2 ? Font.BOLD : Font.PLAIN));
             setBorder(BorderFactory.createEmptyBorder(0, 8, 0, 8));
-            setHorizontalAlignment(c == 5 || c == 7 || c == 9 ? SwingConstants.RIGHT : SwingConstants.LEFT);
+            setHorizontalAlignment(c == 5 || c == 8 ? SwingConstants.RIGHT : SwingConstants.LEFT);
             return this;
         }
     }
