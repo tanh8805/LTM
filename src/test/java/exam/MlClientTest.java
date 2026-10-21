@@ -182,7 +182,7 @@ class MlClientTest {
         waitSamples(1);
         server.scoreRoomNow();
         server.scoreRoomNow();
-        assertEquals(1, count(lines, "Bất thường: S1 (0.90)"), "bị cờ liên tiếp chỉ log một lần");
+        assertEquals(1, count(lines, "Bất thường: S1. Mức bất thường: Rất cao (0.90). Không có hành vi nào lệch rõ rệt."), "bị cờ liên tiếp chỉ log một lần");
         fakeBody = "{\"status\":\"ok\",\"results\":[{\"studentId\":\"S1\",\"score\":0.2,\"anomaly\":false}]}";
         server.scoreRoomNow();
         server.scoreRoomNow();

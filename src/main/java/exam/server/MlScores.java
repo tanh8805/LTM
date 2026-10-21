@@ -5,7 +5,9 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import exam.common.Protocol;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.function.BiConsumer;
@@ -47,15 +49,21 @@ final class MlScores {
             s.anomaly = now;
             s.reasons = reasonsOf(r);
             if (now) { s.flaggedCount++; }
-            if (now && !was) { log.accept("Bất thường: " + s.id + " (" + describe(score, s.reasons) + ")"); onChange.accept(s, "ANOMALY_ON"); }
+            if (now && !was) { log.accept("Bất thường: " + s.id + ". " + describe(score, s.reasons)); onChange.accept(s, "ANOMALY_ON"); }
             if (!now && was) { log.accept("Hết bất thường: " + s.id); onChange.accept(s, "ANOMALY_OFF"); }
             s.maxAnomaly = s.maxAnomaly == null ? score : Math.max(s.maxAnomaly, score);
         }
     }
 
     private static final String[] REASON_FORMATS = {
-        "Tiến trình mới %s", "Rời cửa sổ %s lần", "Thời gian rời cửa sổ %s giây",
-        "Địa chỉ mạng mới %s", "Vi phạm luật %s", "Số lần trả lời %s"};
+        "mở %s chương trình chạy nền mới (các máy khác thường %s)",
+        "rời khỏi bài thi %s lần (các máy khác thường %s lần)",
+        "rời khỏi bài thi tổng cộng %s giây (các máy khác thường %s giây)",
+        "kết nối tới %s địa chỉ mạng mới (các máy khác thường %s)",
+        "vi phạm luật %s lần (các máy khác thường %s lần)",
+        "chọn hoặc đổi đáp án %s lần (các máy khác thường %s lần)"};
+
+    private static final int WINDOW_SECONDS = 30;
 
     private static JsonArray reasonsOf(JsonObject result) {
         JsonElement reasons = result.get("reasons");
@@ -65,34 +73,49 @@ final class MlScores {
         return reasons.getAsJsonArray();
     }
 
-    /** "1.00 – Rời cửa sổ 6 lần (phòng 0.3), Số lần trả lời 8 (phòng 1.5)"; không có lý do thì chỉ còn điểm. */
+    /** Câu giải thích cho giám thị, dùng chung cho log, events.csv và giao diện. */
     static String describe(double score, JsonArray reasons) {
-        String text = String.format(Locale.ROOT, "%.2f", score);
-        StringBuilder parts = new StringBuilder();
+        String text = "Mức bất thường: " + level(score) + " (" + String.format(Locale.ROOT, "%.2f", score) + ").";
+
+        List<String> parts = new ArrayList<>();
+        int windows = 0;
         for (JsonElement element : reasons) {
             JsonObject reason = element.getAsJsonObject();
             int feature = reason.get("feature").getAsInt();
             if (feature < 0 || feature >= REASON_FORMATS.length) {
                 continue;
             }
-            if (parts.length() > 0) {
-                parts.append(", ");
-            }
-            parts.append(String.format(REASON_FORMATS[feature], number(reason.get("value").getAsDouble())));
-            parts.append(" (phòng ").append(number(reason.get("room").getAsDouble())).append(")");
+            windows = reason.get("windows").getAsInt();
+            String mine = String.valueOf(Math.round(reason.get("total").getAsDouble()));
+            String others = String.valueOf(Math.round(reason.get("room_total").getAsDouble()));
+            parts.add(String.format(REASON_FORMATS[feature], mine, others));
         }
-        if (parts.length() == 0) {
-            return text;
+        if (parts.isEmpty()) {
+            return text + " Không có hành vi nào lệch rõ rệt.";
         }
-        return text + " – " + parts;
+        return text + " Trong " + duration(windows * WINDOW_SECONDS) + " gần nhất, máy này: " + String.join(" · ", parts);
     }
 
-    // 6.0 thành "6", 0.33 thành "0.3"
-    private static String number(double value) {
-        double rounded = Math.round(value * 10) / 10.0;
-        if (rounded == Math.rint(rounded)) {
-            return String.valueOf((long) rounded);
+    private static String level(double score) {
+        if (score >= 0.9) {
+            return "Rất cao";
         }
-        return String.format(Locale.ROOT, "%.1f", rounded);
+        if (score >= 0.7) {
+            return "Cao";
+        }
+        return "Trung bình";
+    }
+
+    // 90 giây thành "1 phút 30 giây"
+    private static String duration(int seconds) {
+        int minutes = seconds / 60;
+        int rest = seconds % 60;
+        if (minutes == 0) {
+            return rest + " giây";
+        }
+        if (rest == 0) {
+            return minutes + " phút";
+        }
+        return minutes + " phút " + rest + " giây";
     }
 }

@@ -26,7 +26,8 @@ class ScoreRequest(BaseModel):
 
 def find_reasons(x: np.ndarray, latest: list[int]) -> list[dict]:
     """Các feature mà máy này lệch nhiều nhất so với phòng, lệch càng nhiều càng đứng trước."""
-    value = x[latest].mean(axis=0)      # trung bình feature trong các mẫu gần nhất của máy
+    recent = x[latest]
+    value = recent.mean(axis=0)         # trung bình feature trong các mẫu gần nhất của máy
     room = np.median(x, axis=0)         # trung vị feature trên toàn bộ mẫu của phòng
     deviation = (value - room) / (x.std(axis=0) + 1e-6)
 
@@ -38,6 +39,9 @@ def find_reasons(x: np.ndarray, latest: list[int]) -> list[dict]:
             "feature": int(feature),
             "value": round(float(value[feature]), 3),
             "room": round(float(room[feature]), 3),
+            "total": round(float(recent[:, feature].sum()), 3),             # tổng trong các mẫu gần nhất
+            "room_total": round(float(room[feature]) * len(latest), 3),     # phòng thường có bấy nhiêu trong cùng số mẫu
+            "windows": len(latest),
         })
     return reasons
 
