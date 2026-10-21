@@ -3,6 +3,7 @@ package exam.server;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -38,6 +39,25 @@ class ExamLogTest {
         resp.addProperty("status", "ok");
         resp.add("results", arr);
         return resp;
+    }
+
+    @Test
+    void anomalyOnDetailListsReasons() throws IOException {
+        ExamServer s = serverWithExam();
+        ExamRoom room = s.room();
+        room.login("S1", "An", null, new PrintWriter(new StringWriter()));
+        JsonObject resp = scores("S1", 1.0, true);
+        JsonObject reason = new JsonObject();
+        reason.addProperty("feature", 1);
+        reason.addProperty("value", 6.0);
+        reason.addProperty("room", 0.3);
+        JsonArray reasons = new JsonArray();
+        reasons.add(reason);
+        resp.getAsJsonArray("results").get(0).getAsJsonObject().add("reasons", reasons);
+        room.applyScores(resp);
+        ExamLog.Event on = room.history("S1").get(1);
+        assertEquals("ANOMALY_ON", on.type());
+        assertEquals("1.00 – Rời cửa sổ 6 lần (phòng 0.3)", on.detail());
     }
 
     @Test

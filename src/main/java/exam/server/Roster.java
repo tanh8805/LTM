@@ -74,6 +74,25 @@ final class Roster {
         return result;
     }
 
+    /** Tên tiếng Việt của loại sự kiện cho cột "Loại" trong Lịch sử; events.csv vẫn giữ mã tiếng Anh. */
+    static String typeText(String type) {
+        return switch (type) {
+            case "LOGIN" -> "Đăng nhập";
+            case "RECONNECT" -> "Vào lại";
+            case "LOGIN_FAIL" -> "Đăng nhập lỗi";
+            case "PRECHECK_FAIL" -> "PRECHECK lỗi";
+            case "PRECHECK_OK" -> "PRECHECK đạt";
+            case "EXAM_SENT" -> "Nhận đề";
+            case "VIOLATION" -> "Vi phạm";
+            case "ANOMALY_ON" -> "Bất thường";
+            case "ANOMALY_OFF" -> "Hết bất thường";
+            case "DISCONNECT" -> "Mất kết nối";
+            case "SUBMIT" -> "Nộp bài";
+            case "EXAM_END" -> "Kết thúc";
+            default -> type;
+        };
+    }
+
     /** Một dòng chữ cho khung chi tiết: loại sự kiện đổi sang tiếng Việt dễ đọc. */
     static String eventText(ExamLog.Event e) {
         return switch (e.type()) {

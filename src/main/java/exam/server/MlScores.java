@@ -45,10 +45,54 @@ final class MlScores {
             boolean was = s.anomaly, now = r.get("anomaly").getAsBoolean();
             s.anomalyScore = score;
             s.anomaly = now;
+            s.reasons = reasonsOf(r);
             if (now) { s.flaggedCount++; }
-            if (now && !was) { log.accept(String.format(Locale.ROOT, "Bất thường: %s (%.2f)", s.id, score)); onChange.accept(s, "ANOMALY_ON"); }
+            if (now && !was) { log.accept("Bất thường: " + s.id + " (" + describe(score, s.reasons) + ")"); onChange.accept(s, "ANOMALY_ON"); }
             if (!now && was) { log.accept("Hết bất thường: " + s.id); onChange.accept(s, "ANOMALY_OFF"); }
             s.maxAnomaly = s.maxAnomaly == null ? score : Math.max(s.maxAnomaly, score);
         }
+    }
+
+    private static final String[] REASON_FORMATS = {
+        "Tiến trình mới %s", "Rời cửa sổ %s lần", "Thời gian rời cửa sổ %s giây",
+        "Địa chỉ mạng mới %s", "Vi phạm luật %s", "Số lần trả lời %s"};
+
+    private static JsonArray reasonsOf(JsonObject result) {
+        JsonElement reasons = result.get("reasons");
+        if (reasons == null || !reasons.isJsonArray()) {
+            return new JsonArray();
+        }
+        return reasons.getAsJsonArray();
+    }
+
+    /** "1.00 – Rời cửa sổ 6 lần (phòng 0.3), Số lần trả lời 8 (phòng 1.5)"; không có lý do thì chỉ còn điểm. */
+    static String describe(double score, JsonArray reasons) {
+        String text = String.format(Locale.ROOT, "%.2f", score);
+        StringBuilder parts = new StringBuilder();
+        for (JsonElement element : reasons) {
+            JsonObject reason = element.getAsJsonObject();
+            int feature = reason.get("feature").getAsInt();
+            if (feature < 0 || feature >= REASON_FORMATS.length) {
+                continue;
+            }
+            if (parts.length() > 0) {
+                parts.append(", ");
+            }
+            parts.append(String.format(REASON_FORMATS[feature], number(reason.get("value").getAsDouble())));
+            parts.append(" (phòng ").append(number(reason.get("room").getAsDouble())).append(")");
+        }
+        if (parts.length() == 0) {
+            return text;
+        }
+        return text + " – " + parts;
+    }
+
+    // 6.0 thành "6", 0.33 thành "0.3"
+    private static String number(double value) {
+        double rounded = Math.round(value * 10) / 10.0;
+        if (rounded == Math.rint(rounded)) {
+            return String.valueOf((long) rounded);
+        }
+        return String.format(Locale.ROOT, "%.1f", rounded);
     }
 }

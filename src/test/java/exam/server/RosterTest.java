@@ -88,4 +88,20 @@ class RosterTest {
         assertEquals("Mất kết nối (socket đóng)", Roster.eventText(new ExamLog.Event(t, "S1", "An", "DISCONNECT", "socket đóng")));
         assertEquals("Vào lại phòng thi", Roster.eventText(new ExamLog.Event(t, "S1", "An", "RECONNECT", "")));
     }
+
+    @Test
+    void historyTypesAreInVietnamese() {
+        assertEquals("Đăng nhập", Roster.typeText("LOGIN"));
+        assertEquals("Vào lại", Roster.typeText("RECONNECT"));
+        assertEquals("Đăng nhập lỗi", Roster.typeText("LOGIN_FAIL"));
+        assertEquals("PRECHECK lỗi", Roster.typeText("PRECHECK_FAIL"));
+        assertEquals("PRECHECK đạt", Roster.typeText("PRECHECK_OK"));
+        assertEquals("Nhận đề", Roster.typeText("EXAM_SENT"));
+        assertEquals("Vi phạm", Roster.typeText("VIOLATION"));
+        assertEquals("Bất thường", Roster.typeText("ANOMALY_ON"));
+        assertEquals("Hết bất thường", Roster.typeText("ANOMALY_OFF"));
+        assertEquals("Mất kết nối", Roster.typeText("DISCONNECT"));
+        assertEquals("Nộp bài", Roster.typeText("SUBMIT"));
+        assertEquals("Kết thúc", Roster.typeText("EXAM_END"));
+    }
 }

@@ -10,6 +10,8 @@ RECENT = 3        # chỉ xét 3 cửa sổ gần nhất của mỗi sinh viên
 # nhỏ nên chỉ đánh dấu anomaly khi điểm chuẩn hoá cũng thuộc dải cao nhất phòng. Đo trên dữ liệu giả lập:
 # không có điều kiện này 25-88% sinh viên bình thường bị đánh dấu, có thì ~0-1%, vẫn bắt được 97-100% máy lệch.
 FLAG_MIN_SCORE = 0.7
+MAX_REASONS = 3   # mỗi máy chỉ nêu tối đa 3 feature lệch nhất
+MIN_DEVIATION = 1  # feature phải lệch hơn 1 độ lệch chuẩn của phòng mới được nêu
 
 
 class Sample(BaseModel):
@@ -20,6 +22,24 @@ class Sample(BaseModel):
 
 class ScoreRequest(BaseModel):
     samples: list[Sample]
+
+
+def find_reasons(x: np.ndarray, latest: list[int]) -> list[dict]:
+    """Các feature mà máy này lệch nhiều nhất so với phòng, lệch càng nhiều càng đứng trước."""
+    value = x[latest].mean(axis=0)      # trung bình feature trong các mẫu gần nhất của máy
+    room = np.median(x, axis=0)         # trung vị feature trên toàn bộ mẫu của phòng
+    deviation = (value - room) / (x.std(axis=0) + 1e-6)
+
+    reasons = []
+    for feature in np.argsort(-deviation)[:MAX_REASONS]:
+        if deviation[feature] <= MIN_DEVIATION:
+            break
+        reasons.append({
+            "feature": int(feature),
+            "value": round(float(value[feature]), 3),
+            "room": round(float(room[feature]), 3),
+        })
+    return reasons
 
 
 def score_samples(samples: list[Sample]) -> dict:
@@ -49,6 +69,7 @@ def score_samples(samples: list[Sample]) -> dict:
             "studentId": student_id,
             "score": round(float(max(scores[i] for i in latest)), 3),
             "anomaly": bool(any(flagged[i] and scores[i] >= FLAG_MIN_SCORE for i in latest)),
+            "reasons": find_reasons(x, latest),
         })
     return {"status": "ok", "results": results}
 

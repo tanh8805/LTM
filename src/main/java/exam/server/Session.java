@@ -1,5 +1,6 @@
 package exam.server;
 
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -34,6 +35,7 @@ public class Session {
     Double anomalyScore;
     Double maxAnomaly;
     boolean anomaly;
+    JsonArray reasons = new JsonArray();
     int flaggedCount;
 
     long lastSeen;

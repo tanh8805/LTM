@@ -301,7 +301,12 @@ public class ExamRoom {
     }
 
     private void recordAnomaly(Session s, String type) {
-        event(s, type, String.format(Locale.ROOT, "%.2f", s.anomalyScore));
+        String detail = String.format(Locale.ROOT, "%.2f", s.anomalyScore);
+        if (type.equals("ANOMALY_ON")) {
+            // lúc bị gắn cờ thì kèm lý do để giám thị biết máy lạ ở đâu
+            detail = MlScores.describe(s.anomalyScore, s.reasons);
+        }
+        event(s, type, detail);
     }
 
     synchronized void closeAll() {
