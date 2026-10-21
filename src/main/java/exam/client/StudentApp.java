@@ -104,6 +104,7 @@ public class StudentApp {
         switch (Protocol.type(m)) {
             case Protocol.LOGIN_OK -> onLoginOk(m);
             case Protocol.LOGIN_FAIL -> onLoginFail(Protocol.str(m, "reason"));
+            case Protocol.RULES_UPDATE -> onRulesUpdate(m);
             case Protocol.EXAM_START -> onExamStart(m);
             case Protocol.EXAM_END -> onExamEnd();
             case Protocol.RESULT -> onResult(m);
@@ -118,6 +119,12 @@ public class StudentApp {
         studentName = Protocol.str(m, "name");       // họ tên lấy từ danh sách của server
         monitor.useIntervalFrom(m);
         if (questions == null) { runPrecheck(); }      // đã có đề (vào lại giữa giờ): server sẽ gửi lại EXAM_START
+    }
+
+    private void onRulesUpdate(JsonObject m) {
+        if (!(m.get("rules") instanceof JsonObject updated)) { return; }
+        rules = updated;                    // PRECHECK lần sau dùng luật mới
+        monitor.updateRules(updated);
     }
 
     private void onLoginFail(String reason) {

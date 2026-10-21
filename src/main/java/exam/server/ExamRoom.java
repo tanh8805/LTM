@@ -42,7 +42,7 @@ public class ExamRoom {
     private static final DateTimeFormatter HOUR_MINUTE = DateTimeFormatter.ofPattern("HH:mm"),
         HOUR_MINUTE_SECOND = DateTimeFormatter.ofPattern("HH:mm:ss");
 
-    private final JsonObject rules;
+    private JsonObject rules;
     private final ScheduledExecutorService scheduler;
     private final Consumer<String> log;
     private final ExamLog records;
@@ -151,6 +151,23 @@ public class ExamRoom {
         records.reset();
         log.accept("Kỳ thi mới: đã xoá phiên và mẫu cũ, giữ đề \"" + examTitle() + "\"");
     }
+
+    /** Đổi luật giữa chừng: các máy đang kết nối nhận RULES_UPDATE ngay, máy vào sau nhận luật mới trong LOGIN_OK. */
+    public synchronized void updateRules(JsonObject newRules) {
+        rules = newRules;
+        JsonObject m = Protocol.msg(Protocol.RULES_UPDATE);
+        m.add("rules", newRules);
+        int sent = 0;
+        for (Session s : sessions.values()) {
+            if (s.connected()) {
+                Protocol.send(s.out, m);
+                sent++;
+            }
+        }
+        log.accept("Đã cập nhật luật, gửi cho " + sent + " máy");
+    }
+
+    public synchronized JsonObject rules() { return rules.deepCopy(); }
 
     // ---------- Tin nhắn từ máy sinh viên (ClientHandler gọi) ----------
 

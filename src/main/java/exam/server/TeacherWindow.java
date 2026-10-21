@@ -42,12 +42,12 @@ public class TeacherWindow extends JFrame {
     private final ExamServer server;
     private final ExamRoom room;
     private final JButton chooseBtn = new JButton("Mở đề..."), folderBtn = new JButton("Thư mục kết quả"),
-        studentsBtn = new JButton("Nhập danh sách SV..."), actionBtn = new JButton();
+        studentsBtn = new JButton("Nhập danh sách SV..."), rulesBtn = new JButton("Quản lý ứng dụng..."), actionBtn = new JButton();
     private final JLabel titleLabel = label("Chưa chọn đề", 15, true, Palette.TEXT), subLabel = label(" ", 12, false, Palette.MUTED),
         timeValue = label("-", 15, true, Palette.TEXT), studentsLabel = label(" ", 13, false, Palette.MUTED),
         noListWarning = label("Chưa nạp danh sách sinh viên: ai cũng đăng nhập được", 13, true, new Color(0x7A5B00));
     private final JTextArea logArea = new JTextArea();
-    private final DetailPanel detail = new DetailPanel();
+    private final DetailPanel detail = new DetailPanel(this::setAppAllowed);
     private final JTextField search = new JTextField(22);
     private final Map<Roster.Tab, TabButton> tabs = new EnumMap<>(Roster.Tab.class);
     private final RosterTable table = new RosterTable(row -> showDetail(row), this::openHistory);
@@ -64,6 +64,7 @@ public class TeacherWindow extends JFrame {
         chooseBtn.addActionListener(e -> chooseExam());
         folderBtn.addActionListener(e -> openResults());
         studentsBtn.addActionListener(e -> importStudents());
+        rulesBtn.addActionListener(e -> new RulesDialog(this, server).setVisible(true));
         actionBtn.addActionListener(e -> onAction());
         actionBtn.setForeground(Color.WHITE);
         actionBtn.setFont(actionBtn.getFont().deriveFont(Font.BOLD));
@@ -149,6 +150,7 @@ public class TeacherWindow extends JFrame {
         right.add(address);
         right.add(studentsLabel);
         right.add(studentsBtn);
+        right.add(rulesBtn);
         right.add(folderBtn);
         right.add(actionBtn);
         GridBagConstraints c = new GridBagConstraints();
@@ -217,6 +219,15 @@ public class TeacherWindow extends JFrame {
         actionBtn.setText(ended ? "Kỳ thi mới" : started ? "Kết thúc thi" : "Bắt đầu thi");
         actionBtn.setEnabled(ended || started || sum != null);
         actionBtn.setBackground(!actionBtn.isEnabled() ? new Color(0xA9B4C6) : started && !ended ? new Color(0xC9302C) : Palette.PRIMARY);
+    }
+
+    /** Chuột phải vào một app trong khung chi tiết: cho phép hoặc cấm app đó cho cả phòng. */
+    private void setAppAllowed(String appName, boolean allow) {
+        try {
+            server.applyRules(RulesFile.setAppAllowed(room.rules(), appName, allow));
+        } catch (IOException ex) {
+            JOptionPane.showMessageDialog(this, ex.getMessage(), "Không ghi được rules.json", JOptionPane.ERROR_MESSAGE);
+        }
     }
 
     private void showDetail(ExamRoom.Row row) { detail.show(row, row == null ? List.of() : room.history(row.studentId()), row == null ? null : room.appsOf(row.studentId())); }

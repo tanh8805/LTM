@@ -20,7 +20,7 @@ public final class Protocol {
 
     public static final String LOGIN = "LOGIN", LOGIN_OK = "LOGIN_OK", LOGIN_FAIL = "LOGIN_FAIL",
             PRECHECK_RESULT = "PRECHECK_RESULT", EXAM_START = "EXAM_START", VIOLATION = "VIOLATION",
-            FEATURES = "FEATURES", APPS = "APPS", SUBMIT = "SUBMIT", EXAM_END = "EXAM_END", RESULT = "RESULT";
+            FEATURES = "FEATURES", APPS = "APPS", RULES_UPDATE = "RULES_UPDATE", SUBMIT = "SUBMIT", EXAM_END = "EXAM_END", RESULT = "RESULT";
 
     // Chu kỳ gửi FEATURES (giây): server cấp trong LOGIN_OK, chỉ nhận 10..60, sai hoặc thiếu thì dùng 30
     public static final int FEATURE_INTERVAL_DEFAULT = 30, FEATURE_INTERVAL_MIN = 10, FEATURE_INTERVAL_MAX = 60;

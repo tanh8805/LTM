@@ -115,6 +115,17 @@ public class Monitor {
         this.watching.clear();
     }
 
+    /**
+     * Giám thị đổi luật giữa giờ thi: áp dụng ngay mà KHÔNG lấy lại baseline. App vừa bị cấm mà đang mở được gỡ khỏi
+     * baseline để lần quét kế tiếp coi là mới và báo vi phạm.
+     */
+    public synchronized void updateRules(JsonObject newRules) {
+        this.rules = newRules;
+        this.appRules = new AppRules(newRules);
+        baselineProcesses.removeIf(appRules::blacklisted);
+        if (scanner != null) { scanner.execute(() -> safely(this::resolveBlockedDomains)); }     // tên miền bị cấm có thể đã đổi
+    }
+
     /** Cho test thay lệnh PowerShell hỏi cửa sổ theo pid. */
     public void setWindowLookupForTest(Function<Collection<Integer>, List<Win>> lookup) { this.windowLookup = lookup; }
 

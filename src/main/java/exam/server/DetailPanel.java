@@ -12,10 +12,13 @@ import java.awt.RenderingHints;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
+import java.util.function.BiConsumer;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.JLabel;
+import javax.swing.JMenuItem;
+import javax.swing.JPopupMenu;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 
@@ -24,9 +27,11 @@ class DetailPanel extends JPanel {
     static final String NOTE = "Điểm bất thường chỉ cho biết máy này khác số đông trong phòng. Giám thị là người quyết định có gian lận hay không.";
 
     private final JPanel body = new JPanel();
+    private final BiConsumer<String, Boolean> onAppRule;      // (tên app, true = cho phép / false = cấm)
 
-    DetailPanel() {
+    DetailPanel(BiConsumer<String, Boolean> onAppRule) {
         super(new BorderLayout());
+        this.onAppRule = onAppRule;
         setBackground(Color.WHITE);
         setPreferredSize(new Dimension(UIScale.scale(340), 0));    // chữ HTML tự co giãn theo màn hình nên kích thước cũng phải co giãn
         setBorder(BorderFactory.createMatteBorder(0, 1, 0, 0, Palette.SEPARATOR));
@@ -99,11 +104,23 @@ class DetailPanel extends JPanel {
         if (received) {
             for (ExamRoom.AppLine app : apps.apps()) {
                 String title = app.title().isEmpty() ? "" : " · " + app.title();
-                body.add(text(wrap(app.name() + title), 13, false, colorOf(app.kind())));
+                JLabel line = text(wrap(app.name() + title), 13, false, colorOf(app.kind()));
+                line.setComponentPopupMenu(appMenu(app.name()));
+                body.add(line);
                 body.add(Box.createVerticalStrut(4));
             }
         }
         body.add(Box.createVerticalStrut(16));
+    }
+
+    private JPopupMenu appMenu(String appName) {
+        JPopupMenu menu = new JPopupMenu();
+        JMenuItem allow = new JMenuItem("Cho phép ứng dụng này"), ban = new JMenuItem("Cấm ứng dụng này");
+        allow.addActionListener(e -> onAppRule.accept(appName, true));
+        ban.addActionListener(e -> onAppRule.accept(appName, false));
+        menu.add(allow);
+        menu.add(ban);
+        return menu;
     }
 
     private static Color colorOf(ExamRoom.AppKind kind) {

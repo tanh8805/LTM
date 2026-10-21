@@ -32,6 +32,7 @@ public class ExamServer {
     private final ExamRoom room;
     private volatile Consumer<String> listener;
     private volatile MlClient mlClient;
+    private volatile Path rulesFile;               // null = không ghi ra file (dùng trong test)
     private ServerSocket serverSocket;
     private DatagramSocket udpSocket;
 
@@ -48,6 +49,7 @@ public class ExamServer {
             System.exit(1);
         }
         ExamServer server = new ExamServer(rules);
+        server.setRulesFile(Path.of(rulesPath));
         loadStudents(server);
         server.setMlClient(new MlClient("http://localhost:8000"));
         SwingUtilities.invokeLater(() -> openTeacherWindow(server));
@@ -94,6 +96,18 @@ public class ExamServer {
 
     public void setListener(Consumer<String> logListener) {
         listener = logListener;
+    }
+
+    public void setRulesFile(Path file) {
+        rulesFile = file;
+    }
+
+    /** Ghi luật mới ra file (nếu có) rồi gửi cho các máy đang kết nối; ghi lỗi thì không đổi gì. */
+    public void applyRules(JsonObject newRules) throws IOException {
+        if (rulesFile != null) {
+            RulesFile.save(rulesFile, newRules);
+        }
+        room.updateRules(newRules);
     }
 
     public void setMlClient(MlClient ml) {
