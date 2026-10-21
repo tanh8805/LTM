@@ -19,9 +19,9 @@ def cheater_values():
 
 
 class SimClient(threading.Thread):
-    def __init__(self, host, port, student_id, name, make_values, interval):
+    def __init__(self, host, port, student_id, password, make_values, interval):
         super().__init__(daemon=True)
-        self.host, self.port, self.student_id, self.name = host, port, student_id, name
+        self.host, self.port, self.student_id, self.password = host, port, student_id, password
         self.make_values, self.interval = make_values, interval
         self.write_lock = threading.Lock()  # luồng đọc và luồng FEATURES cùng ghi vào socket
         self.done = threading.Event()
@@ -43,7 +43,7 @@ class SimClient(threading.Thread):
         self.rfile = sock.makefile("r", encoding="utf-8")
         self.wfile = sock.makefile("w", encoding="utf-8")
         try:
-            self.send({"type": "LOGIN", "studentId": self.student_id, "name": self.name})
+            self.send({"type": "LOGIN", "studentId": self.student_id, "password": self.password})
             for line in self.rfile:
                 if self.handle(json.loads(line)):
                     break
@@ -89,15 +89,16 @@ def main():
     parser = argparse.ArgumentParser(description="Giả lập client thi để demo")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=5000)
+    parser.add_argument("--password", default="123456", help="mật khẩu của các tài khoản SIMxx và SIM-X")
     parser.add_argument("--count", type=int, default=5)
     parser.add_argument("--cheater", action="store_true", help="thêm một client có hành vi lệch (SIM-X)")
     parser.add_argument("--interval", type=float, default=20, help="số giây giữa hai FEATURES")
     args = parser.parse_args()
 
-    clients = [SimClient(args.host, args.port, f"SIM{i:02d}", f"Máy giả {i}", normal_values, args.interval)
+    clients = [SimClient(args.host, args.port, f"SIM{i:02d}", args.password, normal_values, args.interval)
                for i in range(1, args.count + 1)]
     if args.cheater:
-        clients.append(SimClient(args.host, args.port, "SIM-X", "Máy giả gian lận", cheater_values, args.interval))
+        clients.append(SimClient(args.host, args.port, "SIM-X", args.password, cheater_values, args.interval))
     for c in clients:
         c.start()
     try:

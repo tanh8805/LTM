@@ -42,10 +42,10 @@ src/main/java/exam/
   common/   Protocol  Palette  Icons  Format
   client/   StudentApp  StudentScreens  Theme  TopBar  LoginPanel  PrecheckPanel  ExamPanel  NumberButton  OptionRow  ResultPanel  Sheet
             ServerConnection  ServerFinder  Monitor  AppRules  WindowsProbe  Diagnose  Debug
-  server/   ExamServer  ExamRoom  ExamLog  Session  ExamFile  ClientHandler  TeacherWindow  RosterTable  Roster  DetailPanel  HistoryDialog  MlClient
+  server/   ExamServer  ExamRoom  ExamLog  Session  ExamFile  StudentList  ClientHandler  TeacherWindow  RosterTable  Roster  DetailPanel  HistoryDialog  MlClient
             Pill  TabButton  LocalAddresses
 ml/         ml_service.py  simulate_clients.py  test_ml_service.py
-config/     rules.json        exams/   sample_exam.json
+config/     rules.json  students.csv        exams/   sample_exam.json
 ```
 
 ## 3. Giao thức
@@ -56,9 +56,9 @@ config/     rules.json        exams/   sample_exam.json
 
 | Chiều | type | Trường | Ghi chú |
 |---|---|---|---|
-| C→S | `LOGIN` | `studentId`, `name`, `os` | `os` (tên hệ điều hành, tuỳ chọn) hiện ở cột Máy của giám thị |
-| S→C | `LOGIN_OK` | `rules` | Luật do server gửi xuống |
-| S→C | `LOGIN_FAIL` | `reason` | |
+| C→S | `LOGIN` | `studentId`, `password`, `os`, `name` | `os` (tên hệ điều hành, tuỳ chọn) hiện ở cột Máy của giám thị; `name` chỉ có tác dụng khi server chưa nạp danh sách sinh viên (client không gửi, server lấy mã SV làm tên) |
+| S→C | `LOGIN_OK` | `rules`, `name`, `featureIntervalSeconds` | Luật do server gửi xuống; `name` là họ tên trong danh sách sinh viên |
+| S→C | `LOGIN_FAIL` | `reason` | Sai mã SV hoặc mật khẩu thì `reason` luôn là `Sai mã sinh viên hoặc mật khẩu` (không nói rõ sai cái nào) |
 | C→S | `PRECHECK_RESULT` | `ok`, `issues` | Có thể gửi nhiều lần |
 | S→C | `EXAM_START` | `title`, `remainingSeconds`, `questions` | Câu hỏi không có `answer` |
 | C→S | `VIOLATION` | `kind` (`APP`/`NET`/`USB`), `detail`, `time` | |
@@ -101,6 +101,14 @@ Giả lập thêm máy để demo: `cd ml && python simulate_clients.py --count 
 Mỗi kỳ thi có một thư mục riêng `ket-qua/<yyyyMMdd-HHmmss>_<tên đề không dấu>/` (tạo khi giáo viên bấm Bắt đầu thi, nằm ở thư mục chạy server), gồm `results.csv`, `events.csv` và `server.log`. Hai file CSV là UTF-8 có BOM nên Excel đọc được tiếng Việt. Không còn `results.csv` ở thư mục gốc.
 `events.csv` có các cột `time,studentId,name,type,detail`, mỗi sự kiện ghi và flush ngay một dòng; sự kiện xảy ra trước khi bấm Bắt đầu (đăng nhập, PRECHECK) được giữ trong bộ nhớ và ghi vào file khi thư mục được tạo. Các `type`: `LOGIN`, `RECONNECT`, `LOGIN_FAIL`, `PRECHECK_FAIL` (detail là danh sách vấn đề), `PRECHECK_OK`, `EXAM_SENT`, `VIOLATION`, `ANOMALY_ON`, `ANOMALY_OFF`, `DISCONNECT`, `SUBMIT`, `EXAM_END` (sự kiện của cả phòng, `studentId` rỗng). `server.log` là toàn bộ log của cửa sổ giám thị.
 Trên cửa sổ giám thị, nhấp đúp vào một dòng để xem lịch sử của thí sinh đó (giờ, loại, chi tiết, lấy từ bộ nhớ); nút **Mở thư mục kết quả** mở thư mục của kỳ thi (không mở được thì hiện đường dẫn).
+
+### Tài khoản sinh viên
+
+Sinh viên đăng nhập bằng **mã SV và mật khẩu** (không còn ô Họ tên; họ tên lấy từ danh sách và server gửi về trong `LOGIN_OK`). Danh sách là file CSV UTF-8 (có hoặc không có BOM), dòng đầu là `studentId,name,password`, mỗi sinh viên một dòng, đúng 3 cột (không dùng dấu phẩy trong giá trị), không trùng mã SV. File mẫu `config/students.csv` có `SIM01`..`SIM30`, `SIM-X` và 4 tài khoản test `SV001`..`SV004`, mật khẩu `123456`.
+- Giám thị bấm **Nhập danh sách SV...** để chọn file; mỗi dòng lỗi được báo `Dòng n: lý do` (tối đa 10 lỗi) và không nạp gì. Nạp được thì lưu thành `config/students.csv`, lần sau mở server tự nạp lại; cửa sổ hiện `Đã nạp n SV`.
+- So khớp mã SV không phân biệt hoa thường và bỏ khoảng trắng. Sai mã SV hoặc mật khẩu: `LOGIN_FAIL` kèm sự kiện `LOGIN_FAIL` trong `events.csv`.
+- Chưa nạp danh sách (dev): ai cũng đăng nhập được, giao diện hiện cảnh báo vàng `Chưa nạp danh sách sinh viên: ai cũng đăng nhập được`.
+- Giả lập: `python simulate_clients.py --password 123456` (mặc định `123456`).
 
 ### Kỳ thi mới không cần tắt server
 
@@ -226,7 +234,7 @@ Phần quét tiến trình, mạng, USB chỉ chạy trên Windows nên chưa ki
 - **Kỳ thi mới giữa lúc máy còn "Đang nộp bài...":** máy đó thấy `Mất kết nối` và phải đóng mở lại app (hiếm; hộp xác nhận của giáo viên đã cảnh báo).
 - **Log `ML: chưa đủ dữ liệu (n/20 mẫu)` có thể in `n` lớn hơn số mẫu ML thật sự nhận** (mẫu được chụp trước khi gọi HTTP, số `n` đếm lại sau); chỉ là chữ trong log, điểm vẫn đúng ở lần chấm kế.
 - **Đáp án chỉ lưu trong bộ nhớ client:** rớt mạng mà không tắt app thì vẫn giữ; tắt hẳn app thì mất.
-- **Chưa có xác thực và mã hoá:** mã SV không có mật khẩu, kết nối TCP/UDP không mã hoá. Chỉ dùng trong mạng tin cậy.
+- **Mật khẩu truyền dạng chữ thường:** mật khẩu đi trong tin `LOGIN` qua mạng LAN, chưa mã hoá (và lưu thô trong `config/students.csv`); kết nối TCP/UDP không mã hoá. Chỉ dùng trong mạng tin cậy.
 - **Phụ thuộc cấu hình Windows:** cần PowerShell và `tasklist`/`netstat` có sẵn (mặc định đều có).
 
 ## 10. Hướng dẫn đọc code

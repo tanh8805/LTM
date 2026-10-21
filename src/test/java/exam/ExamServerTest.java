@@ -220,7 +220,7 @@ class ExamServerTest {
     void emptyIdIsRejected() throws IOException {
         TestClient c = connect();
         c.send(loginMsg("", "An"));
-        assertEquals("Thiếu mã SV hoặc họ tên", Protocol.str(c.next(Protocol.LOGIN_FAIL, 2000), "reason"));
+        assertEquals("Thiếu mã SV", Protocol.str(c.next(Protocol.LOGIN_FAIL, 2000), "reason"));
     }
 
     @Test

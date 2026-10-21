@@ -26,7 +26,7 @@ public class StudentApp {
     private ServerConnection conn;
     private JsonObject rules;
     private JsonArray questions;               // null cho tới khi nhận đề lần đầu
-    private String studentId = "", studentName = "";
+    private String studentId = "", studentName = "", password = "";
     private int current;
     private long deadlineMillis;
     private boolean loggedInOnce, examActive, submitted, finished;   // finished: đã hiện màn kết thúc/kết quả
@@ -59,8 +59,8 @@ public class StudentApp {
 
     private void login() {
         studentId = screens.studentId();
-        studentName = screens.studentName();
-        if (studentId.isEmpty() || studentName.isEmpty()) { screens.showMessage("Hãy nhập mã SV và họ tên"); return; }
+        password = screens.password();
+        if (studentId.isEmpty() || password.isEmpty()) { screens.showMessage("Hãy nhập mã SV và mật khẩu"); return; }
         String host = screens.host();
         screens.setLoginBusy(true, host.isEmpty() ? "Đang tìm server..." : "Đang kết nối...");
         new Thread(() -> connect(host), "login").start();   // tìm server và nối mạng không được chặn luồng giao diện
@@ -95,7 +95,7 @@ public class StudentApp {
     private void sendLogin() {
         JsonObject m = Protocol.msg(Protocol.LOGIN);
         m.addProperty("studentId", studentId);
-        m.addProperty("name", studentName);
+        m.addProperty("password", password);
         m.addProperty("os", System.getProperty("os.name", ""));
         conn.send(m);
     }
@@ -114,6 +114,7 @@ public class StudentApp {
     private void onLoginOk(JsonObject m) {
         loggedInOnce = true;
         rules = m.getAsJsonObject("rules");
+        studentName = Protocol.str(m, "name");       // họ tên lấy từ danh sách của server
         monitor.useIntervalFrom(m);
         if (questions == null) { runPrecheck(); }      // đã có đề (vào lại giữa giờ): server sẽ gửi lại EXAM_START
     }
@@ -142,7 +143,7 @@ public class StudentApp {
             // EXAM_START về ngay sau đó và phải được xử lý sau, không bị màn "Chờ" đè lên màn làm bài.
             SwingUtilities.invokeLater(() -> {
                 if (questions == null && !finished) {
-                    if (issues.isEmpty()) { screens.showWaiting(); } else { screens.showPrecheck(issues, serverText); }
+                    if (issues.isEmpty()) { screens.showWaiting(studentName); } else { screens.showPrecheck(issues, serverText, studentName); }
                 }
             });
             if (!finished) { conn.send(m); }        // đã có RESULT (đăng nhập lại sau khi nộp) thì không cần báo PRECHECK nữa

@@ -80,7 +80,7 @@ class StudentScreens {
 
     String studentId() { return login.studentId(); }
 
-    String studentName() { return login.studentName(); }
+    String password() { return login.password(); }
 
     String host() { return login.host(); }
 
@@ -114,14 +114,14 @@ class StudentScreens {
 
     void showLogin() { show("login"); }
 
-    void showPrecheck(List<String> issues, String server) {
-        topBar.setStudent(studentName(), studentId());
+    void showPrecheck(List<String> issues, String server, String name) {
+        topBar.setStudent(name, studentId());
         precheck.setIssues(issues, server);
         show("precheck");
     }
 
-    void showWaiting() {
-        topBar.setStudent(studentName(), studentId());
+    void showWaiting(String name) {
+        topBar.setStudent(name, studentId());
         show("wait");
     }
 
