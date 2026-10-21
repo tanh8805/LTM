@@ -1,6 +1,7 @@
 // Màn làm bài: lưới số câu bên trái, câu hỏi và các lựa chọn dạng hàng ở giữa, nút điều hướng và gợi ý phím ở dưới, phím tắt (Người 1).
 package exam.client;
 
+import exam.common.Card;
 import exam.common.Html;
 import exam.common.Icons;
 import java.awt.BorderLayout;
@@ -41,7 +42,8 @@ class ExamPanel extends JPanel {
         super(new BorderLayout());
         this.onGoto = onGoto;
         this.onAnswer = onAnswer;
-        setBackground(Color.WHITE);
+        setBackground(Theme.BACKGROUND);
+        setBorder(BorderFactory.createEmptyBorder(16, 16, 16, 16));
         add(sidebar(), BorderLayout.WEST);
         add(main(onPrev, onNext), BorderLayout.CENTER);
         keys(onPrev, onNext);
@@ -49,11 +51,10 @@ class ExamPanel extends JPanel {
 
     /** Cột trái: "CÂU HỎI" + "Đã làm x/n", lưới số câu, chú thích màu và dòng báo đang ghi nhận. */
     private JPanel sidebar() {
-        JPanel side = new JPanel(new BorderLayout(0, 14));
-        side.setBackground(new Color(0xF7F8FB));
-        side.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createMatteBorder(0, 0, 0, 1, Theme.BORDER),
-            BorderFactory.createEmptyBorder(20, 20, 18, 20)));
-        side.setPreferredSize(new Dimension(280, 0));
+        JPanel side = new Card();
+        side.setLayout(new BorderLayout(0, 16));
+        side.setBorder(BorderFactory.createEmptyBorder(24, 24, 24, 24));
+        side.setPreferredSize(new Dimension(288, 0));
         JPanel header = new JPanel(new BorderLayout());
         header.setOpaque(false);
         header.add(Theme.label("CÂU HỎI", 12, true, Theme.MUTED), BorderLayout.WEST);
@@ -118,7 +119,7 @@ class ExamPanel extends JPanel {
         questionText.setOpaque(false);
         questionText.setLineWrap(true);
         questionText.setWrapStyleWord(true);
-        questionText.setFont(Theme.font(20, true));
+        questionText.setFont(Theme.font(24, true));
         questionText.setForeground(Theme.TEXT);
         optionsPanel.setLayout(new BoxLayout(optionsPanel, BoxLayout.Y_AXIS));
         optionsPanel.setOpaque(false);
@@ -128,7 +129,7 @@ class ExamPanel extends JPanel {
         question.add(questionText, BorderLayout.CENTER);
         JPanel content = new ScrollContent();
         content.setOpaque(false);
-        content.setLayout(new BorderLayout(0, 20));
+        content.setLayout(new BorderLayout(0, 24));
         content.add(question, BorderLayout.NORTH);
         content.add(optionsPanel, BorderLayout.CENTER);
         JScrollPane scroll = new JScrollPane(content);
@@ -153,9 +154,9 @@ class ExamPanel extends JPanel {
         left.add(next);
         nav.add(left, BorderLayout.WEST);
         nav.add(Theme.label("Phím A–D chọn đáp án · ← → chuyển câu", 13, false, Theme.MUTED), BorderLayout.EAST);
-        JPanel p = new JPanel(new BorderLayout(0, 16));
-        p.setOpaque(false);
-        p.setBorder(BorderFactory.createEmptyBorder(28, 44, 24, 44));
+        JPanel p = new Card();
+        p.setLayout(new BorderLayout(0, 16));
+        p.setBorder(BorderFactory.createEmptyBorder(40, 56, 32, 56));
         p.add(scroll, BorderLayout.CENTER);
         p.add(nav, BorderLayout.SOUTH);
         return p;
@@ -205,7 +206,7 @@ class ExamPanel extends JPanel {
             OptionRow row = new OptionRow((char) ('A' + i), options.get(i), i == selected, this::choose, i);
             rows.add(row);
             optionsPanel.add(row);
-            optionsPanel.add(javax.swing.Box.createVerticalStrut(12));
+            optionsPanel.add(javax.swing.Box.createVerticalStrut(16));
         }
         optionsPanel.revalidate();
         optionsPanel.repaint();

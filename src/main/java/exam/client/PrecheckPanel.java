@@ -1,6 +1,7 @@
 // Màn PRECHECK (danh sách việc cần làm kèm nút xử lý và dòng đã đạt, tự kiểm tra lại) và màn chờ giám thị bắt đầu (Người 1).
 package exam.client;
 
+import exam.common.Card;
 import exam.common.Icons;
 import java.awt.BorderLayout;
 import java.awt.Color;
@@ -44,7 +45,7 @@ class PrecheckPanel extends JPanel {
         list.setLayout(new BoxLayout(list, BoxLayout.Y_AXIS));
         list.setOpaque(false);
         again.addActionListener(e -> recheck());
-        Theme.Card card = new Theme.Card();
+        Card card = new Card();
         card.setLayout(new BorderLayout());
         card.setBorder(BorderFactory.createEmptyBorder(4, 0, 4, 0));
         card.add(list, BorderLayout.CENTER);
@@ -147,7 +148,7 @@ class PrecheckPanel extends JPanel {
         JPanel row = new JPanel(new BorderLayout(14, 0));
         row.setOpaque(false);
         row.setBorder(BorderFactory.createCompoundBorder(
-            separator ? BorderFactory.createMatteBorder(1, 0, 0, 0, new Color(0xE8ECF2)) : BorderFactory.createEmptyBorder(),
+            separator ? BorderFactory.createMatteBorder(1, 0, 0, 0, Theme.SEPARATOR) : BorderFactory.createEmptyBorder(),
             BorderFactory.createEmptyBorder(14, 22, 14, 22)));
         row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 80));
         row.add(new JLabel(item.ok() ? Icons.check(24) : Icons.cross(24)), BorderLayout.WEST);

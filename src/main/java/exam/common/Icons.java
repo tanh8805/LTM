@@ -84,7 +84,7 @@ public final class Icons {
         return new Glyph(size, (g, s) -> {
             g.setColor(Palette.SUCCESS_SOFT);
             g.fill(new Ellipse2D.Float(0, 0, s, s));
-            g.setColor(new Color(0x1B7A43));
+            g.setColor(Palette.SUCCESS_TEXT);
             g.setStroke(stroke(s / 12));
             Path2D p = new Path2D.Float();
             p.moveTo(s * 0.30, s * 0.52);

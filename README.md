@@ -155,37 +155,31 @@ Luật nằm trong `config/rules.json` **ở server** và được gửi xuống
 
 ### Giao diện
 
-Giao diện làm theo bộ ảnh tham khảo của giám thị và sinh viên. Ảnh chụp trong `statics/results/ui/` (chụp bằng Xvfb trên Linux; ảnh PRECHECK, đang tìm server, mất kết nối và các hộp xác nhận dùng dữ liệu mẫu).
+Màu, khoảng cách (lưới 8px) và bo góc (12px) nằm ở một chỗ: `exam.common.Palette` (màu, `GAP`, `RADIUS`), `exam/theme/FlatLaf.properties` trong resources (bo góc, thanh cuộn) và `exam.common.Look.install()` ghép hai thứ đó cho cả client lẫn giám thị. Font Segoe UI trên Windows, Inter trên Linux nếu có, không thì mặc định. Nội dung đặt trong thẻ trắng viền mảnh (`exam.common.Card`) trên nền xám nhạt. Ảnh chụp bằng Xvfb trong `statics/results/ui/` (giám thị: 15 máy giả + 1 máy giả gian lận + 1 máy gửi `APPS`; ảnh PRECHECK của client dùng dữ liệu mẫu vì phần quét chỉ chạy trên Windows).
 
-| Đăng nhập | PRECHECK không đạt |
+Cửa sổ giám thị: thanh bên trái có 5 mục `Giám sát` (màn hình hiện tại), `Sinh viên` (nhập danh sách), `Đề thi` (quản lý đề, tắt khi đã bắt đầu thi), `Ứng dụng` (quản lý ứng dụng), `Kết quả` (mở thư mục kết quả); thanh trên cùng có tên đề tài, đề đang mở, đồng hồ, `IP LAN` và nút Bắt đầu/Kết thúc.
+
+| Giám sát | Sinh viên (nhập danh sách) |
 |---|---|
-| ![Đăng nhập](statics/results/ui/01-dang-nhap.png) | ![PRECHECK](statics/results/ui/02-precheck-khong-dat.png) |
+| ![Giám sát](statics/results/ui/giam-thi-1-giam-sat.png) | ![Sinh viên](statics/results/ui/giam-thi-2-sinh-vien.png) |
 
-| Chờ bắt đầu | Làm bài |
+| Đề thi | Ứng dụng |
 |---|---|
-| ![Chờ](statics/results/ui/03-cho-bat-dau.png) | ![Làm bài](statics/results/ui/04-lam-bai.png) |
+| ![Đề thi](statics/results/ui/giam-thi-3-de-thi.png) | ![Ứng dụng](statics/results/ui/giam-thi-4-ung-dung.png) |
 
-| Mất kết nối | Kết quả |
+| Kết quả (máy ảo không có trình quản lý file nên hiện đường dẫn) |
+|---|
+| ![Kết quả](statics/results/ui/giam-thi-5-ket-qua.png) |
+
+| Client: đăng nhập | Client: PRECHECK không đạt |
 |---|---|
-| ![Mất kết nối](statics/results/ui/05-mat-ket-noi.png) | ![Kết quả](statics/results/ui/07-ket-qua.png) |
+| ![Đăng nhập](statics/results/ui/client-1-dang-nhap.png) | ![PRECHECK](statics/results/ui/client-2-precheck.png) |
 
-Các bước kỳ thi nhiều lượt (chụp bằng Xvfb, 15 máy giả + 1 máy giả gian lận + 1 client thật):
-
-| Giám thị trước giờ thi | SIM-X bị gắn cờ |
+| Client: làm bài | Client: kết quả |
 |---|---|
-| ![Trước giờ thi](statics/results/ui/09-giam-thi-cho-bat-dau.png) | ![Gắn cờ](statics/results/ui/10-giam-thi-sim-x-bi-gan-co.png) |
+| ![Làm bài](statics/results/ui/client-3-lam-bai.png) | ![Kết quả](statics/results/ui/client-4-ket-qua.png) |
 
-| Lịch sử một thí sinh (nhấp đúp) | Sau khi kết thúc thi |
-|---|---|
-| ![Lịch sử](statics/results/ui/11-lich-su-sim-x.png) | ![Kết thúc](statics/results/ui/12-giam-thi-ket-thuc.png) |
-
-| Giám thị sau Kỳ thi mới | Kỳ thi thứ hai đang chạy |
-|---|---|
-| ![Kỳ thi mới](statics/results/ui/13-giam-thi-ky-thi-moi.png) | ![Kỳ 2](statics/results/ui/16-giam-thi-dang-thi-ky-2.png) |
-
-Mẫu `events.csv` của lần chạy này: [events-mau.csv](statics/results/events-mau.csv).
-
-Hộp xác nhận nộp bài và hộp thoát khi bài chưa nộp: [06-xac-nhan-nop-bai.png](statics/results/ui/06-xac-nhan-nop-bai.png), [06b-thoat-khi-chua-nop.png](statics/results/ui/06b-thoat-khi-chua-nop.png). Cửa sổ giám thị (dòng cần chú ý, tức có vi phạm hoặc bị ML gắn cờ, tô cam nhạt kèm biểu tượng cảnh báo; khung chi tiết bên phải): [08-giam-thi.png](statics/results/ui/08-giam-thi.png).
+Mẫu `events.csv`: [events-mau.csv](statics/results/events-mau.csv).
 Phím tắt khi làm bài: `1`-`9` hoặc `A`-`I` chọn đáp án, mũi tên trái/phải chuyển câu.
 
 ## 6. Mạng

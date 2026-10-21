@@ -1,6 +1,7 @@
 // Màn đăng nhập: một khung giữa màn hình, lỗi hiện chữ đỏ dưới form, đang tìm server thì hiện thanh tiến trình (Người 1).
 package exam.client;
 
+import exam.common.Card;
 import exam.common.Html;
 import exam.common.Protocol;
 import java.awt.Dimension;
@@ -33,10 +34,10 @@ class LoginPanel extends JPanel {
         progress.setIndeterminate(true);
         progress.setVisible(false);
 
-        Theme.Card card = new Theme.Card();
+        Card card = new Card();
         card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
         card.setBorder(BorderFactory.createEmptyBorder(32, 40, 32, 40));
-        card.setPreferredSize(new Dimension(460, 500));
+        card.setPreferredSize(new Dimension(460, 470));
         add(card, new GridBagConstraints());
         card.add(left(Theme.label(Html.wrap(Protocol.TOPIC, 380), 22, true, Theme.PRIMARY)));
         card.add(left(Theme.label("Đăng nhập để vào phòng thi", Theme.BASE_SIZE, false, Theme.MUTED)));
