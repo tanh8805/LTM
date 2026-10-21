@@ -8,13 +8,14 @@ Mảng của bạn: phát hiện vi phạm trên máy sinh viên và hiển th�
 
 | File | Làm gì |
 |---|---|
-| `client/Monitor.java` | Luật giám sát: baseline lúc PRECHECK, so sánh mỗi 3 giây để ra vi phạm APP/USB/NET, đếm focus và đáp án, gom 6 feature mỗi 30 giây (luồng riêng với luồng quét). Không chạy lệnh Windows nên test được trên Linux. |
+| `client/Monitor.java` | Luật giám sát: baseline lúc PRECHECK, so sánh mỗi 3 giây để ra vi phạm APP/USB/NET, đếm focus và đáp án, gom 6 feature mỗi 30 giây (luồng riêng với luồng quét); `reportApps`/`sendAppsIfChanged` báo danh sách app đang mở (`APPS`, 15 giây một lần, chỉ khi đổi); `updateRules` áp dụng luật mới giữa giờ thi mà không lấy lại baseline. Không chạy lệnh Windows nên test được trên Linux. |
 | `client/AppRules.java` | Luật về tên app: chuẩn hoá tên (chữ thường, bỏ `.exe`), blacklist/whitelist/`allowedWindowApps`/`ignoreProcesses`, ra các vấn đề PRECHECK về app. |
 | `client/WindowsProbe.java` | Nói chuyện với Windows: chạy `tasklist` (tên + PID), `netstat`, PowerShell (app có cửa sổ), phân giải DNS. Không biết gì về luật. |
 | `client/Diagnose.java` | Công cụ chẩn đoán chạy tay trên máy Windows, ghi `chan-doan-<tên máy>.txt`. |
 | `client/Debug.java` | Log gỡ lỗi khi chạy với `-Dexam.debug=true` (thời gian mỗi lần quét, nội dung `FEATURES`). |
-| `server/TeacherWindow.java` | Cửa sổ giám thị (FlatLaf): thanh trên (Mở đề, đồng hồ, địa chỉ, nút Bắt đầu/Kết thúc/Kỳ thi mới), tab lọc và ô tìm kiếm, nhật ký; nhấp đúp một dòng mở lịch sử. |
-| `server/RosterTable.java`, `Roster.java`, `DetailPanel.java` | Bảng thí sinh (biểu tượng cảnh báo, nhãn trạng thái, thanh Bất thường, dòng cần chú ý tô cam nhạt), logic thuần của bảng (lọc theo tab, tìm kiếm không dấu, chữ hiển thị, sự kiện đáng chú ý) và khung chi tiết bên phải. |
+| `server/TeacherWindow.java`, `SideBar.java` | Cửa sổ giám thị (FlatLaf): thanh bên trái 5 mục (Giám sát, Sinh viên, Đề thi, Ứng dụng, Kết quả), thanh trên (tên đề tài, đề đang mở, đồng hồ, `IP LAN`, nút Bắt đầu/Kết thúc/Kỳ thi mới), cảnh báo vàng khi chưa nạp danh sách sinh viên, tab lọc và ô tìm kiếm, nhật ký; nhấp đúp một dòng mở lịch sử. `SideBar` chỉ là cột nút. |
+| `server/RosterTable.java`, `Roster.java`, `DetailPanel.java` | Bảng thí sinh (biểu tượng cảnh báo, nhãn trạng thái, thanh Bất thường, dòng cần chú ý tô cam nhạt), logic thuần của bảng (lọc theo tab, tìm kiếm không dấu, chữ hiển thị, sự kiện đáng chú ý) và khung chi tiết bên phải (có phần "Ứng dụng đang mở" tô đỏ/xanh/xám theo luật, chuột phải một app thì `Cho phép/Cấm ứng dụng này`). |
+| `server/RulesDialog.java`, `ListEditor.java`, `RulesFile.java` | Hộp thoại `Quản lý ứng dụng` 4 tab; `ListEditor` là một danh sách chuỗi có Thêm/Xoá; `RulesFile` sửa các danh sách trong luật (`withList`, `setAppAllowed`) và ghi lại `rules.json`, giữ nguyên các khoá khác. |
 | `config/rules.json` | Luật: `blacklistApps`, `whitelistApps`, `allowedWindowApps`, `ignoreProcesses`, `blockedDomains`. Nằm ở server, gửi xuống client khi đăng nhập, nên chỉnh không cần build lại hay gửi lại jar. |
 
 ## 2. Thứ tự đọc
@@ -28,6 +29,8 @@ Mảng của bạn: phát hiện vi phạm trên máy sinh viên và hiển th�
 7. `Monitor.start` rồi `scan`: hai luồng riêng, quét 3 giây và gửi `FEATURES` theo chu kỳ server cấp (`Monitor.useIntervalFrom`).
 8. `Diagnose.processSections`: các mục báo cáo chẩn đoán.
 9. `TeacherWindow.refresh` cùng `Roster.filter` và các lớp vẽ trong `RosterTable`.
+10. `Monitor.sendAppsIfChanged` → `ClientHandler.handleApps` → `ExamRoom.apps` / `ExamRoom.appsOf` → `DetailPanel.addApps`: đường đi của danh sách app đang mở.
+11. `RulesDialog.save` → `ExamServer.applyRules` → `Monitor.updateRules`: đường đi của luật mới (xem file Người 3).
 
 ## 3. Một luồng chạy thật: cắm USB đến khi dòng được tô cam
 
@@ -52,7 +55,7 @@ Mảng của bạn: phát hiện vi phạm trên máy sinh viên và hiển th�
 
 ## 5. 3 câu thầy có thể hỏi và cách sửa
 
-**a) "Thêm một app vào danh sách cấm / cho phép / bỏ qua."** Không cần sửa code Java, chỉ sửa `config/rules.json` ở máy server rồi chạy lại server (luật đọc lúc `ExamServer.main` khởi động, client nhận qua `LOGIN_OK`). Tên không phân biệt hoa thường, có hay không `.exe` đều được. Khi bị báo vi phạm oan: chạy `Diagnose` trên máy đó rồi chép tên vào `ignoreProcesses` hoặc `allowedWindowApps`.
+**a) "Thêm một app vào danh sách cấm / cho phép / bỏ qua."** Không cần sửa code Java: bấm **Ứng dụng** (hoặc chuột phải một app trong khung chi tiết) trên cửa sổ giám thị, luật được ghi vào `config/rules.json` và gửi ngay cho các máy đang thi (`RULES_UPDATE`); cũng có thể sửa tay file rồi chạy lại server (luật đọc lúc `ExamServer.main` khởi động, client nhận qua `LOGIN_OK`). Tên không phân biệt hoa thường, có hay không `.exe` đều được. Khi bị báo vi phạm oan: chạy `Diagnose` trên máy đó rồi thêm tên vào `ignoreProcesses` hoặc `allowedWindowApps` (tab Nâng cao).
 
 ```json
 "blacklistApps": ["chrome.exe", "msedge.exe", "firefox.exe", "wechat"]

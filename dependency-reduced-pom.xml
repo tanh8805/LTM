@@ -5,6 +5,17 @@
   <artifactId>exam</artifactId>
   <version>1.0</version>
   <build>
+    <resources>
+      <resource>
+        <directory>src/main/resources</directory>
+      </resource>
+      <resource>
+        <directory>config</directory>
+        <includes>
+          <include>rules.json</include>
+        </includes>
+      </resource>
+    </resources>
     <finalName>exam</finalName>
     <plugins>
       <plugin>

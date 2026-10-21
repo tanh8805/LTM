@@ -30,22 +30,22 @@ Client chỉ phát hiện và báo cáo: không chặn mạng, không kill tiế
 | Người | File | Mảng phụ trách | Cần hiểu |
 |---|---|---|---|
 | Cả nhóm | `exam/common/Protocol.java` | Giao thức chung | - Mỗi tin nhắn là một dòng JSON, luôn có `type`<br>- Gson tự escape ký tự xuống dòng nên không bao giờ vỡ dòng |
-| 1 | `StudentApp`, `StudentScreens` (+ `Theme`, `TopBar`, `LoginPanel`, `PrecheckPanel`, `ExamPanel`, `NumberButton`, `OptionRow`, `ResultPanel`, `Sheet`), `ServerConnection`, `ServerFinder` | Client sinh viên: kết nối TCP, tìm server UDP, giao diện làm bài (FlatLaf) | - Luồng màn hình: đăng nhập, PRECHECK, chờ, làm bài, kết quả<br>- `StudentApp` chỉ lo logic, `StudentScreens` ghép các panel; vì sao dùng callback<br>- Tự kết nối lại mỗi 5 giây và đăng nhập lại; vì sao chỉ tính "rời cửa sổ" khi `getOppositeWindow() == null`<br>- Tìm server bằng UDP broadcast tới từng card mạng |
-| 2 | `Monitor`, `AppRules`, `WindowsProbe`, `Diagnose`, `TeacherWindow`, `config/rules.json` | Giám sát: phát hiện vi phạm ở client và hiển thị cho giám thị | - Baseline lấy ở PRECHECK, so sánh mỗi 3 giây; vì sao chỉ xét app có cửa sổ và cần `SYSTEM_PROCESSES`<br>- 6 feature mỗi 30 giây và cách reset cửa sổ<br>- `WindowsProbe` chạy lệnh Windows; `Monitor` chỉ chứa luật nên test được trên Linux |
-| 3 | `ExamServer`, `ExamRoom`, `Session`, `ExamFile`, `ClientHandler` | Server: nhận kết nối, luật phòng thi, chấm điểm, lưu kết quả | - `ExamRoom` giữ mọi trạng thái và mọi phương thức đổi trạng thái đều `synchronized`; `trySendExam` là điểm gửi đề duy nhất<br>- Chống nhầm session cũ và mới (so sánh socket); watchdog 90 giây (chỉ tính từ lúc máy nhận đề)<br>- Chấm điểm, `ket-qua/<kỳ thi>/` gồm `results.csv`, `events.csv`, `server.log` (UTF-8 có BOM cho hai file CSV) |
+| 1 | `StudentApp`, `StudentScreens` (+ `Theme`, `Look`, `Card`, `TopBar`, `LoginPanel`, `PrecheckPanel`, `ExamPanel`, `NumberButton`, `OptionRow`, `ResultPanel`, `Sheet`), `ServerConnection`, `ServerFinder` | Client sinh viên: kết nối TCP, tìm server UDP, giao diện làm bài (FlatLaf) | - Luồng màn hình: đăng nhập, PRECHECK, chờ, làm bài, kết quả<br>- `StudentApp` chỉ lo logic, `StudentScreens` ghép các panel; vì sao dùng callback<br>- Tự kết nối lại mỗi 5 giây và đăng nhập lại; vì sao chỉ tính "rời cửa sổ" khi `getOppositeWindow() == null`<br>- Tìm server bằng UDP broadcast tới từng card mạng |
+| 2 | `Monitor`, `AppRules`, `WindowsProbe`, `Diagnose`, `TeacherWindow`, `config/rules.json` | Giám sát: phát hiện vi phạm ở client, báo app đang mở, hiển thị và sửa luật ở giám thị (`SideBar`, `RulesDialog`, `ListEditor`, `RulesFile`) | - Baseline lấy ở PRECHECK, so sánh mỗi 3 giây; vì sao chỉ xét app có cửa sổ và cần `SYSTEM_PROCESSES`<br>- 6 feature mỗi 30 giây và cách reset cửa sổ<br>- `WindowsProbe` chạy lệnh Windows; `Monitor` chỉ chứa luật nên test được trên Linux |
+| 3 | `ExamServer`, `ExamRoom`, `Session`, `ExamFile`, `StudentList`, `ExamBank` (+ `ExamBankDialog`, `QuestionDialog`), `ClientHandler` | Server: nhận kết nối, luật phòng thi, chấm điểm, lưu kết quả | - `ExamRoom` giữ mọi trạng thái và mọi phương thức đổi trạng thái đều `synchronized`; `trySendExam` là điểm gửi đề duy nhất<br>- Chống nhầm session cũ và mới (so sánh socket); watchdog 90 giây (chỉ tính từ lúc máy nhận đề)<br>- Chấm điểm, `ket-qua/<kỳ thi>/` gồm `results.csv`, `events.csv`, `server.log` (UTF-8 có BOM cho hai file CSV) |
 | 4 | `ml/ml_service.py`, `ml/simulate_clients.py`, `MlClient` | ML: Isolation Forest, giả lập phòng thi, nối Java với Python | - Isolation Forest không giám sát, fit trên chính dữ liệu buổi thi; điểm chuẩn hoá min-max và 3 cửa sổ gần nhất<br>- Vì sao `anomaly` có thêm điều kiện điểm ≥ 0.7 (xem mục 9)<br>- Gọi HTTP ngoài khối `synchronized` để ML chậm không treo server |
 
 Cấu trúc mã nguồn (mỗi file Java trong `src/main` dài khoảng 280 dòng trở xuống; cần thì tách file mới):
 
 ```
 src/main/java/exam/
-  common/   Protocol  Palette  Icons  Format
+  common/   Protocol  Palette  Look  Card  Icons  Format
   client/   StudentApp  StudentScreens  Theme  TopBar  LoginPanel  PrecheckPanel  ExamPanel  NumberButton  OptionRow  ResultPanel  Sheet
             ServerConnection  ServerFinder  Monitor  AppRules  WindowsProbe  Diagnose  Debug
   server/   ExamServer  ExamRoom  ExamLog  Session  ExamFile  StudentList  RulesFile  RulesDialog  ListEditor  ExamBank  ExamBankDialog  QuestionDialog  ClientHandler  TeacherWindow  RosterTable  Roster  DetailPanel  HistoryDialog  MlClient
-            Pill  TabButton  LocalAddresses
+            Pill  TabButton  SideBar  LocalAddresses
 ml/         ml_service.py  simulate_clients.py  test_ml_service.py
-config/     rules.json  students.csv        exams/   sample_exam.json
+config/     rules.json  students.csv        exams/   sample_exam.json        src/main/resources/exam/theme/FlatLaf.properties
 ```
 
 ## 3. Giao thức
@@ -79,7 +79,7 @@ Sáu giá trị của `values`: số tiến trình mới, số lần rời cửa
 
 - **Máy server:** JDK 17+ và Maven; Python 3.10+.
 - **Máy client (Windows):** chỉ cần Java 17+ (JRE là đủ) và **2 file** cùng thư mục: `exam.jar` và `chay-thi.bat`. Sinh viên nhấp đúp `chay-thi.bat` để mở bài thi (không có cửa sổ terminal đi kèm). Terminal (cmd, PowerShell, Windows Terminal) mở trong giờ thi bị PRECHECK/giám sát báo vi phạm; `git`, `curl`, `ssh`... và `github.com` cũng bị cấm trong `config/rules.json`.
-- **Thư viện Java** (Maven tự tải, shade plugin gói hết vào `exam.jar` nên client chỉ cần một file): Gson 2.11.0 (JSON) và **FlatLaf 3.7.2** (giao diện Swing hiện đại; `Theme.install()` ở client và `FlatLightLaf.setup()` ở server).
+- **Thư viện Java** (Maven tự tải, shade plugin gói hết vào `exam.jar` nên client chỉ cần một file): Gson 2.11.0 (JSON) và **FlatLaf 3.7.2** (giao diện Swing hiện đại; cả client và server cài qua `Look.install()`).
 - **Python:**
   ```bash
   python3 -m venv ml/.venv

@@ -2,7 +2,7 @@
 
 Tất cả nằm trong `src/main/java/exam/server/`. Mỗi `File.hàm` dưới đây đều có thật trong code.
 
-## (a) Sáu file
+## (a) Các file
 
 | File | Một câu |
 |---|---|
@@ -11,6 +11,9 @@ Tất cả nằm trong `src/main/java/exam/server/`. Mỗi `File.hàm` dưới �
 | `ExamRoom` | Luật của phòng thi: đăng nhập, gửi đề, nộp bài, mất kết nối, bắt đầu/kết thúc/kỳ thi mới; hàm đổi trạng thái đều `synchronized`. |
 | `Session` | Dữ liệu của một sinh viên (socket, cờ PRECHECK/nộp, vi phạm, mẫu `FEATURES`, điểm) và các chuỗi trạng thái; không có luật. |
 | `ExamFile` | Nạp và kiểm tra file đề, bỏ đáp án khi gửi cho sinh viên, chấm điểm, ghi `results.csv`. |
+| `StudentList` | Danh sách tài khoản sinh viên (CSV `studentId,name,password`): `parse` kiểm tra từng dòng và báo `Dòng n: lý do`, `find` so khớp mã SV không phân biệt hoa thường, `save` ghi `config/students.csv`. |
+| `ExamBank` | Soạn đề: `build` dựng JSON (đánh số lại `id`), `save` ghi file tạm rồi kiểm tra bằng `ExamFile.load`, `parseCsv` nhập câu hỏi từ CSV. Giao diện ở `ExamBankDialog` và `QuestionDialog`. |
+| `RulesFile` | Sửa các danh sách trong luật và ghi lại `rules.json` (giữ các khoá khác); `ExamServer.applyRules` ghi file rồi gọi `ExamRoom.updateRules`. |
 | `ExamLog` | Giữ sự kiện và dòng log, tạo thư mục `ket-qua/<giờ>_<tên đề>/` và ghi ngay `events.csv`, `server.log`. |
 
 ## (b) Ba luồng chạy
@@ -18,11 +21,14 @@ Tất cả nằm trong `src/main/java/exam/server/`. Mỗi `File.hàm` dưới �
 **1. Kết nối → đăng nhập → PRECHECK → nhận đề → nộp bài**
 
 - `ExamServer.acceptLoop` → `ClientHandler.run` → `ClientHandler.handleLine` → `ClientHandler.handleMessage`
-- `LOGIN`: `handleMessage` → `ClientHandler.handleLogin` → `ExamRoom.login` (`ExamRoom.loginError` kiểm tra) → `Protocol.send(LOGIN_OK)` → `ExamRoom.trySendExam` (chưa PRECHECK nên chưa gửi đề)
+- `LOGIN`: `handleMessage` → `ClientHandler.handleLogin` (đọc `studentId`, `password`) → `ExamRoom.login` (có danh sách thì `StudentList.find` + so mật khẩu, sai thì `ExamRoom.loginFailed` gửi `LOGIN_FAIL` chung một lý do và ghi sự kiện; rồi `ExamRoom.loginError` kiểm tra đăng nhập trùng) → `Protocol.send(LOGIN_OK)` kèm `name` → `ExamRoom.trySendExam` (chưa PRECHECK nên chưa gửi đề)
 - `PRECHECK_RESULT`: `ClientHandler.handlePrecheckResult` → `ExamRoom.precheckResult` → `ExamRoom.trySendExam` (gửi `EXAM_START` nếu giám thị đã bấm Bắt đầu)
 - Giám thị bấm Bắt đầu: `TeacherWindow` → `ExamRoom.startExam` → `ExamLog.attach` → `ExamRoom.trySendExam` cho từng máy đã PRECHECK đạt
 - `FEATURES` (mỗi `featureIntervalSeconds` giây, server cấp trong `LOGIN_OK`; cũng là heartbeat): `ClientHandler.handleFeatures` → `ExamRoom.features`
+- `APPS`: `ClientHandler.handleApps` (bỏ phần tử sai, tối đa 100 dòng) → `ExamRoom.apps` lưu vào `Session.apps` kèm giờ; giám thị đọc bằng `ExamRoom.appsOf` (tô loại theo luật hiện tại).
 - `SUBMIT`: `ClientHandler.handleSubmit` → `ExamRoom.submit` → `ExamFile.grade` → `ExamRoom.writeResults` → `ExamFile.writeResults` → `ExamRoom.sendResult`
+
+**1b. Giám thị đổi luật giữa giờ thi:** `RulesDialog.save` (hoặc menu chuột phải trong `DetailPanel`) → `ExamServer.applyRules` → `RulesFile.save` → `ExamRoom.updateRules` → `Protocol.send(RULES_UPDATE)` cho mọi `Session.connected()`; máy vào sau nhận luật mới trong `LOGIN_OK`.
 
 **2. Máy rớt mạng rồi vào lại**
 
@@ -48,11 +54,12 @@ Tất cả nằm trong `src/main/java/exam/server/`. Mỗi `File.hàm` dưới �
 | Đổi cách chấm điểm | `ExamFile.grade` | Sửa dòng `score = Math.round(correct * 1000.0 / total) / 100.0` (thang 10, 2 số lẻ). Sửa luôn `GradingTest`. |
 | Thêm cột vào `results.csv` | `Session` + `ExamRoom` + `ExamFile` | Thêm trường ở `Session`, gán ở `ExamRoom` (vd `submit`), thêm tên cột vào `ExamFile.RESULTS_HEADER` và giá trị vào `ExamFile.resultsRow` (cùng thứ tự). |
 | Thêm loại sự kiện vào `events.csv` | `ExamRoom` (chỗ xảy ra sự kiện) | Gọi `event(s, "LOAI_MOI", "chi tiết")`; `ExamLog.record` tự ghi file. Muốn hiện trong nhật ký bên giám thị thì thêm tên vào `Roster.NOTABLE` và `Roster.eventText`. |
-| Chỉ cho đăng nhập mã SV có trong danh sách | `ExamFile` + `ExamRoom.loginError` | Thêm `ExamFile.loadStudentIds(Path)` đọc file danh sách; `ExamRoom` giữ `Set<String> allowedIds`; trong `loginError` thêm `if (!allowedIds.contains(id)) return "Mã SV không có trong danh sách";`. |
+| Đổi cách kiểm tra mật khẩu (vd băm) | `StudentList` + `ExamRoom.login` | Hiện `ExamRoom.login` so `account.password().equals(password)`; muốn băm thì lưu băm trong `StudentList.Account` và so băm của mật khẩu client gửi tại đúng dòng đó. |
 | Gửi thông báo tới mọi máy | `ExamRoom` (hàm mới `broadcast`) | `synchronized`, `Protocol.msg("NOTICE")` rồi vòng `for` qua `sessions.values()`, máy `connected()` thì `Protocol.send(s.out, m)`. Thêm nút ở `TeacherWindow`; client xử lý `NOTICE` như một loại tin mới. |
 | Tự kết thúc khi mọi máy đã nộp | `ExamRoom.submit` | Cuối nhánh chấm bài, nếu không còn session nào `!s.submitted` thì `endExam("Mọi máy đã nộp")`. |
 | Kick một máy | `ExamRoom` (hàm mới `kick`) | `synchronized`; lấy `Session s = sessions.get(id)`; `s.close(); markDisconnected(s, "giám thị đá");`. Client sẽ tự vào lại, muốn chặn thì thêm `Set<String> kicked` và kiểm tra trong `loginError`. |
 | Ghi IP máy vào kết quả | `Session` + `ExamRoom.login` + `ExamFile` | `Session` thêm `String ip`; trong `login` gán `s.ip = socket.getInetAddress().getHostAddress()` (kiểm tra `socket != null`, test truyền `null`); thêm cột như dòng "Thêm cột". |
+| Đổi tin báo sai mật khẩu | `ExamRoom.login` | Chuỗi `Sai mã sinh viên hoặc mật khẩu` (cố ý không nói rõ sai cái nào); test `loginWithWrongPasswordFails` kiểm tra đúng chuỗi này. |
 | Đổi chu kỳ FEATURES và chấm ML | `config/rules.json` | Đổi `featureIntervalSeconds` (10 đến 60, sai thì 30). Server gửi trong `LOGIN_OK`, `ExamServer.start` chấm ML cùng chu kỳ. |
 
 ## (d) Năm câu thầy hay hỏi
