@@ -190,6 +190,32 @@ class ExamServerTest {
         assertEquals("zalo.exe", ok.getAsJsonObject("rules").getAsJsonArray("blacklistApps").get(0).getAsString());
     }
 
+    private int loginOkInterval(JsonObject rules) throws IOException {
+        ExamServer other = new ExamServer(rules);
+        other.start(0);
+        try (TestClient c = new TestClient(other.tcpPort())) {
+            c.send(loginMsg("S1", "An"));
+            return c.next(Protocol.LOGIN_OK, 2000).get("featureIntervalSeconds").getAsInt();
+        } finally {
+            other.stop();
+        }
+    }
+
+    @Test
+    void loginOkCarriesFeatureInterval() throws IOException {
+        JsonObject rules = new JsonObject();
+        rules.addProperty("featureIntervalSeconds", 20);
+        assertEquals(20, loginOkInterval(rules));
+    }
+
+    @Test
+    void invalidIntervalFallsBackTo30() throws IOException {
+        JsonObject tooBig = new JsonObject();
+        tooBig.addProperty("featureIntervalSeconds", 99);
+        assertEquals(30, loginOkInterval(tooBig));
+        assertEquals(30, loginOkInterval(new JsonObject()), "thiếu thì dùng 30");
+    }
+
     @Test
     void emptyIdIsRejected() throws IOException {
         TestClient c = connect();

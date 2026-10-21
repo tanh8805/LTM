@@ -21,6 +21,9 @@ public final class Protocol {
             PRECHECK_RESULT = "PRECHECK_RESULT", EXAM_START = "EXAM_START", VIOLATION = "VIOLATION",
             FEATURES = "FEATURES", SUBMIT = "SUBMIT", EXAM_END = "EXAM_END", RESULT = "RESULT";
 
+    // Chu kỳ gửi FEATURES (giây): server cấp trong LOGIN_OK, chỉ nhận 10..60, sai hoặc thiếu thì dùng 30
+    public static final int FEATURE_INTERVAL_DEFAULT = 30, FEATURE_INTERVAL_MIN = 10, FEATURE_INTERVAL_MAX = 60;
+
     public static final Gson GSON = new Gson();
 
     private Protocol() {}
@@ -30,6 +33,19 @@ public final class Protocol {
         JsonObject m = new JsonObject();
         m.addProperty("type", type);
         return m;
+    }
+
+    /** Đọc trường featureIntervalSeconds của m (rules.json hoặc LOGIN_OK); không hợp lệ thì trả 30. */
+    public static int featureInterval(JsonObject m) {
+        JsonElement e = m.get("featureIntervalSeconds");
+        if (e == null || !e.isJsonPrimitive() || !e.getAsJsonPrimitive().isNumber()) {
+            return FEATURE_INTERVAL_DEFAULT;
+        }
+        double seconds = e.getAsDouble();
+        if (seconds != Math.rint(seconds) || seconds < FEATURE_INTERVAL_MIN || seconds > FEATURE_INTERVAL_MAX) {
+            return FEATURE_INTERVAL_DEFAULT;
+        }
+        return (int) seconds;
     }
 
     public static String type(JsonObject m) {

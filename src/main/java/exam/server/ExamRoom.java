@@ -45,7 +45,8 @@ public class ExamRoom {
     private String endReason = "";
     private long startMillis;
     private ScheduledFuture<?> autoEnd;
-    private MlScores mlScores = new MlScores();
+    private final int featureIntervalSeconds;
+    private MlScores mlScores;
     private int epoch;
 
     ExamRoom(JsonObject rules, ScheduledExecutorService scheduler, Consumer<String> log, ExamLog records) {
@@ -53,6 +54,8 @@ public class ExamRoom {
         this.scheduler = scheduler;
         this.log = log;
         this.records = records;
+        this.featureIntervalSeconds = Protocol.featureInterval(rules);
+        this.mlScores = new MlScores(featureIntervalSeconds);
     }
 
     // ---------- Giám thị điều khiển phòng ----------
@@ -123,7 +126,7 @@ public class ExamRoom {
         }
         closeAll();
         sessions.clear();
-        mlScores = new MlScores();
+        mlScores = new MlScores(featureIntervalSeconds);
         started = false;
         ended = false;
         endReason = "";
@@ -166,6 +169,7 @@ public class ExamRoom {
 
         JsonObject ok = Protocol.msg(Protocol.LOGIN_OK);
         ok.add("rules", rules);
+        ok.addProperty("featureIntervalSeconds", featureIntervalSeconds);
         Protocol.send(out, ok);
         log.accept("Đăng nhập: " + id + " - " + s.name);
         if (returning) {
@@ -304,7 +308,7 @@ public class ExamRoom {
         String detail = String.format(Locale.ROOT, "%.2f", s.anomalyScore);
         if (type.equals("ANOMALY_ON")) {
             // lúc bị gắn cờ thì kèm lý do để giám thị biết máy lạ ở đâu
-            detail = MlScores.describe(s.anomalyScore, s.reasons);
+            detail = MlScores.describe(s.anomalyScore, s.reasons, featureIntervalSeconds);
         }
         event(s, type, detail);
     }
@@ -367,6 +371,10 @@ public class ExamRoom {
 
     public synchronized boolean isEnded() {
         return ended;
+    }
+
+    public int featureIntervalSeconds() {
+        return featureIntervalSeconds;
     }
 
     public synchronized int epoch() {

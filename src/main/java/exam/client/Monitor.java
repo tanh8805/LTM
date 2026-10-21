@@ -1,4 +1,4 @@
-// Luật giám sát ở client: baseline, phát hiện vi phạm (APP có cửa sổ/USB/NET), đếm focus/đáp án và gom feature mỗi 30 giây (Người 2).
+// Luật giám sát ở client: baseline, phát hiện vi phạm (APP có cửa sổ/USB/NET), đếm focus/đáp án và gom feature theo chu kỳ server cấp, mặc định 30 giây (Người 2).
 package exam.client;
 
 import com.google.gson.JsonArray;
@@ -29,7 +29,8 @@ public class Monitor {
 
     private final boolean windows = WindowsProbe.isWindows();
     private final Runnable scanTask;
-    private final long scanMs, featuresMs;
+    private final long scanMs;
+    private volatile long featuresMs;
     private ScheduledExecutorService scanner, heartbeat;        // hai luồng riêng: quét chậm không được làm trễ FEATURES
     private volatile Consumer<JsonObject> sender;
 
@@ -46,7 +47,7 @@ public class Monitor {
     private final Map<Integer, Integer> watching = new HashMap<>();
     private static final int WINDOW_CHECKS = 10;
 
-    // Bộ đếm của cửa sổ 30 giây hiện tại
+    // Bộ đếm của cửa sổ FEATURES hiện tại
     private int window = 1, focusLostCount, violationsInWindow, answers;
     private final Set<String> newProcesses = new HashSet<>(), newHosts = new HashSet<>();
     // Đã từng được đếm trong buổi thi: mỗi tiến trình/IP mới chỉ tính vào cửa sổ đầu tiên nó xuất hiện
@@ -54,12 +55,19 @@ public class Monitor {
     private long focusLostMillis;
     private long lostSince = -1;                                  // -1 = đang ở trong cửa sổ thi
 
-    public Monitor() { this(null, 3000, 30_000); }
+    public Monitor() { this(null, 3000, Protocol.FEATURE_INTERVAL_DEFAULT * 1000L); }
     /** Cho test: {@code scanTask} thay phép quét thật (null = quét tiến trình/USB/mạng như bình thường). */
     public Monitor(Runnable scanTask, long scanMs, long featuresMs) {
         this.scanTask = scanTask != null ? scanTask : this::scan;
         this.scanMs = scanMs; this.featuresMs = featuresMs;
     }
+
+    /** Lấy chu kỳ gửi FEATURES từ LOGIN_OK; phải gọi trước start(). Thiếu hoặc sai thì 30 giây. */
+    public void useIntervalFrom(JsonObject loginOk) {
+        featuresMs = Protocol.featureInterval(loginOk) * 1000L;
+    }
+
+    public long featureIntervalMillis() { return featuresMs; }
 
     /** Danh sách vấn đề (rỗng = đạt). Chạy lệnh hệ thống nên phải gọi ngoài luồng giao diện. */
     public List<String> precheck(JsonObject rules) {

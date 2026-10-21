@@ -91,7 +91,7 @@ def main():
     parser.add_argument("--port", type=int, default=5000)
     parser.add_argument("--count", type=int, default=5)
     parser.add_argument("--cheater", action="store_true", help="thêm một client có hành vi lệch (SIM-X)")
-    parser.add_argument("--interval", type=float, default=30, help="số giây giữa hai FEATURES")
+    parser.add_argument("--interval", type=float, default=20, help="số giây giữa hai FEATURES")
     args = parser.parse_args()
 
     clients = [SimClient(args.host, args.port, f"SIM{i:02d}", f"Máy giả {i}", normal_values, args.interval)
