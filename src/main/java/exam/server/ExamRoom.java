@@ -1,6 +1,7 @@
 package exam.server;
 
 import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import exam.client.AppRules;
 import exam.common.Protocol;
@@ -259,7 +260,7 @@ public class ExamRoom {
     }
 
     synchronized void features(Session s, JsonObject sample) {
-        if (live(s)) {
+        if (live(s) && !s.terminated) {
             s.samples.add(sample);
         }
     }
@@ -281,7 +282,7 @@ public class ExamRoom {
     }
 
     synchronized void violation(Session s, String kind, String detail) {
-        if (!live(s)) {
+        if (!live(s) || s.terminated) {
             return;
         }
         s.violations++;
@@ -289,6 +290,41 @@ public class ExamRoom {
         s.lastViolationAt = LocalTime.now().format(HOUR_MINUTE);
         log.accept("Vi phạm " + s.id + " - " + s.lastViolation);
         event(s, "VIOLATION", s.lastViolation);
+
+        // chỉ vi phạm luật mới đình chỉ; điểm bất thường của ML không bao giờ đi qua đây
+        int limit = maxViolations();
+        boolean examRunning = started && !ended && !s.submitted;
+        if (limit > 0 && s.violations >= limit && examRunning) {
+            terminate(s, "Vi phạm " + s.lastViolation);
+        }
+    }
+
+    // maxViolations trong rules.json: 0 hoặc thiếu hoặc sai là tắt đình chỉ (chỉ cảnh báo)
+    private int maxViolations() {
+        JsonElement e = rules.get("maxViolations");
+        if (e == null || !e.isJsonPrimitive() || !e.getAsJsonPrimitive().isNumber()) {
+            return 0;
+        }
+        return Math.max(0, e.getAsInt());
+    }
+
+    // Đình chỉ là quyết định cuối: coi như đã nộp với 0 điểm, không có đường nào gỡ
+    private void terminate(Session s, String reason) {
+        JsonObject result = new JsonObject();
+        result.addProperty("score", 0.0);
+        result.addProperty("correct", 0);
+        result.addProperty("total", exam.getAsJsonArray("questions").size());
+        result.addProperty("terminated", true);
+        result.addProperty("reason", reason);
+        s.result = result;
+        s.submitted = true;
+        s.terminated = true;
+        log.accept("Đình chỉ: " + s.id + " – " + reason);
+        event(s, "TERMINATED", reason);
+        writeResults();
+        if (s.connected()) {
+            sendResult(s);
+        }
     }
 
     synchronized void apps(Session s, List<AppInfo> apps) {
@@ -300,7 +336,7 @@ public class ExamRoom {
     }
 
     synchronized void submit(Session s, JsonObject answers) {
-        if (!live(s)) {
+        if (!live(s) || s.terminated) {
             return;
         }
         if (!started) {

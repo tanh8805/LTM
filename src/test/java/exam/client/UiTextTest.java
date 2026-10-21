@@ -26,6 +26,12 @@ class UiTextTest {
     }
 
     @Test
+    void terminatedScreenTitleAndReason() {
+        assertEquals("Bài thi bị đình chỉ", ResultPanel.TERMINATED_TITLE);
+        assertEquals("Lý do: Vi phạm APP: zalo.exe", ResultPanel.reasonText("Vi phạm APP: zalo.exe"));
+    }
+
+    @Test
     void scoreUsesVietnameseComma() {
         assertEquals("5,5", exam.common.Format.score(5.5));
         assertEquals("10,0", exam.common.Format.score(10.0));

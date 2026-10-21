@@ -53,6 +53,7 @@ Toàn bộ `src/main/java/exam/client/`: từ lúc mở app đến lúc xem đi�
 | Thêm app vào danh sách cấm / cho phép | Không cần sửa code | Giám thị bấm **Ứng dụng** (Server 2) hoặc sửa `config/rules.json`. Khi báo oan: chạy `Diagnose` rồi thêm tên vào `ignoreProcesses` hoặc `allowedWindowApps`. |
 | Thêm một loại vi phạm mới | `Monitor.processSnapshot`/`applySnapshot`, `violate` | Thêm kiểm tra trong `applySnapshot` rồi gọi `violate("LOẠI", "chi tiết")`; mỗi cặp chỉ gửi một lần. Server đã nhận mọi `kind`. |
 | Chặn terminal / công cụ tải tài liệu | `config/rules.json`, `AppRules.TERMINALS` | Terminal mở trong giờ thi là vi phạm; `git`, `curl`, `ssh`... nằm trong `blacklistApps`. Dev dùng cờ `-Dexam.allowTerminal=true`. |
+| Đổi màn bị đình chỉ | `StudentApp.onResult`, `ResultPanel.showTerminated` | `RESULT` có `terminated: true` thì dừng giám sát/đồng hồ và hiện màn đỏ (tiêu đề `TERMINATED_TITLE`, lý do `reasonText`, điểm 0). |
 | Đổi thông báo / màu màn kết quả | `ResultPanel.showResult`, `Theme` | Sửa nhãn trong `showResult`; màu theo `Theme`/`Palette`. |
 | Đổi tên miền bị chặn | `config/rules.json` → `blockedDomains` | Thêm tên miền; `Monitor.resolveBlockedDomains` phân giải IP một lần lúc bắt đầu thi. |
 

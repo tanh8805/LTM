@@ -15,12 +15,12 @@ final class Roster {
     }
 
     private static final Set<String> NOTABLE = Set.of("PRECHECK_FAIL", "LOGIN_FAIL", "VIOLATION", "ANOMALY_ON", "ANOMALY_OFF",
-        "DISCONNECT", "RECONNECT");
+        "DISCONNECT", "RECONNECT", "TERMINATED");
 
     private Roster() {}
 
     /** Có vi phạm hoặc bị ML gắn cờ: dòng được tô cam và đếm vào tab "Cần chú ý". */
-    static boolean needsAttention(ExamRoom.Row r) { return r.violations() > 0 || r.anomaly(); }
+    static boolean needsAttention(ExamRoom.Row r) { return r.violations() > 0 || r.anomaly() || r.status().equals(Session.ST_TERMINATED); }
 
     static boolean inTab(ExamRoom.Row r, Tab tab) {
         return switch (tab) {
@@ -89,6 +89,7 @@ final class Roster {
             case "DISCONNECT" -> "Mất kết nối";
             case "SUBMIT" -> "Nộp bài";
             case "EXAM_END" -> "Kết thúc";
+            case "TERMINATED" -> "Đình chỉ";
             default -> type;
         };
     }
@@ -99,6 +100,7 @@ final class Roster {
             case "VIOLATION" -> e.detail();
             case "ANOMALY_ON" -> e.detail();
             case "ANOMALY_OFF" -> "Hết bất thường";
+            case "TERMINATED" -> "Đình chỉ: " + e.detail();
             case "DISCONNECT" -> "Mất kết nối (" + e.detail() + ")";
             case "RECONNECT" -> "Vào lại phòng thi";
             case "PRECHECK_FAIL" -> "PRECHECK lỗi: " + e.detail();

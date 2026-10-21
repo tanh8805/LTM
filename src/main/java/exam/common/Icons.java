@@ -94,6 +94,22 @@ public final class Icons {
         });
     }
 
+    /** Dấu X lớn trên nền tròn đỏ nhạt (màn bị đình chỉ). */
+    public static Icon bigCross(int size) {
+        return new Glyph(size, (g, s) -> {
+            g.setColor(Palette.ERROR_SOFT);
+            g.fill(new Ellipse2D.Float(0, 0, s, s));
+            g.setColor(Palette.ERROR_TEXT);
+            g.setStroke(stroke(s / 12));
+            Path2D p = new Path2D.Float();
+            p.moveTo(s * 0.34, s * 0.34);
+            p.lineTo(s * 0.66, s * 0.66);
+            p.moveTo(s * 0.66, s * 0.34);
+            p.lineTo(s * 0.34, s * 0.66);
+            g.draw(p);
+        });
+    }
+
     public static Icon clock(int size, Color color) {
         return new Glyph(size, (g, s) -> {
             g.setColor(color);

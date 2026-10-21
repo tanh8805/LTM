@@ -42,6 +42,23 @@ class ExamLogTest {
     }
 
     @Test
+    void anomalyNeverTerminates() throws IOException {
+        ExamServer s = serverWithExam();
+        ExamRoom room = s.room();
+        JsonObject rules = room.rules();
+        rules.addProperty("maxViolations", 1);
+        room.updateRules(rules);
+        room.login("S1", "An", null, new PrintWriter(new StringWriter()));
+        room.startExam();
+        room.applyScores(scores("S1", 1.0, true));
+        ExamRoom.Row row = room.rows().get(0);
+        assertTrue(row.anomaly());
+        assertNotEquals(Session.ST_TERMINATED, row.status());
+        assertNull(row.score(), "ML chỉ cảnh báo, không cho điểm 0");
+        assertFalse(room.history("S1").stream().anyMatch(e -> e.type().equals("TERMINATED")));
+    }
+
+    @Test
     void anomalyOnDetailListsReasons() throws IOException {
         ExamServer s = serverWithExam();
         ExamRoom room = s.room();

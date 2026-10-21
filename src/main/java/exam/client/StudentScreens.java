@@ -141,6 +141,11 @@ class StudentScreens {
         show("result");
     }
 
+    void showTerminated(String reason, int total) {
+        result.showTerminated(reason, total);
+        show("result");
+    }
+
     void setTimer(int seconds) { topBar.setTimer(seconds); }
 
     /** Hiện một câu hỏi; selected là chỉ số lựa chọn đã chọn trước đó, -1 nếu chưa chọn. */
