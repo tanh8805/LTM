@@ -107,7 +107,7 @@ pom.xml
 README.md
 .gitignore
 docs/AGENT_BRIEF.md                               # chính tài liệu này
-docs/huong-dan-doc-code/nguoi-1.md ... nguoi-4.md # hướng dẫn đọc code cho từng người
+docs/huong-dan-doc-code/{server-1,server-2,client,ml}.md # hướng dẫn đọc code cho từng vai
 config/rules.json                                 # luật giám sát, nằm ở server; Người 2
 exams/sample_exam.json                            # đề mẫu 10 câu
 src/main/java/exam/common/Protocol.java           # cả nhóm đọc
