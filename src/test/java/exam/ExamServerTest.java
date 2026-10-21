@@ -369,6 +369,48 @@ class ExamServerTest {
     }
 
     @Test
+    void loginAfterSubmitGetsResultAgain() throws IOException {
+        TestClient first = loginAndStart("S1");
+        submitCorrect(first);
+        // đã nộp thì đăng nhập lại (thi lượt mới hoặc tắt app mở lại) nhận ngay RESULT cũ, không cần PRECHECK
+        TestClient again = reconnect(first, "S1");
+        assertEquals(10.0, again.next(Protocol.RESULT, 2000).get("score").getAsDouble());
+        assertNull(again.tryNext(Protocol.EXAM_START, 300), "Đã nộp thì không được gửi đề lại");
+
+        // kết thúc rồi vẫn vậy
+        server.room().endExam("test");
+        TestClient afterEnd = reconnect(again, "S1");
+        assertEquals(10.0, afterEnd.next(Protocol.RESULT, 2000).get("score").getAsDouble());
+    }
+
+    @Test
+    void loginAfterEndWithoutSubmitIsRejected() throws IOException {
+        TestClient s1 = loginAndStart("S1");
+        submitCorrect(s1);
+        server.room().endExam("test");
+        TestClient stranger = connect();
+        stranger.send(loginMsg("S9", "Chưa từng vào"));
+        assertEquals("Bài thi đã kết thúc", Protocol.str(stranger.next(Protocol.LOGIN_FAIL, 2000), "reason"));
+    }
+
+    @Test
+    void sameStudentCanLoginAfterNewSession() throws Exception {
+        TestClient first = loginAndStart("S1");
+        submitCorrect(first);
+        server.room().endExam("test");
+        first.close();
+        server.room().newSession();
+
+        // phòng mới trống: mã SV cũ là người mới, phải qua PRECHECK và nhận đề kỳ mới
+        TestClient again = login("S1");
+        assertNull(again.tryNext(Protocol.RESULT, 300), "Kỳ mới không có kết quả cũ");
+        server.room().startExam();
+        precheck(again, true);
+        again.next(Protocol.EXAM_START, 2000);
+        assertEquals(Session.ST_IN_EXAM, row("S1").status());
+    }
+
+    @Test
     void remainingIsZeroAfterEnd() throws IOException {
         loginAndStart("S1");
         assertTrue(server.room().remainingSeconds() > 0);

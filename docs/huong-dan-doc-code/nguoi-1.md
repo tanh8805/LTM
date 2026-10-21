@@ -12,7 +12,7 @@ Mảng của bạn: phần chạy trên máy sinh viên, từ lúc mở app đ�
 | `client/StudentScreens.java` | Ghép giao diện: `CardLayout` 5 màn hình, thanh trên (`TopBar`), thanh cam "Mất kết nối" và thanh trạng thái; hộp xác nhận nộp bài và thoát khi chưa nộp (qua `Sheet`); nút bấm gọi ngược về `StudentApp`. |
 | `client/Theme.java` | Font, `Theme.install()` cài FlatLaf, vài hàm dựng nút/nhãn. Màu và biểu tượng tự vẽ dùng chung với giám thị nằm ở `common/Palette.java` và `common/Icons.java`; điểm hiển thị kiểu Việt Nam (dấu phẩy) ở `common/Format.java`. |
 | `client/TopBar.java` | Tên kỳ thi bên trái; ngoài giờ thi bên phải là mã SV - họ tên; trong giờ thi có đồng hồ ở giữa (đổi cam dưới 5 phút, đỏ dưới 1 phút), chấm kết nối và nút Nộp bài. |
-| `client/LoginPanel.java`, `PrecheckPanel.java`, `ResultPanel.java` | Màn đăng nhập; PRECHECK (danh sách việc cần làm, nút xử lý, dòng đã đạt, tự kiểm tra lại sau 5 giây) + màn chờ; kết quả (giờ nộp, Điểm, Số câu đúng, Thoát ứng dụng, Thi lượt mới). |
+| `client/LoginPanel.java`, `PrecheckPanel.java`, `ResultPanel.java` | Màn đăng nhập; PRECHECK (danh sách việc cần làm, nút xử lý, dòng đã đạt, tự kiểm tra lại sau 5 giây) + màn chờ; kết quả (giờ nộp, Điểm, Số câu đúng, lời cảm ơn, Thoát ứng dụng). Không có nút thi lại: thi kỳ mới thì tắt app rồi mở lại; `StudentApp.onResult` chuyển sang màn kết quả ở bất kỳ màn nào khi nhận `RESULT`. |
 | `client/Sheet.java` | Hộp xác nhận kiểu "tấm" (tiêu đề, nội dung, hai nút) dùng cho Nộp bài ngay? và Thoát khi bài chưa nộp?. |
 | `client/ExamPanel.java`, `NumberButton.java`, `OptionRow.java` | Màn làm bài: lưới số câu, hàng lựa chọn bấm được, phím tắt. |
 | `client/ServerConnection.java` | Kết nối TCP, luồng đọc từng dòng JSON, tự nối lại mỗi 5 giây khi rớt mạng. |

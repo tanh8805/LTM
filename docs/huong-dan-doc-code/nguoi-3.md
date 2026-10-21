@@ -33,7 +33,7 @@ Tất cả nằm trong `src/main/java/exam/server/`. Mỗi `File.hàm` dưới �
 **3. Giám thị bấm Kết thúc, rồi bấm Kỳ thi mới**
 
 - Kết thúc: `TeacherWindow` → `ExamRoom.endExam` → `ExamRoom.sendEnd` (máy chưa nộp) → `ExamLog.record(EXAM_END)` → `ExamRoom.writeResults`. Hết giờ thì `scheduler` gọi cùng hàm này.
-- Kỳ thi mới: `TeacherWindow` → `ExamRoom.newSession` → `ExamRoom.sendEnd` → `ExamRoom.closeAll` → `sessions.clear()`, `epoch++` → `ExamLog.reset`. Đề đang nạp được giữ; luồng cũ kết thúc muộn bị bỏ qua nhờ `ExamRoom.live`; điểm ML trả về muộn bị bỏ nhờ `epoch` trong `ExamRoom.applyScores`.
+- Kỳ thi mới: `TeacherWindow` → `ExamRoom.newSession` → `ExamRoom.sendEnd` → `ExamRoom.closeAll` → `sessions.clear()`, `epoch++` → `ExamLog.reset`. Đề đang nạp được giữ; phòng trống nên mã SV cũ đăng nhập lại là người mới (client phải tắt app mở lại); luồng cũ kết thúc muộn bị bỏ qua nhờ `ExamRoom.live`; điểm ML trả về muộn bị bỏ nhờ `epoch` trong `ExamRoom.applyScores`.
 
 ## (c) Thầy bảo sửa gì → mở đâu, đổi gì
 

@@ -105,7 +105,7 @@ Trên cửa sổ giám thị, nhấp đúp vào một dòng để xem lịch s�
 ### Kỳ thi mới không cần tắt server
 
 Sau khi bấm **Kết thúc thi**, nút **Kỳ thi mới** (có hộp xác nhận) đóng kết nối các máy còn lại (máy chưa nộp được gửi `EXAM_END` trước), xoá phiên, mẫu ML và bộ đếm, đưa phòng về trạng thái ban đầu nhưng **giữ đề đang nạp**. Nút **Chọn file đề...** dùng được bất cứ lúc nào bài thi chưa bắt đầu (kể cả sau Kỳ thi mới). Kết quả và lịch sử kỳ trước vẫn nằm nguyên trong thư mục `ket-qua/` riêng của nó; kỳ mới tạo thư mục mới khi bấm Bắt đầu.
-Ở client, màn kết quả có nút **Thi lượt mới**: về màn đăng nhập với mã SV và họ tên đã nhập sẵn, đăng nhập lại cho kỳ mới. Cần gửi `exam.jar` mới (kèm `chay-thi.bat`) cho các máy Windows.
+Ở client, màn kết quả chỉ có điểm, lời cảm ơn và nút **Thoát ứng dụng** (không còn nút Thi lượt mới). Muốn thi kỳ mới thì **tắt app rồi mở lại** (nhấp đúp `chay-thi.bat`). Đăng nhập lại cùng mã SV khi đã nộp trong kỳ hiện tại thì server gửi `LOGIN_OK` rồi `RESULT` cũ ngay (không cần PRECHECK, không gửi đề); sau **Kỳ thi mới** phòng trống nên mã SV cũ là người mới. Cần gửi `exam.jar` mới (kèm `chay-thi.bat`) cho các máy Windows.
 
 ### Watchdog chỉ tính sau khi nhận đề
 
@@ -161,10 +161,6 @@ Các bước kỳ thi nhiều lượt (chụp bằng Xvfb, 15 máy giả + 1 má
 |---|---|
 | ![Lịch sử](statics/results/ui/11-lich-su-sim-x.png) | ![Kết thúc](statics/results/ui/12-giam-thi-ket-thuc.png) |
 
-| Client: nút Thi lượt mới | Client: về màn đăng nhập |
-|---|---|
-| ![Thi lượt mới](statics/results/ui/12b-client-ket-qua-thi-luot-moi.png) | ![Đăng nhập lại](statics/results/ui/14-client-ve-man-dang-nhap.png) |
-
 | Giám thị sau Kỳ thi mới | Kỳ thi thứ hai đang chạy |
 |---|---|
 | ![Kỳ thi mới](statics/results/ui/13-giam-thi-ky-thi-moi.png) | ![Kỳ 2](statics/results/ui/16-giam-thi-dang-thi-ky-2.png) |
@@ -192,7 +188,7 @@ Phím tắt khi làm bài: `1`-`9` hoặc `A`-`I` chọn đáp án, mũi tên tr
 7. Máy C chuyển qua lại với Calculator (nằm trong whitelist) liên tục rồi trả lời dồn dập. Không luật nào bắt được, nhưng sau 1-2 phút cột Bất thường của máy C cao hẳn so với cả phòng.
 8. Tắt Wi-Fi máy A: `Mất kết nối`. Bật lại: máy A tự vào lại, làm tiếp với thời gian còn lại.
 9. Kết thúc thi, mở thư mục `ket-qua/<kỳ thi>/` xem `results.csv` và `events.csv`; nhấp đúp một dòng để xem lịch sử máy đó.
-10. Bấm **Kỳ thi mới**, ở máy sinh viên bấm **Thi lượt mới**, đăng nhập lại và bắt đầu thi lần nữa mà không tắt server.
+10. Bấm **Kỳ thi mới**, ở máy sinh viên tắt app rồi mở lại (`chay-thi.bat`), đăng nhập lại và bắt đầu thi lần nữa mà không tắt server.
 
 ## 8. Checklist test thủ công trên Windows
 
@@ -214,7 +210,7 @@ Phần quét tiến trình, mạng, USB chỉ chạy trên Windows nên chưa ki
 - [ ] Hộp xác nhận "Nộp bài?" **không** bị tính là rời cửa sổ.
 - [ ] Nút **Mở thư mục kết quả** mở được thư mục `ket-qua/<kỳ thi>/` bằng Explorer (`Desktop.open`); `events.csv` mở bằng Excel đọc đúng tiếng Việt.
 - [ ] Đăng nhập, PRECHECK đạt, **chờ hơn 2 phút** rồi bấm Bắt đầu: không máy nào bị `Mất kết nối`.
-- [ ] Kết thúc thi, bấm **Kỳ thi mới** rồi **Thi lượt mới** trên máy Windows: đăng nhập lại và thi được lượt mới (quét USB/app lại từ đầu, vi phạm lượt trước không bị nhớ).
+- [ ] Kết thúc thi, bấm **Kỳ thi mới**, tắt app và mở lại bằng `chay-thi.bat` trên máy Windows: đăng nhập lại và thi được lượt mới (quét USB/app lại từ đầu, vi phạm lượt trước không bị nhớ).
 - [ ] Tắt Wi-Fi rồi bật lại: client báo "Mất kết nối, đang thử lại...", tự vào lại, giữ đáp án, thời gian còn lại đúng.
 - [ ] Tìm server qua UDP (để trống ô IP), kể cả máy có ZeroTier (nhiều card mạng).
 - [ ] Nhập IP server thủ công.
