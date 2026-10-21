@@ -42,7 +42,7 @@ public class StudentApp {
 
     private void show() {
         screens = new StudentScreens(frame, this::login, this::runPrecheck, () -> goTo(current - 1),
-            () -> goTo(current + 1), this::submit, this::onAnswer, this::goTo, this::newRound, this::exitNow);
+            () -> goTo(current + 1), this::submit, this::onAnswer, this::goTo, this::exitNow);
         frame.addWindowFocusListener(new WindowAdapter() {
             @Override public void windowGainedFocus(WindowEvent e) { if (otherApp(e)) { monitor.focusGained(); } }
             @Override public void windowLostFocus(WindowEvent e) { if (otherApp(e)) { monitor.focusLost(); } }
@@ -114,6 +114,7 @@ public class StudentApp {
     private void onLoginOk(JsonObject m) {
         loggedInOnce = true;
         rules = m.getAsJsonObject("rules");
+        monitor.useIntervalFrom(m);
         if (questions == null) { runPrecheck(); }      // đã có đề (vào lại giữa giờ): server sẽ gửi lại EXAM_START
     }
 
@@ -144,7 +145,7 @@ public class StudentApp {
                     if (issues.isEmpty()) { screens.showWaiting(); } else { screens.showPrecheck(issues, serverText); }
                 }
             });
-            conn.send(m);
+            if (!finished) { conn.send(m); }        // đã có RESULT (đăng nhập lại sau khi nộp) thì không cần báo PRECHECK nữa
         }, "precheck").start();
     }
 
@@ -160,22 +161,6 @@ public class StudentApp {
         showCurrentQuestion();
         tick();
         screens.showExam(Protocol.str(m, "title"));
-    }
-
-    /** Nút "Thi lượt mới": xoá mọi trạng thái của lượt trước rồi về màn đăng nhập (mã SV, họ tên giữ nguyên trong form). */
-    private void newRound() {
-        if (conn != null) { conn.close(); }
-        monitor.stop();
-        monitor.reset();
-        countdown.stop();
-        answers.clear();
-        questions = null;
-        rules = null;
-        current = 0;
-        deadlineMillis = 0;
-        loggedInOnce = examActive = submitted = finished = exitAfterResult = false;
-        submittedAt = "";
-        screens.resetForNewRound();
     }
 
     private void tick() {
@@ -220,7 +205,7 @@ public class StudentApp {
     private void onExamEnd() {
         if (questions == null) {               // chưa có đề (vào sau khi kết thúc): không có gì để nộp
             finished = true;
-            screens.showEnded("Bài thi đã kết thúc");
+            screens.showFinished("Bài thi đã kết thúc");
             screens.setConnection(TopBar.Conn.NONE);
             conn.close();
         } else if (submitted) {
@@ -251,8 +236,12 @@ public class StudentApp {
         conn.send(m);
     }
 
+    /** RESULT đến lúc nào cũng chuyển sang màn kết quả, kể cả khi máy đang ở màn chờ/PRECHECK (đăng nhập lại sau khi đã nộp). */
     private void onResult(JsonObject m) {
         finished = true;
+        examActive = false;
+        monitor.stop();
+        countdown.stop();
         if (submittedAt.isEmpty()) { submittedAt = java.time.LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss")); }
         screens.showResult(m.get("score").getAsDouble(), m.get("correct").getAsInt(), m.get("total").getAsInt(), submittedAt);
         conn.close();

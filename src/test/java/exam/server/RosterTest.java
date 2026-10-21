@@ -83,7 +83,7 @@ class RosterTest {
     void eventTextIsReadableVietnamese() {
         LocalDateTime t = LocalDateTime.now();
         assertEquals("NET: chatgpt.com", Roster.eventText(new ExamLog.Event(t, "S1", "An", "VIOLATION", "NET: chatgpt.com")));
-        assertEquals("Bất thường 0.91", Roster.eventText(new ExamLog.Event(t, "S1", "An", "ANOMALY_ON", "0.91")));
+        assertEquals("Mức bất thường: Rất cao (0.91).", Roster.eventText(new ExamLog.Event(t, "S1", "An", "ANOMALY_ON", "Mức bất thường: Rất cao (0.91).")));
         assertEquals("Hết bất thường", Roster.eventText(new ExamLog.Event(t, "S1", "An", "ANOMALY_OFF", "0.20")));
         assertEquals("Mất kết nối (socket đóng)", Roster.eventText(new ExamLog.Event(t, "S1", "An", "DISCONNECT", "socket đóng")));
         assertEquals("Vào lại phòng thi", Roster.eventText(new ExamLog.Event(t, "S1", "An", "RECONNECT", "")));

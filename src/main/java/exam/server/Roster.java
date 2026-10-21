@@ -97,7 +97,7 @@ final class Roster {
     static String eventText(ExamLog.Event e) {
         return switch (e.type()) {
             case "VIOLATION" -> e.detail();
-            case "ANOMALY_ON" -> "Bất thường " + e.detail();
+            case "ANOMALY_ON" -> e.detail();
             case "ANOMALY_OFF" -> "Hết bất thường";
             case "DISCONNECT" -> "Mất kết nối (" + e.detail() + ")";
             case "RECONNECT" -> "Vào lại phòng thi";

@@ -21,7 +21,7 @@ Tất cả nằm trong `src/main/java/exam/server/`. Mỗi `File.hàm` dưới �
 - `LOGIN`: `handleMessage` → `ClientHandler.handleLogin` → `ExamRoom.login` (`ExamRoom.loginError` kiểm tra) → `Protocol.send(LOGIN_OK)` → `ExamRoom.trySendExam` (chưa PRECHECK nên chưa gửi đề)
 - `PRECHECK_RESULT`: `ClientHandler.handlePrecheckResult` → `ExamRoom.precheckResult` → `ExamRoom.trySendExam` (gửi `EXAM_START` nếu giám thị đã bấm Bắt đầu)
 - Giám thị bấm Bắt đầu: `TeacherWindow` → `ExamRoom.startExam` → `ExamLog.attach` → `ExamRoom.trySendExam` cho từng máy đã PRECHECK đạt
-- `FEATURES` (30 giây một lần, cũng là heartbeat): `ClientHandler.handleFeatures` → `ExamRoom.features`
+- `FEATURES` (mỗi `featureIntervalSeconds` giây, server cấp trong `LOGIN_OK`; cũng là heartbeat): `ClientHandler.handleFeatures` → `ExamRoom.features`
 - `SUBMIT`: `ClientHandler.handleSubmit` → `ExamRoom.submit` → `ExamFile.grade` → `ExamRoom.writeResults` → `ExamFile.writeResults` → `ExamRoom.sendResult`
 
 **2. Máy rớt mạng rồi vào lại**
@@ -33,13 +33,13 @@ Tất cả nằm trong `src/main/java/exam/server/`. Mỗi `File.hàm` dưới �
 **3. Giám thị bấm Kết thúc, rồi bấm Kỳ thi mới**
 
 - Kết thúc: `TeacherWindow` → `ExamRoom.endExam` → `ExamRoom.sendEnd` (máy chưa nộp) → `ExamLog.record(EXAM_END)` → `ExamRoom.writeResults`. Hết giờ thì `scheduler` gọi cùng hàm này.
-- Kỳ thi mới: `TeacherWindow` → `ExamRoom.newSession` → `ExamRoom.sendEnd` → `ExamRoom.closeAll` → `sessions.clear()`, `epoch++` → `ExamLog.reset`. Đề đang nạp được giữ; luồng cũ kết thúc muộn bị bỏ qua nhờ `ExamRoom.live`; điểm ML trả về muộn bị bỏ nhờ `epoch` trong `ExamRoom.applyScores`.
+- Kỳ thi mới: `TeacherWindow` → `ExamRoom.newSession` → `ExamRoom.sendEnd` → `ExamRoom.closeAll` → `sessions.clear()`, `epoch++` → `ExamLog.reset`. Đề đang nạp được giữ; phòng trống nên mã SV cũ đăng nhập lại là người mới (client phải tắt app mở lại); luồng cũ kết thúc muộn bị bỏ qua nhờ `ExamRoom.live`; điểm ML trả về muộn bị bỏ nhờ `epoch` trong `ExamRoom.applyScores`.
 
 ## (c) Thầy bảo sửa gì → mở đâu, đổi gì
 
 | Thầy bảo | File → hàm | Đổi gì |
 |---|---|---|
-| Đổi timeout watchdog | `ExamServer` → trường `idleTimeoutMs` | Đổi `90_000`. Phải lớn hơn chu kỳ heartbeat 30 giây của client. Chu kỳ quét 10 giây nằm ở `ExamServer.start`. |
+| Đổi timeout watchdog | `ExamServer` → trường `idleTimeoutMs` | Đổi `90_000`. Phải lớn hơn chu kỳ heartbeat `featureIntervalSeconds` (tối đa 60 giây) của client. Chu kỳ quét 10 giây nằm ở `ExamServer.start`. |
 | Đổi cổng | `ExamServer.openTeacherWindow` | Đổi tham số `server.start(...)` (TCP). Máy sinh viên tự biết cổng TCP mới vì UDP trả cổng trong `EXAM_SERVER <cổng>`. Cổng UDP nằm ở `Protocol.UDP_PORT`, client phải khớp. |
 | Thêm loại tin nhắn mới (vd `HELP`) | 1) `Protocol` thêm hằng. 2) `ClientHandler.handleMessage` thêm `case`. 3) `ClientHandler` thêm `handleHelp`. 4) `ExamRoom` thêm hàm `synchronized` (đầu hàm `if (!live(s)) return;`, rồi `log.accept`, `event`). 5) `Session` thêm trường nếu cần lưu. 6) Muốn hiện trên bảng giám thị: `ExamRoom.Row` + `rows()` và giao diện. 7) Client gửi/nhận tin đó. 8) Viết test. | Quên bước 2 thì server chỉ log "Bỏ qua type không biết". |
 | Cho nộp lại bài | `ExamRoom.submit` | Bỏ `if (s.result == null)` để lần nào cũng `ExamFile.grade` lại và `writeResults`. Client đang tự đóng kết nối sau `RESULT`, phải sửa phía client nữa. |
@@ -53,7 +53,7 @@ Tất cả nằm trong `src/main/java/exam/server/`. Mỗi `File.hàm` dưới �
 | Tự kết thúc khi mọi máy đã nộp | `ExamRoom.submit` | Cuối nhánh chấm bài, nếu không còn session nào `!s.submitted` thì `endExam("Mọi máy đã nộp")`. |
 | Kick một máy | `ExamRoom` (hàm mới `kick`) | `synchronized`; lấy `Session s = sessions.get(id)`; `s.close(); markDisconnected(s, "giám thị đá");`. Client sẽ tự vào lại, muốn chặn thì thêm `Set<String> kicked` và kiểm tra trong `loginError`. |
 | Ghi IP máy vào kết quả | `Session` + `ExamRoom.login` + `ExamFile` | `Session` thêm `String ip`; trong `login` gán `s.ip = socket.getInetAddress().getHostAddress()` (kiểm tra `socket != null`, test truyền `null`); thêm cột như dòng "Thêm cột". |
-| Đổi chu kỳ chấm ML | `ExamServer.start` | Đổi `30, 30` ở dòng `scheduleAtFixedRate(this::scoreIfRunning, ...)`. |
+| Đổi chu kỳ FEATURES và chấm ML | `config/rules.json` | Đổi `featureIntervalSeconds` (10 đến 60, sai thì 30). Server gửi trong `LOGIN_OK`, `ExamServer.start` chấm ML cùng chu kỳ. |
 
 ## (d) Năm câu thầy hay hỏi
 
@@ -63,6 +63,6 @@ Tất cả nằm trong `src/main/java/exam/server/`. Mỗi `File.hàm` dưới �
 
 **3. Vì sao gọi ML ngoài khối `synchronized`?** Gọi HTTP có thể mất vài giây hoặc treo; giữ khoá phòng lúc đó thì đăng nhập, nộp bài, bảng giám thị đều đứng. Nên `ExamServer.scoreRoomNow` lấy bản sao mẫu và `epoch` trong khoá, gọi ML ngoài khoá, rồi mới khoá lại để `applyScores`; nếu giữa chừng đã sang kỳ mới thì `epoch` khác và điểm bị bỏ.
 
-**4. Watchdog hoạt động thế nào?** `ExamServer.start` lập lịch `checkIdle` mỗi 10 giây, gọi `ExamRoom.dropIdle(idleTimeoutMs)`. Máy đang ở trạng thái "Đang thi" mà `now - lastSeen` quá 90 giây thì bị `Session.close()` và đánh dấu "Mất kết nối". `lastSeen` được cập nhật khi nhận bất kỳ tin nào (kể cả `FEATURES` 30 giây một lần) và đúng lúc gửi `EXAM_START`, vì trước giờ thi client chưa gửi gì và không được tính là im lặng. Cần watchdog vì rút mạng đột ngột thì TCP không báo lỗi, `readLine` treo mãi.
+**4. Watchdog hoạt động thế nào?** `ExamServer.start` lập lịch `checkIdle` mỗi 10 giây, gọi `ExamRoom.dropIdle(idleTimeoutMs)`. Máy đang ở trạng thái "Đang thi" mà `now - lastSeen` quá 90 giây thì bị `Session.close()` và đánh dấu "Mất kết nối". `lastSeen` được cập nhật khi nhận bất kỳ tin nào (kể cả `FEATURES` mỗi chu kỳ) và đúng lúc gửi `EXAM_START`, vì trước giờ thi client chưa gửi gì và không được tính là im lặng. Cần watchdog vì rút mạng đột ngột thì TCP không báo lỗi, `readLine` treo mãi.
 
 **5. Vì sao TCP cho nghiệp vụ còn UDP chỉ để tìm server?** Đăng nhập, đề, nộp bài, kết quả không được mất hay đảo thứ tự, và cần biết khi nào mất kết nối, nên dùng TCP. Máy sinh viên chưa biết IP server nên broadcast `EXAM_DISCOVER` bằng UDP (TCP không broadcast được); mất gói thì hỏi lại cũng chẳng sao. Server trả `EXAM_SERVER <cổng TCP>` đúng người hỏi, rồi client mở TCP.

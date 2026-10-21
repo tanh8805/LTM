@@ -16,9 +16,13 @@ public final class AppRules {
      * Tiến trình do chính client sinh ra hoặc Windows tự bật/tắt liên tục. tasklist liệt kê cả chính nó,
      * nên thiếu danh sách này thì máy nào cũng bị báo vi phạm. Luôn bỏ qua, không đòi cấu hình.
      */
-    static final Set<String> SYSTEM_PROCESSES = Set.of("tasklist", "netstat", "powershell", "conhost", "cmd", "java",
+    static final Set<String> SYSTEM_PROCESSES = Set.of("tasklist", "netstat", "conhost", "java",
         "javaw", "backgroundtaskhost", "runtimebroker", "searchprotocolhost", "searchfilterhost", "wmiprvse", "dllhost",
         "audiodg", "taskhostw", "smartscreen", "wermgr", "consent", "svchost");
+
+    // Terminal không được mở trong giờ thi (gõ git/curl tải tài liệu); chỉ -Dexam.allowTerminal=true mới bỏ qua, để dev
+    private static final Set<String> TERMINALS = Set.of("cmd", "powershell", "pwsh", "windowsterminal", "openconsole",
+        "conhost");
 
     private final Set<String> blacklist, whitelist, allowedWindow, ignore;
 
@@ -38,7 +42,8 @@ public final class AppRules {
     /** Tiến trình bị bỏ qua hoàn toàn (hệ thống hoặc nằm trong ignoreProcesses). */
     public boolean skip(String name) {
         String n = norm(name);
-        return SYSTEM_PROCESSES.contains(n) || ignore.contains(n);
+        if (SYSTEM_PROCESSES.contains(n) || ignore.contains(n)) { return true; }
+        return Boolean.getBoolean("exam.allowTerminal") && TERMINALS.contains(n);
     }
 
     public boolean blacklisted(String name) { return blacklist.contains(norm(name)); }

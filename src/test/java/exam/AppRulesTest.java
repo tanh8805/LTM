@@ -191,10 +191,68 @@ class AppRulesTest {
     @Test
     void defaultRulesAllowShellAndConsoleWindows() throws Exception {
         AppRules rules = new AppRules(defaultRules());
-        for (String name : List.of("java", "javaw", "cmd", "powershell", "pwsh", "WindowsTerminal", "OpenConsole",
+        for (String name : List.of("java", "javaw", "OpenConsole",
                 "conhost", "explorer", "ApplicationFrameHost", "TextInputHost", "SearchHost",
                 "StartMenuExperienceHost", "ShellExperienceHost", "LockApp")) {
             assertTrue(rules.windowAllowed(name) || rules.skip(name), name + " phải được phép có cửa sổ");
+        }
+    }
+
+    private List<String> precheckWithTerminalWindow(String name, String title) throws Exception {
+        return monitor.precheckFrom(defaultRules(), List.of(new Proc("explorer.exe", 4), new Proc(name + ".exe", 6)),
+            List.of(new Win(name, 6, title)), Set.of());
+    }
+
+    @Test
+    void terminalWindowFailsPrecheck() throws Exception {
+        for (String name : List.of("cmd", "powershell", "pwsh", "WindowsTerminal")) {
+            List<String> issues = precheckWithTerminalWindow(name, "Terminal");
+            assertEquals(1, issues.size(), name + ": " + issues);
+            assertTrue(issues.get(0).toLowerCase().contains(name.toLowerCase()), issues.get(0));
+        }
+    }
+
+    @Test
+    void terminalOpenedDuringExamIsViolation() throws Exception {
+        monitor.setBaselineForTest(Set.of("explorer.exe"), Set.of("C:\\"), Set.of(), defaultRules(), Map.of(), sent::add);
+        windows.put(700, new Win("powershell", 700, "Windows PowerShell"));
+        snapshot(new Proc("powershell.exe", 700));
+        assertEquals(1, sent.size());
+        assertEquals("APP", sent.get(0).get("kind").getAsString());
+    }
+
+    @Test
+    void gitProcessIsViolationEvenWithoutWindow() throws Exception {
+        monitor.setBaselineForTest(Set.of("explorer.exe"), Set.of("C:\\"), Set.of(), defaultRules(), Map.of(), sent::add);
+        snapshot(new Proc("git.exe", 800), new Proc("git-remote-https.exe", 801), new Proc("curl.exe", 802));
+        assertEquals(3, sent.size());
+        assertEquals("git.exe", sent.get(0).get("detail").getAsString());
+    }
+
+    @Test
+    void allowTerminalFlagSkipsTerminal() throws Exception {
+        System.setProperty("exam.allowTerminal", "true");
+        try {
+            assertEquals(List.of(), precheckWithTerminalWindow("powershell", "Windows PowerShell"));
+            assertEquals(List.of(), precheckWithTerminalWindow("WindowsTerminal", "Terminal"));
+        } finally {
+            System.clearProperty("exam.allowTerminal");
+        }
+        assertEquals(1, precheckWithTerminalWindow("powershell", "Windows PowerShell").size(), "Cờ tắt thì lại bị bắt");
+    }
+
+    @Test
+    void defaultRulesBlacklistTransferToolsAndBlockCodeHosts() throws Exception {
+        AppRules rules = new AppRules(defaultRules());
+        for (String name : List.of("git", "git-remote-https", "gh", "curl", "wget", "ssh", "scp", "sftp", "ftp",
+                "bitsadmin", "winscp", "filezilla")) {
+            assertTrue(rules.blacklisted(name + ".exe"), name + " phải bị cấm");
+        }
+        List<String> have = new ArrayList<>();
+        defaultRules().getAsJsonArray("blockedDomains").forEach(e -> have.add(e.getAsString()));
+        for (String d : List.of("github.com", "api.github.com", "codeload.github.com", "raw.githubusercontent.com",
+                "objects.githubusercontent.com", "gitlab.com", "bitbucket.org", "pastebin.com")) {
+            assertTrue(have.contains(d), d);
         }
     }
 

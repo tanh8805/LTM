@@ -62,7 +62,7 @@ config/     rules.json        exams/   sample_exam.json
 | C→S | `PRECHECK_RESULT` | `ok`, `issues` | Có thể gửi nhiều lần |
 | S→C | `EXAM_START` | `title`, `remainingSeconds`, `questions` | Câu hỏi không có `answer` |
 | C→S | `VIOLATION` | `kind` (`APP`/`NET`/`USB`), `detail`, `time` | |
-| C→S | `FEATURES` | `window`, `values` (đúng 6 số) | Mỗi 30 giây, đồng thời là heartbeat |
+| C→S | `FEATURES` | `window`, `values` (đúng 6 số) | Mỗi `featureIntervalSeconds` giây (server cấp trong `LOGIN_OK`, mặc định 30), đồng thời là heartbeat |
 | C→S | `SUBMIT` | `answers` | Khoá = id câu, giá trị = chỉ số lựa chọn từ 0 |
 | S→C | `EXAM_END` | `reason` | Client nhận được thì tự `SUBMIT` |
 | S→C | `RESULT` | `score`, `correct`, `total` | |
@@ -76,7 +76,7 @@ Sáu giá trị của `values`: số tiến trình mới, số lần rời cửa
 ## 4. Cài đặt
 
 - **Máy server:** JDK 17+ và Maven; Python 3.10+.
-- **Máy client (Windows):** chỉ cần Java 17+ (JRE là đủ), chép `exam.jar` sang.
+- **Máy client (Windows):** chỉ cần Java 17+ (JRE là đủ) và **2 file** cùng thư mục: `exam.jar` và `chay-thi.bat`. Sinh viên nhấp đúp `chay-thi.bat` để mở bài thi (không có cửa sổ terminal đi kèm). Terminal (cmd, PowerShell, Windows Terminal) mở trong giờ thi bị PRECHECK/giám sát báo vi phạm; `git`, `curl`, `ssh`... và `github.com` cũng bị cấm trong `config/rules.json`.
 - **Thư viện Java** (Maven tự tải, shade plugin gói hết vào `exam.jar` nên client chỉ cần một file): Gson 2.11.0 (JSON) và **FlatLaf 3.7.2** (giao diện Swing hiện đại; `Theme.install()` ở client và `FlatLightLaf.setup()` ở server).
 - **Python:**
   ```bash
@@ -93,7 +93,7 @@ Chạy từ thư mục gốc repo, theo thứ tự ML, server, client:
 mvn -q package                                                   # tạo target/exam.jar (đã gói kèm Gson)
 cd ml && uvicorn ml_service:app --host 127.0.0.1 --port 8000     # 1. service ML
 java -cp target/exam.jar exam.server.ExamServer                  # 2. server (đọc config/rules.json)
-java -cp target/exam.jar exam.client.StudentApp                  # 3. client
+java -Dexam.allowTerminal=true -cp target/exam.jar exam.client.StudentApp   # 3. client (dev: chạy từ terminal nên phải bật cờ này; máy thi dùng chay-thi.bat)
 ```
 
 Chạy test: `mvn -q test` và `cd ml && python -m pytest -q`.
@@ -105,14 +105,14 @@ Trên cửa sổ giám thị, nhấp đúp vào một dòng để xem lịch s�
 ### Kỳ thi mới không cần tắt server
 
 Sau khi bấm **Kết thúc thi**, nút **Kỳ thi mới** (có hộp xác nhận) đóng kết nối các máy còn lại (máy chưa nộp được gửi `EXAM_END` trước), xoá phiên, mẫu ML và bộ đếm, đưa phòng về trạng thái ban đầu nhưng **giữ đề đang nạp**. Nút **Chọn file đề...** dùng được bất cứ lúc nào bài thi chưa bắt đầu (kể cả sau Kỳ thi mới). Kết quả và lịch sử kỳ trước vẫn nằm nguyên trong thư mục `ket-qua/` riêng của nó; kỳ mới tạo thư mục mới khi bấm Bắt đầu.
-Ở client, màn kết quả có nút **Thi lượt mới**: về màn đăng nhập với mã SV và họ tên đã nhập sẵn, đăng nhập lại cho kỳ mới. Cần gửi `exam.jar` mới cho các máy Windows.
+Ở client, màn kết quả chỉ có điểm, lời cảm ơn và nút **Thoát ứng dụng** (không còn nút Thi lượt mới). Muốn thi kỳ mới thì **tắt app rồi mở lại** (nhấp đúp `chay-thi.bat`). Đăng nhập lại cùng mã SV khi đã nộp trong kỳ hiện tại thì server gửi `LOGIN_OK` rồi `RESULT` cũ ngay (không cần PRECHECK, không gửi đề); sau **Kỳ thi mới** phòng trống nên mã SV cũ là người mới. Cần gửi `exam.jar` mới (kèm `chay-thi.bat`) cho các máy Windows.
 
 ### Watchdog chỉ tính sau khi nhận đề
 
 Server coi máy `Đang thi` là mất kết nối khi quá 90 giây không nhận tin nào, tính từ `lastSeen`. Trước giờ thi client không gửi gì, nên `lastSeen` được đặt lại đúng lúc server gửi `EXAM_START` (`ExamRoom.trySendExam`); máy chờ lâu trước khi bấm Bắt đầu không bị đá nữa.
 `results.csv` có thêm cột `samples` (số FEATURES server đã nhận từ máy đó) và `flaggedCount` (số lần chấm mà máy bị gắn cờ).
 Bảng giám thị có cột **Mẫu**; log ghi `Bất thường: <mã SV> (<điểm>)` / `Hết bất thường: <mã SV>` khi đổi trạng thái và `ML: chưa đủ dữ liệu (n/20 mẫu)` khi n đổi.
-Debug client: thêm `-Dexam.debug=true` (`java -Dexam.debug=true -cp exam.jar exam.client.StudentApp`) để in thời gian mỗi lần quét và nội dung mỗi FEATURES ra stderr.
+Debug client: nhấp đúp `chay-thi-debug.bat` (hoặc thêm `-Dexam.debug=true`; chạy từ terminal thì thêm cả `-Dexam.allowTerminal=true`) để in thời gian mỗi lần quét và nội dung mỗi FEATURES ra stderr.
 
 ### Luật ứng dụng và khi bị báo vi phạm oan
 
@@ -161,10 +161,6 @@ Các bước kỳ thi nhiều lượt (chụp bằng Xvfb, 15 máy giả + 1 má
 |---|---|
 | ![Lịch sử](statics/results/ui/11-lich-su-sim-x.png) | ![Kết thúc](statics/results/ui/12-giam-thi-ket-thuc.png) |
 
-| Client: nút Thi lượt mới | Client: về màn đăng nhập |
-|---|---|
-| ![Thi lượt mới](statics/results/ui/12b-client-ket-qua-thi-luot-moi.png) | ![Đăng nhập lại](statics/results/ui/14-client-ve-man-dang-nhap.png) |
-
 | Giám thị sau Kỳ thi mới | Kỳ thi thứ hai đang chạy |
 |---|---|
 | ![Kỳ thi mới](statics/results/ui/13-giam-thi-ky-thi-moi.png) | ![Kỳ 2](statics/results/ui/16-giam-thi-dang-thi-ky-2.png) |
@@ -192,7 +188,7 @@ Phím tắt khi làm bài: `1`-`9` hoặc `A`-`I` chọn đáp án, mũi tên tr
 7. Máy C chuyển qua lại với Calculator (nằm trong whitelist) liên tục rồi trả lời dồn dập. Không luật nào bắt được, nhưng sau 1-2 phút cột Bất thường của máy C cao hẳn so với cả phòng.
 8. Tắt Wi-Fi máy A: `Mất kết nối`. Bật lại: máy A tự vào lại, làm tiếp với thời gian còn lại.
 9. Kết thúc thi, mở thư mục `ket-qua/<kỳ thi>/` xem `results.csv` và `events.csv`; nhấp đúp một dòng để xem lịch sử máy đó.
-10. Bấm **Kỳ thi mới**, ở máy sinh viên bấm **Thi lượt mới**, đăng nhập lại và bắt đầu thi lần nữa mà không tắt server.
+10. Bấm **Kỳ thi mới**, ở máy sinh viên tắt app rồi mở lại (`chay-thi.bat`), đăng nhập lại và bắt đầu thi lần nữa mà không tắt server.
 
 ## 8. Checklist test thủ công trên Windows
 
@@ -206,7 +202,7 @@ Phần quét tiến trình, mạng, USB chỉ chạy trên Windows nên chưa ki
 - [ ] App micro, app nền (OneDrive, driver âm thanh, Phone Link...) đang chạy: không bị báo vi phạm.
 - [ ] Antigravity mở **trước** lúc đăng nhập: PRECHECK không đạt; mở **trong** giờ thi: vi phạm `APP`.
 - [ ] Calculator vẫn dùng được (không vi phạm, cửa sổ UWP nằm dưới `ApplicationFrameHost`).
-- [ ] Cột **Mẫu** của máy Windows tăng đều 30 giây một lần; có điểm Bất thường sau khi cả phòng đủ 20 mẫu (bật `-Dexam.debug=true` để xem thời gian quét).
+- [ ] Cột **Mẫu** của máy Windows tăng đều mỗi chu kỳ FEATURES (20 giây theo `config/rules.json`) một lần; có điểm Bất thường sau khi cả phòng đủ 20 mẫu (bật `-Dexam.debug=true` để xem thời gian quét).
 - [ ] Giao diện mới hiển thị đúng tiếng Việt có dấu, không vỡ bố cục ở độ phóng to 125%/150% của Windows.
 - [ ] Cắm USB khi đang thi: dòng tô cam, vi phạm `USB`.
 - [ ] Vào chatgpt.com khi đang thi: vi phạm `NET` (và `APP` nếu mở bằng trình duyệt mới).
@@ -214,7 +210,7 @@ Phần quét tiến trình, mạng, USB chỉ chạy trên Windows nên chưa ki
 - [ ] Hộp xác nhận "Nộp bài?" **không** bị tính là rời cửa sổ.
 - [ ] Nút **Mở thư mục kết quả** mở được thư mục `ket-qua/<kỳ thi>/` bằng Explorer (`Desktop.open`); `events.csv` mở bằng Excel đọc đúng tiếng Việt.
 - [ ] Đăng nhập, PRECHECK đạt, **chờ hơn 2 phút** rồi bấm Bắt đầu: không máy nào bị `Mất kết nối`.
-- [ ] Kết thúc thi, bấm **Kỳ thi mới** rồi **Thi lượt mới** trên máy Windows: đăng nhập lại và thi được lượt mới (quét USB/app lại từ đầu, vi phạm lượt trước không bị nhớ).
+- [ ] Kết thúc thi, bấm **Kỳ thi mới**, tắt app và mở lại bằng `chay-thi.bat` trên máy Windows: đăng nhập lại và thi được lượt mới (quét USB/app lại từ đầu, vi phạm lượt trước không bị nhớ).
 - [ ] Tắt Wi-Fi rồi bật lại: client báo "Mất kết nối, đang thử lại...", tự vào lại, giữ đáp án, thời gian còn lại đúng.
 - [ ] Tìm server qua UDP (để trống ô IP), kể cả máy có ZeroTier (nhiều card mạng).
 - [ ] Nhập IP server thủ công.
@@ -226,7 +222,7 @@ Phần quét tiến trình, mạng, USB chỉ chạy trên Windows nên chưa ki
 - **Luật NET không bắt được 100%:** tên miền được phân giải một lần lúc bắt đầu thi; trang dùng CDN đổi IP sẽ lọt. Cột trạng thái của `netstat` không được đọc (để chạy được trên Windows mọi ngôn ngữ) nên cả kết nối đã đóng (`TIME_WAIT`) cũng được tính.
 - **Isolation Forest chỉ phát hiện "khác số đông"**, không biết ai gian lận. Giao diện chỉ ghi "Bất thường"; giám thị quyết định.
 - **Điều kiện `anomaly` khác đặc tả gốc:** `predict() == -1` của Isolation Forest gắn cờ 25-88% sinh viên bình thường khi feature là số đếm nhỏ, nên service chỉ đánh dấu khi điểm chuẩn hoá cũng ≥ 0.7 (`FLAG_MIN_SCORE = 0.7` trong `ml/ml_service.py`; chi tiết và số liệu ở PR Task 8). Điểm chuẩn hoá là tương đối theo phòng, nên phòng không có ai lệch vẫn có thể có vài máy ở dải cao nhất bị đánh dấu.
-- **Điểm Bất thường cần ít nhất 20 mẫu trong cả phòng** (`MIN_SAMPLES` trong `ml/ml_service.py`). Mỗi máy gửi 1 mẫu / 30 giây, nên phòng ít máy phải đợi lâu mới có điểm (4 máy: khoảng 150 giây, điểm đầu tiên xuất hiện ở lần chấm 30 giây kế tiếp). Cột Mẫu và log `ML: chưa đủ dữ liệu` cho biết đang ở đâu. Chạy thêm `simulate_clients.py` để đủ mẫu sớm hơn.
+- **Điểm Bất thường cần ít nhất 20 mẫu trong cả phòng** (`MIN_SAMPLES` trong `ml/ml_service.py`). Mỗi máy gửi 1 mẫu mỗi `featureIntervalSeconds` giây (20 giây theo `config/rules.json`, 10 đến 60, sai hoặc thiếu thì 30), nên phòng ít máy phải đợi lâu mới có điểm (4 máy: khoảng 150 giây, điểm đầu tiên xuất hiện ở lần chấm 30 giây kế tiếp). Cột Mẫu và log `ML: chưa đủ dữ liệu` cho biết đang ở đâu. Chạy thêm `simulate_clients.py` để đủ mẫu sớm hơn.
 - **Kỳ thi mới giữa lúc máy còn "Đang nộp bài...":** máy đó thấy `Mất kết nối` và phải đóng mở lại app (hiếm; hộp xác nhận của giáo viên đã cảnh báo).
 - **Log `ML: chưa đủ dữ liệu (n/20 mẫu)` có thể in `n` lớn hơn số mẫu ML thật sự nhận** (mẫu được chụp trước khi gọi HTTP, số `n` đếm lại sau); chỉ là chữ trong log, điểm vẫn đúng ở lần chấm kế.
 - **Đáp án chỉ lưu trong bộ nhớ client:** rớt mạng mà không tắt app thì vẫn giữ; tắt hẳn app thì mất.

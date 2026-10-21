@@ -1,9 +1,10 @@
-// Luật giám sát ở client: baseline, phát hiện vi phạm (APP có cửa sổ/USB/NET), đếm focus/đáp án và gom feature mỗi 30 giây (Người 2).
+// Luật giám sát ở client: baseline, phát hiện vi phạm (APP có cửa sổ/USB/NET), đếm focus/đáp án và gom feature theo chu kỳ server cấp, mặc định 30 giây (Người 2).
 package exam.client;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import exam.client.WindowsProbe.Conn;
 import exam.client.WindowsProbe.Proc;
 import exam.client.WindowsProbe.Win;
 import exam.common.Protocol;
@@ -28,7 +29,8 @@ public class Monitor {
 
     private final boolean windows = WindowsProbe.isWindows();
     private final Runnable scanTask;
-    private final long scanMs, featuresMs;
+    private final long scanMs;
+    private volatile long featuresMs;
     private ScheduledExecutorService scanner, heartbeat;        // hai luồng riêng: quét chậm không được làm trễ FEATURES
     private volatile Consumer<JsonObject> sender;
 
@@ -45,18 +47,27 @@ public class Monitor {
     private final Map<Integer, Integer> watching = new HashMap<>();
     private static final int WINDOW_CHECKS = 10;
 
-    // Bộ đếm của cửa sổ 30 giây hiện tại
+    // Bộ đếm của cửa sổ FEATURES hiện tại
     private int window = 1, focusLostCount, violationsInWindow, answers;
     private final Set<String> newProcesses = new HashSet<>(), newHosts = new HashSet<>();
+    // Đã từng được đếm trong buổi thi: mỗi tiến trình/IP mới chỉ tính vào cửa sổ đầu tiên nó xuất hiện
+    private final Set<String> seenProcesses = new HashSet<>(), seenHosts = new HashSet<>();
     private long focusLostMillis;
     private long lostSince = -1;                                  // -1 = đang ở trong cửa sổ thi
 
-    public Monitor() { this(null, 3000, 30_000); }
+    public Monitor() { this(null, 3000, Protocol.FEATURE_INTERVAL_DEFAULT * 1000L); }
     /** Cho test: {@code scanTask} thay phép quét thật (null = quét tiến trình/USB/mạng như bình thường). */
     public Monitor(Runnable scanTask, long scanMs, long featuresMs) {
         this.scanTask = scanTask != null ? scanTask : this::scan;
         this.scanMs = scanMs; this.featuresMs = featuresMs;
     }
+
+    /** Lấy chu kỳ gửi FEATURES từ LOGIN_OK; phải gọi trước start(). Thiếu hoặc sai thì 30 giây. */
+    public void useIntervalFrom(JsonObject loginOk) {
+        featuresMs = Protocol.featureInterval(loginOk) * 1000L;
+    }
+
+    public long featureIntervalMillis() { return featuresMs; }
 
     /** Danh sách vấn đề (rỗng = đạt). Chạy lệnh hệ thống nên phải gọi ngoài luồng giao diện. */
     public List<String> precheck(JsonObject rules) {
@@ -147,7 +158,7 @@ public class Monitor {
     private void scan() {
         if (!windows) { return; }
         processSnapshot(Debug.timed("quét tasklist", WindowsProbe::processList), Debug.timed("quét ổ đĩa", WindowsProbe::roots),
-            Debug.timed("quét netstat", WindowsProbe::remoteIps));
+            Debug.timed("quét netstat", WindowsProbe::remoteConnections));
     }
 
     /** Dành cho test cũ chỉ có tên tiến trình, không có pid nên không hỏi cửa sổ. */
@@ -160,9 +171,16 @@ public class Monitor {
      * app mới có cửa sổ không được phép mới bị báo. Hỏi PowerShell chậm nên làm ngoài khối synchronized.
      */
     public void processSnapshot(List<Proc> procs, Set<String> roots, Set<String> remoteIps) {
+        List<Conn> conns = new ArrayList<>();
+        for (String ip : remoteIps) { conns.add(new Conn(ip, -1)); }
+        processSnapshot(procs, roots, conns);
+    }
+
+    /** Như trên nhưng mỗi kết nối kèm PID để vi phạm NET nêu được tên chương trình. */
+    public void processSnapshot(List<Proc> procs, Set<String> roots, List<Conn> connections) {
         List<Integer> toCheck;
         synchronized (this) {
-            toCheck = applySnapshot(procs, roots, remoteIps);
+            toCheck = applySnapshot(procs, roots, connections);
         }
         if (toCheck.isEmpty()) { return; }
         List<Win> found = Debug.timed("hỏi cửa sổ của " + toCheck.size() + " tiến trình mới", () -> windowLookup.apply(toCheck));
@@ -177,12 +195,12 @@ public class Monitor {
     }
 
     /** Trả về các pid mới cần hỏi xem có cửa sổ không. */
-    private List<Integer> applySnapshot(List<Proc> procs, Set<String> roots, Set<String> remoteIps) {
+    private List<Integer> applySnapshot(List<Proc> procs, Set<String> roots, List<Conn> connections) {
         Set<Integer> alive = new HashSet<>();
         for (Proc p : procs) {
             String n = AppRules.norm(p.name());
             if (appRules.skip(n) || baselineProcesses.contains(n)) { continue; }
-            newProcesses.add(n);
+            if (seenProcesses.add(n)) { newProcesses.add(n); }
             if (appRules.blacklisted(n)) {
                 violate("APP", p.name().toLowerCase());
             } else if (p.pid() >= 0) {
@@ -193,10 +211,12 @@ public class Monitor {
         for (String root : roots) {
             if (!baselineRoots.contains(root)) { violate("USB", root); }
         }
-        for (String ip : remoteIps) {
-            String domain = blockedIpToDomain.get(ip);
-            if (domain != null) { violate("NET", domain + " (" + ip + ")"); }
-            if (!baselineIps.contains(ip)) { newHosts.add(ip); }
+        Map<Integer, String> processNames = new HashMap<>();
+        for (Proc p : procs) { processNames.put(p.pid(), p.name()); }
+        for (Conn conn : connections) {
+            String domain = blockedIpToDomain.get(conn.ip());
+            if (domain != null) { violateNet(domain, conn, processNames); }
+            if (!baselineIps.contains(conn.ip()) && seenHosts.add(conn.ip())) { newHosts.add(conn.ip()); }
         }
         watching.keySet().retainAll(alive);
         List<Integer> toCheck = new ArrayList<>();
@@ -209,8 +229,22 @@ public class Monitor {
         return toCheck;
     }
 
-    private void violate(String kind, String detail) {
-        if (!sentViolations.add(kind + "|" + detail)) { return; }
+    /** "<tên miền> (<IP>) – <chương trình>"; chỉ báo một lần cho mỗi cặp tên miền + chương trình dù IP khác nhau. */
+    private void violateNet(String domain, Conn conn, Map<Integer, String> processNames) {
+        String detail = domain + " (" + conn.ip() + ")";
+        String program = "";
+        if (conn.pid() >= 0) {
+            program = processNames.getOrDefault(conn.pid(), "PID " + conn.pid());
+            detail += " – " + program;
+        }
+        violate("NET", detail, domain + "|" + program);
+    }
+
+    private void violate(String kind, String detail) { violate(kind, detail, detail); }
+
+    /** dedupKey: hai vi phạm cùng kind và cùng dedupKey chỉ gửi một lần cả buổi. */
+    private void violate(String kind, String detail, String dedupKey) {
+        if (!sentViolations.add(kind + "|" + dedupKey)) { return; }
         violationsInWindow++;
         JsonObject m = Protocol.msg(Protocol.VIOLATION);
         m.addProperty("kind", kind);
@@ -246,19 +280,6 @@ public class Monitor {
         focusLostCount = violationsInWindow = answers = 0;
         focusLostMillis = 0;
         return m;
-    }
-
-    /** Lượt thi mới: quên vi phạm đã báo và bộ đếm của lượt trước (baseline lấy lại ở PRECHECK kế tiếp). */
-    public synchronized void reset() {
-        sentViolations.clear();
-        flaggedWindowApps.clear();
-        watching.clear();
-        newProcesses.clear();
-        newHosts.clear();
-        window = 1;
-        focusLostCount = violationsInWindow = answers = 0;
-        focusLostMillis = 0;
-        lostSince = -1;
     }
 
     public synchronized void recordAnswer() { answers++; }

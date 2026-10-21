@@ -23,9 +23,9 @@ Mảng của bạn: phát hiện vi phạm trên máy sinh viên và hiển th�
 2. `Monitor.precheck` → `precheckFrom`: kiểm tra trước giờ thi (app bị cấm, app có cửa sổ không được phép, USB) và **lưu baseline**.
 3. `Monitor.processSnapshot`: một lần quét: tiến trình mới nào bị cấm thì vi phạm ngay; tiến trình mới khác chỉ được hỏi "có cửa sổ không" (PowerShell) rồi mới quyết định.
 4. `Monitor.violate`: tạo tin `VIOLATION`, mỗi cặp (`kind`, `detail`) chỉ gửi một lần.
-5. `Monitor.buildFeatures`: ghép 6 số của cửa sổ 30 giây rồi reset bộ đếm.
+5. `Monitor.buildFeatures`: ghép 6 số của một cửa sổ (mặc định 30 giây, server cấp trong `LOGIN_OK`) rồi reset bộ đếm.
 6. `WindowsProbe.parseTasklistProcs`, `parseWindows`, `parseNetstat`, `run`: đọc kết quả lệnh và chạy lệnh có timeout 10 giây.
-7. `Monitor.start` rồi `scan`: hai luồng riêng, quét 3 giây và gửi `FEATURES` 30 giây.
+7. `Monitor.start` rồi `scan`: hai luồng riêng, quét 3 giây và gửi `FEATURES` theo chu kỳ server cấp (`Monitor.useIntervalFrom`).
 8. `Diagnose.processSections`: các mục báo cáo chẩn đoán.
 9. `TeacherWindow.refresh` cùng `Roster.filter` và các lớp vẽ trong `RosterTable`.
 
