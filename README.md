@@ -63,6 +63,7 @@ config/     rules.json  students.csv        exams/   sample_exam.json
 | S→C | `EXAM_START` | `title`, `remainingSeconds`, `questions` | Câu hỏi không có `answer` |
 | C→S | `VIOLATION` | `kind` (`APP`/`NET`/`USB`), `detail`, `time` | |
 | C→S | `FEATURES` | `window`, `values` (đúng 6 số) | Mỗi `featureIntervalSeconds` giây (server cấp trong `LOGIN_OK`, mặc định 30), đồng thời là heartbeat |
+| C→S | `APPS` | `apps` (danh sách `{name, title}` các app có cửa sổ) | Gửi lúc PRECHECK, rồi cứ 15 giây kiểm tra một lần và chỉ gửi khi danh sách đổi; Linux gửi danh sách rỗng. Server giữ bản mới nhất kèm giờ cập nhật (tối đa 100 dòng) |
 | C→S | `SUBMIT` | `answers` | Khoá = id câu, giá trị = chỉ số lựa chọn từ 0 |
 | S→C | `EXAM_END` | `reason` | Client nhận được thì tự `SUBMIT` |
 | S→C | `RESULT` | `score`, `correct`, `total` | |
@@ -100,6 +101,7 @@ Chạy test: `mvn -q test` và `cd ml && python -m pytest -q`.
 Giả lập thêm máy để demo: `cd ml && python simulate_clients.py --count 5 --cheater` (thêm `--interval 3` để thấy kết quả nhanh).
 Mỗi kỳ thi có một thư mục riêng `ket-qua/<yyyyMMdd-HHmmss>_<tên đề không dấu>/` (tạo khi giáo viên bấm Bắt đầu thi, nằm ở thư mục chạy server), gồm `results.csv`, `events.csv` và `server.log`. Hai file CSV là UTF-8 có BOM nên Excel đọc được tiếng Việt. Không còn `results.csv` ở thư mục gốc.
 `events.csv` có các cột `time,studentId,name,type,detail`, mỗi sự kiện ghi và flush ngay một dòng; sự kiện xảy ra trước khi bấm Bắt đầu (đăng nhập, PRECHECK) được giữ trong bộ nhớ và ghi vào file khi thư mục được tạo. Các `type`: `LOGIN`, `RECONNECT`, `LOGIN_FAIL`, `PRECHECK_FAIL` (detail là danh sách vấn đề), `PRECHECK_OK`, `EXAM_SENT`, `VIOLATION`, `ANOMALY_ON`, `ANOMALY_OFF`, `DISCONNECT`, `SUBMIT`, `EXAM_END` (sự kiện của cả phòng, `studentId` rỗng). `server.log` là toàn bộ log của cửa sổ giám thị.
+Bấm vào một sinh viên thì khung chi tiết bên phải có thêm phần **Ứng dụng đang mở (cập nhật hh:mm:ss)**: mỗi app một dòng gồm tên và tiêu đề cửa sổ; app bị cấm tô đỏ, app được phép tô xanh, app chưa có trong danh sách nào màu xám (bỏ các tiến trình hệ thống và `java`).
 Trên cửa sổ giám thị, nhấp đúp vào một dòng để xem lịch sử của thí sinh đó (giờ, loại, chi tiết, lấy từ bộ nhớ); nút **Mở thư mục kết quả** mở thư mục của kỳ thi (không mở được thì hiện đường dẫn).
 
 ### Tài khoản sinh viên

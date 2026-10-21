@@ -44,11 +44,11 @@ class DetailPanel extends JPanel {
         note.setFont(note.getFont().deriveFont(12.5f));
         note.setBorder(BorderFactory.createEmptyBorder(8, 20, 18, 20));
         add(note, BorderLayout.SOUTH);
-        show(null, List.of());
+        show(null, List.of(), null);
     }
 
     /** row = null: chưa chọn ai. events là toàn bộ lịch sử của thí sinh; chỉ các sự kiện đáng chú ý được liệt kê, mới nhất trước. */
-    void show(ExamRoom.Row row, List<ExamLog.Event> events) {
+    void show(ExamRoom.Row row, List<ExamLog.Event> events, ExamRoom.AppsView apps) {
         body.removeAll();
         if (row == null) {
             body.add(text("Chọn một thí sinh", 17, true, Palette.TEXT));
@@ -67,6 +67,7 @@ class DetailPanel extends JPanel {
             stats.add(stat("Bất thường", row.anomalyScore() == null ? "-" : String.format(Locale.ROOT, "%.2f", row.anomalyScore())));
             body.add(stats);
             body.add(Box.createVerticalStrut(20));
+            addApps(apps);
             body.add(text("SỰ KIỆN", 12, true, Palette.MUTED));
             body.add(Box.createVerticalStrut(8));
             List<ExamLog.Event> notable = Roster.notableEvents(events);
@@ -83,6 +84,34 @@ class DetailPanel extends JPanel {
         }
         body.revalidate();
         body.repaint();
+    }
+
+    /** Mỗi app một dòng: đỏ = bị cấm, xanh = được phép, xám = chưa có trong danh sách nào. */
+    private void addApps(ExamRoom.AppsView apps) {
+        boolean received = apps != null && !apps.updatedAt().isEmpty();
+        body.add(text(received ? "ỨNG DỤNG ĐANG MỞ (cập nhật " + apps.updatedAt() + ")" : "ỨNG DỤNG ĐANG MỞ", 12, true, Palette.MUTED));
+        body.add(Box.createVerticalStrut(8));
+        if (!received) {
+            body.add(text(wrap("Chưa nhận danh sách từ máy này."), 13, false, Palette.MUTED));
+        } else if (apps.apps().isEmpty()) {
+            body.add(text(wrap("Không có ứng dụng nào có cửa sổ."), 13, false, Palette.MUTED));
+        }
+        if (received) {
+            for (ExamRoom.AppLine app : apps.apps()) {
+                String title = app.title().isEmpty() ? "" : " · " + app.title();
+                body.add(text(wrap(app.name() + title), 13, false, colorOf(app.kind())));
+                body.add(Box.createVerticalStrut(4));
+            }
+        }
+        body.add(Box.createVerticalStrut(16));
+    }
+
+    private static Color colorOf(ExamRoom.AppKind kind) {
+        return switch (kind) {
+            case BLOCKED -> Palette.ERROR;
+            case ALLOWED -> Palette.SUCCESS;
+            case OTHER -> Palette.MUTED;
+        };
     }
 
     /** Chữ tự xuống dòng trong bề ngang của khung (JLabel không tự ngắt dòng nếu không dùng HTML). */

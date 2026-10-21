@@ -219,7 +219,7 @@ public class TeacherWindow extends JFrame {
         actionBtn.setBackground(!actionBtn.isEnabled() ? new Color(0xA9B4C6) : started && !ended ? new Color(0xC9302C) : Palette.PRIMARY);
     }
 
-    private void showDetail(ExamRoom.Row row) { detail.show(row, row == null ? List.of() : room.history(row.studentId())); }
+    private void showDetail(ExamRoom.Row row) { detail.show(row, row == null ? List.of() : room.history(row.studentId()), row == null ? null : room.appsOf(row.studentId())); }
 
     private void openHistory(ExamRoom.Row row) {
         if (row != null) { new HistoryDialog(this, row.studentId(), row.name(), room.history(row.studentId())).setVisible(true); }

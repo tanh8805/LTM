@@ -2,6 +2,7 @@ package exam.server;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import exam.client.AppRules;
 import exam.common.Protocol;
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -26,9 +27,20 @@ public class ExamRoom {
                       Double anomalyScore, boolean anomaly, Double score, int samples, String os, int focusLost,
                       String lastViolationAt) {}
 
+    public record AppInfo(String name, String title) {}
+
+    /** BLOCKED = trong blacklistApps, ALLOWED = được phép có cửa sổ, OTHER = chưa có trong danh sách nào. */
+    public enum AppKind { BLOCKED, ALLOWED, OTHER }
+
+    public record AppLine(String name, String title, AppKind kind) {}
+
+    /** updatedAt rỗng nghĩa là máy chưa báo danh sách app lần nào. */
+    public record AppsView(List<AppLine> apps, String updatedAt) {}
+
     public record Summary(String title, int questions, int minutes, String startedAt) {}
 
-    private static final DateTimeFormatter HOUR_MINUTE = DateTimeFormatter.ofPattern("HH:mm");
+    private static final DateTimeFormatter HOUR_MINUTE = DateTimeFormatter.ofPattern("HH:mm"),
+        HOUR_MINUTE_SECOND = DateTimeFormatter.ofPattern("HH:mm:ss");
 
     private final JsonObject rules;
     private final ScheduledExecutorService scheduler;
@@ -262,6 +274,14 @@ public class ExamRoom {
         event(s, "VIOLATION", s.lastViolation);
     }
 
+    synchronized void apps(Session s, List<AppInfo> apps) {
+        if (!live(s)) {
+            return;
+        }
+        s.apps = apps;
+        s.appsAt = LocalTime.now().format(HOUR_MINUTE_SECOND);
+    }
+
     synchronized void submit(Session s, JsonObject answers) {
         if (!live(s)) {
             return;
@@ -355,6 +375,26 @@ public class ExamRoom {
                 s.anomaly, score, s.samples.size(), s.os, s.focusLost(), s.lastViolationAt));
         }
         return list;
+    }
+
+    /** App đang mở của một thí sinh, đã tô loại theo luật hiện tại; null nếu không có thí sinh đó. */
+    public synchronized AppsView appsOf(String studentId) {
+        Session s = sessions.get(studentId);
+        if (s == null) {
+            return null;
+        }
+        AppRules appRules = new AppRules(rules);
+        List<AppLine> lines = new ArrayList<>();
+        for (AppInfo a : s.apps) {
+            AppKind kind = AppKind.OTHER;
+            if (appRules.blacklisted(a.name())) {
+                kind = AppKind.BLOCKED;
+            } else if (appRules.windowAllowed(a.name())) {
+                kind = AppKind.ALLOWED;
+            }
+            lines.add(new AppLine(a.name(), a.title(), kind));
+        }
+        return new AppsView(lines, s.appsAt);
     }
 
     public synchronized Summary summary() {

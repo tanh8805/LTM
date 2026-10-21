@@ -114,6 +114,7 @@ public class StudentApp {
     private void onLoginOk(JsonObject m) {
         loggedInOnce = true;
         rules = m.getAsJsonObject("rules");
+        monitor.forgetApps();                       // server (mới) chưa có danh sách app đang mở
         studentName = Protocol.str(m, "name");       // họ tên lấy từ danh sách của server
         monitor.useIntervalFrom(m);
         if (questions == null) { runPrecheck(); }      // đã có đề (vào lại giữa giờ): server sẽ gửi lại EXAM_START
@@ -146,7 +147,7 @@ public class StudentApp {
                     if (issues.isEmpty()) { screens.showWaiting(studentName); } else { screens.showPrecheck(issues, serverText, studentName); }
                 }
             });
-            if (!finished) { conn.send(m); }        // đã có RESULT (đăng nhập lại sau khi nộp) thì không cần báo PRECHECK nữa
+            if (!finished) { conn.send(m); monitor.reportApps(conn::send); }        // đã có RESULT (đăng nhập lại sau khi nộp) thì không cần báo PRECHECK nữa
         }, "precheck").start();
     }
 
