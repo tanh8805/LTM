@@ -40,6 +40,9 @@ public class Session {
 
     long lastSeen;
 
+    List<ExamRoom.AppInfo> apps = List.of();       // danh sách app mới nhất do client báo
+    String appsAt = "";                            // giờ cập nhật dạng HH:mm:ss; rỗng = chưa nhận
+
     Session(String id, String name) {
         this.id = id;
         this.name = name;

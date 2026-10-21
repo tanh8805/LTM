@@ -605,4 +605,27 @@ class ExamServerTest {
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> server.room().loadExam(bad));
         assertTrue(e.getMessage().contains("2"), e.getMessage());
     }
+
+    @Test
+    void appsMessageStoredOnSession() throws IOException, InterruptedException {
+        TestClient c = login("S1");
+        JsonObject m = Protocol.msg(Protocol.APPS);
+        JsonArray apps = new JsonArray();
+        for (String[] a : new String[][] {{"zalo", "Zalo"}, {"calc", "Máy tính"}, {"notepad", "Ghi chú"}}) {
+            JsonObject app = new JsonObject();
+            app.addProperty("name", a[0]);
+            app.addProperty("title", a[1]);
+            apps.add(app);
+        }
+        m.add("apps", apps);
+        c.send(m);
+        long deadline = System.currentTimeMillis() + 2000;
+        while (server.room().appsOf("S1").updatedAt().isEmpty() && System.currentTimeMillis() < deadline) { Thread.sleep(20); }
+        ExamRoom.AppsView view = server.room().appsOf("S1");
+        assertTrue(view.updatedAt().matches("\\d\\d:\\d\\d:\\d\\d"), view.updatedAt());
+        assertEquals(3, view.apps().size());
+        assertEquals("Zalo", view.apps().get(0).title());
+        assertEquals(ExamRoom.AppKind.BLOCKED, view.apps().get(0).kind());      // zalo.exe nằm trong blacklistApps của setUp
+        assertEquals(ExamRoom.AppKind.OTHER, view.apps().get(1).kind());
+    }
 }

@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -23,6 +24,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 public class Monitor {
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm:ss");
@@ -31,6 +33,10 @@ public class Monitor {
     private final Runnable scanTask;
     private final long scanMs;
     private volatile long featuresMs;
+    private static final long APPS_SECONDS = 15;
+    private ScheduledExecutorService appsTimer;                 // báo danh sách app đang mở, tạo ở lần PRECHECK đầu tiên
+    private Supplier<List<Win>> appsLookup = () -> windows ? WindowsProbe.windowedApps() : List.of();
+    private String lastApps;                                    // JSON của lần gửi APPS gần nhất; null = chưa gửi
     private ScheduledExecutorService scanner, heartbeat;        // hai luồng riêng: quét chậm không được làm trễ FEATURES
     private volatile Consumer<JsonObject> sender;
 
@@ -133,8 +139,50 @@ public class Monitor {
         return Executors.newSingleThreadScheduledExecutor(r -> { Thread t = new Thread(r, name); t.setDaemon(true); return t; });
     }
 
+    /** Gửi APPS ngay (lần đầu), rồi cứ 15 giây kiểm tra một lần và chỉ gửi khi danh sách đổi. Gọi nhiều lần cũng chỉ có một bộ hẹn giờ. */
+    public synchronized void reportApps(Consumer<JsonObject> out) {
+        if (appsTimer != null) { return; }
+        appsTimer = newThread("monitor-apps");
+        appsTimer.scheduleWithFixedDelay(() -> safely(() -> sendAppsIfChanged(out)), 0, APPS_SECONDS, TimeUnit.SECONDS);
+    }
+
+    /** Server mới (hoặc vào lại) chưa có danh sách: lần kiểm tra kế tiếp sẽ gửi lại dù không đổi. */
+    public synchronized void forgetApps() { lastApps = null; }
+
+    /** Cho test thay lệnh PowerShell liệt kê app có cửa sổ. */
+    public void setAppsLookupForTest(Supplier<List<Win>> lookup) { this.appsLookup = lookup; }
+
+    /** Gửi APPS nếu danh sách khác lần trước. Trên Linux danh sách luôn rỗng (gửi một lần). */
+    public void sendAppsIfChanged(Consumer<JsonObject> out) {
+        JsonObject m = appsMessage(appsLookup.get());
+        synchronized (this) {
+            String json = m.toString();
+            if (json.equals(lastApps)) { return; }
+            lastApps = json;
+        }
+        out.accept(m);
+    }
+
+    /** APPS gồm các app có cửa sổ (bỏ tiến trình hệ thống), sắp theo tên rồi tiêu đề, không trùng. */
+    private synchronized JsonObject appsMessage(List<Win> wins) {
+        List<Win> sorted = new ArrayList<>(wins);
+        sorted.sort(Comparator.comparing((Win w) -> w.name().toLowerCase()).thenComparing(Win::title));
+        Set<String> seen = new HashSet<>();
+        JsonArray apps = new JsonArray();
+        for (Win w : sorted) {
+            if (appRules.skip(w.name()) || !seen.add(w.name() + "|" + w.title())) { continue; }
+            JsonObject app = new JsonObject();
+            app.addProperty("name", w.name());
+            app.addProperty("title", w.title());
+            apps.add(app);
+        }
+        JsonObject m = Protocol.msg(Protocol.APPS);
+        m.add("apps", apps);
+        return m;
+    }
+
     public void stop() {
-        for (ScheduledExecutorService e : new ScheduledExecutorService[] {scanner, heartbeat}) {
+        for (ScheduledExecutorService e : new ScheduledExecutorService[] {scanner, heartbeat, appsTimer}) {
             if (e != null) { e.shutdownNow(); }
         }
     }

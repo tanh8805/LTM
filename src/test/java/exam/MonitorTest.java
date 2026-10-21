@@ -227,4 +227,24 @@ class MonitorTest {
         long features = got.stream().filter(m -> "FEATURES".equals(m.get("type").getAsString())).count();
         assertTrue(features >= 5, "chỉ gửi được " + features + " FEATURES trong 1,5 giây trong khi quét đang chậm");
     }
+
+    @Test
+    void appsSentOnlyWhenChanged() {
+        List<WindowsProbe.Win> wins = new ArrayList<>(List.of(new WindowsProbe.Win("notepad", 7, "Ghi chú"),
+            new WindowsProbe.Win("calc", 8, "Máy tính")));
+        monitor.setAppsLookupForTest(() -> wins);
+        List<JsonObject> sent = new ArrayList<>();
+        monitor.sendAppsIfChanged(sent::add);
+        monitor.sendAppsIfChanged(sent::add);
+        assertEquals(1, sent.size(), "danh sách không đổi thì không gửi lại");
+        assertEquals(Protocol.APPS, Protocol.type(sent.get(0)));
+        assertEquals("calc", sent.get(0).getAsJsonArray("apps").get(0).getAsJsonObject().get("name").getAsString());
+        wins.add(new WindowsProbe.Win("zalo", 9, "Zalo"));
+        monitor.sendAppsIfChanged(sent::add);
+        assertEquals(2, sent.size());
+        assertEquals(3, sent.get(1).getAsJsonArray("apps").size());
+        monitor.forgetApps();
+        monitor.sendAppsIfChanged(sent::add);
+        assertEquals(3, sent.size(), "sau forgetApps thì gửi lại dù không đổi");
+    }
 }

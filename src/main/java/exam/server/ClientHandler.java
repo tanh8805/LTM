@@ -8,8 +8,12 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.net.Socket;
+import java.util.ArrayList;
+import java.util.List;
 
 class ClientHandler implements Runnable {
+    private static final int MAX_APPS = 100;
+
     private final ExamServer server;
     private final ExamRoom room;
     private final Socket socket;
@@ -79,6 +83,7 @@ class ClientHandler implements Runnable {
             case Protocol.PRECHECK_RESULT -> handlePrecheckResult(m);
             case Protocol.VIOLATION -> handleViolation(m);
             case Protocol.FEATURES -> handleFeatures(m);
+            case Protocol.APPS -> handleApps(m);
             case Protocol.SUBMIT -> handleSubmit(m);
             default -> server.log("Bỏ qua type không biết: " + type);
         }
@@ -145,6 +150,21 @@ class ClientHandler implements Runnable {
         sample.addProperty("window", window);
         sample.add("values", values);
         room.features(session, sample);
+    }
+
+    private void handleApps(JsonObject m) {
+        if (!(m.get("apps") instanceof JsonArray array)) {
+            server.log("Bỏ qua APPS thiếu danh sách từ " + session.id);
+            return;
+        }
+        List<ExamRoom.AppInfo> apps = new ArrayList<>();
+        for (JsonElement item : array) {
+            // phần tử sai kiểu hoặc thiếu tên thì bỏ qua; giới hạn số dòng để một tin xấu không làm nặng giao diện
+            if (item instanceof JsonObject app && !Protocol.str(app, "name").isEmpty() && apps.size() < MAX_APPS) {
+                apps.add(new ExamRoom.AppInfo(Protocol.str(app, "name"), Protocol.str(app, "title")));
+            }
+        }
+        room.apps(session, apps);
     }
 
     private boolean isSixNumbers(JsonElement values) {
