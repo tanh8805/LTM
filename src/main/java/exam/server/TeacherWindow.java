@@ -42,7 +42,8 @@ public class TeacherWindow extends JFrame {
     private final ExamServer server;
     private final ExamRoom room;
     private final JButton chooseBtn = new JButton("Mở đề..."), folderBtn = new JButton("Thư mục kết quả"),
-        studentsBtn = new JButton("Nhập danh sách SV..."), rulesBtn = new JButton("Quản lý ứng dụng..."), actionBtn = new JButton();
+        studentsBtn = new JButton("Nhập danh sách SV..."), rulesBtn = new JButton("Quản lý ứng dụng..."),
+        examsBtn = new JButton("Quản lý đề..."), actionBtn = new JButton();
     private final JLabel titleLabel = label("Chưa chọn đề", 15, true, Palette.TEXT), subLabel = label(" ", 12, false, Palette.MUTED),
         timeValue = label("-", 15, true, Palette.TEXT), studentsLabel = label(" ", 13, false, Palette.MUTED),
         noListWarning = label("Chưa nạp danh sách sinh viên: ai cũng đăng nhập được", 13, true, new Color(0x7A5B00));
@@ -64,6 +65,7 @@ public class TeacherWindow extends JFrame {
         chooseBtn.addActionListener(e -> chooseExam());
         folderBtn.addActionListener(e -> openResults());
         studentsBtn.addActionListener(e -> importStudents());
+        examsBtn.addActionListener(e -> { new ExamBankDialog(this, room, ExamBank.DIR).setVisible(true); refresh(); });
         rulesBtn.addActionListener(e -> new RulesDialog(this, server).setVisible(true));
         actionBtn.addActionListener(e -> onAction());
         actionBtn.setForeground(Color.WHITE);
@@ -134,6 +136,7 @@ public class TeacherWindow extends JFrame {
         titles.add(titleLabel, BorderLayout.NORTH);
         titles.add(subLabel, BorderLayout.SOUTH);
         left.add(chooseBtn);
+        left.add(examsBtn);
         left.add(titles);
         Pill clock = new Pill(Color.WHITE, Palette.BORDER, 18, 6);
         clock.add(label("Còn lại", 13, false, Palette.MUTED));
@@ -207,6 +210,7 @@ public class TeacherWindow extends JFrame {
         int students = room.studentCount();
         studentsLabel.setText(students == 0 ? " " : "Đã nạp " + students + " SV");
         noListWarning.setVisible(students == 0);
+        examsBtn.setEnabled(!started);
         chooseBtn.setEnabled(!started);                    // chỉ đổi được đề khi bài thi chưa bắt đầu (kể cả sau Kỳ thi mới)
         if (ended) {
             timeValue.setText("Đã kết thúc");
