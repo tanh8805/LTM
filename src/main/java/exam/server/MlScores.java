@@ -15,7 +15,10 @@ import java.util.function.Consumer;
 
 final class MlScores {
     static final int ML_MIN_SAMPLES = 20;          // phải khớp MIN_SAMPLES trong ml/ml_service.py
-    private int lastShortage = -1;                 // số mẫu ở lần đã log "chưa đủ dữ liệu", để không lặp lại mỗi 30 giây
+    private int lastShortage = -1;                 // số mẫu ở lần đã log "chưa đủ dữ liệu", để không lặp lại mỗi lần chấm
+    private final int windowSeconds;               // độ dài một cửa sổ FEATURES, dùng để nói "trong bao lâu gần nhất"
+
+    MlScores(int windowSeconds) { this.windowSeconds = windowSeconds; }
 
     /** Bản sao mọi mẫu FEATURES của cả phòng, mỗi mẫu có thêm studentId. Gọi trong khối synchronized của phòng. */
     static JsonArray samples(Collection<Session> sessions) {
@@ -49,7 +52,7 @@ final class MlScores {
             s.anomaly = now;
             s.reasons = reasonsOf(r);
             if (now) { s.flaggedCount++; }
-            if (now && !was) { log.accept("Bất thường: " + s.id + ". " + describe(score, s.reasons)); onChange.accept(s, "ANOMALY_ON"); }
+            if (now && !was) { log.accept("Bất thường: " + s.id + ". " + describe(score, s.reasons, windowSeconds)); onChange.accept(s, "ANOMALY_ON"); }
             if (!now && was) { log.accept("Hết bất thường: " + s.id); onChange.accept(s, "ANOMALY_OFF"); }
             s.maxAnomaly = s.maxAnomaly == null ? score : Math.max(s.maxAnomaly, score);
         }
@@ -63,8 +66,6 @@ final class MlScores {
         "vi phạm luật %s lần (các máy khác thường %s lần)",
         "chọn hoặc đổi đáp án %s lần (các máy khác thường %s lần)"};
 
-    private static final int WINDOW_SECONDS = 30;
-
     private static JsonArray reasonsOf(JsonObject result) {
         JsonElement reasons = result.get("reasons");
         if (reasons == null || !reasons.isJsonArray()) {
@@ -74,7 +75,7 @@ final class MlScores {
     }
 
     /** Câu giải thích cho giám thị, dùng chung cho log, events.csv và giao diện. */
-    static String describe(double score, JsonArray reasons) {
+    static String describe(double score, JsonArray reasons, int windowSeconds) {
         String text = "Mức bất thường: " + level(score) + " (" + String.format(Locale.ROOT, "%.2f", score) + ").";
 
         List<String> parts = new ArrayList<>();
@@ -93,7 +94,7 @@ final class MlScores {
         if (parts.isEmpty()) {
             return text + " Không có hành vi nào lệch rõ rệt.";
         }
-        return text + " Trong " + duration(windows * WINDOW_SECONDS) + " gần nhất, máy này: " + String.join(" · ", parts);
+        return text + " Trong " + duration(windows * windowSeconds) + " gần nhất, máy này: " + String.join(" · ", parts);
     }
 
     private static String level(double score) {

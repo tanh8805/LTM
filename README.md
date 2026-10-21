@@ -62,7 +62,7 @@ config/     rules.json        exams/   sample_exam.json
 | C→S | `PRECHECK_RESULT` | `ok`, `issues` | Có thể gửi nhiều lần |
 | S→C | `EXAM_START` | `title`, `remainingSeconds`, `questions` | Câu hỏi không có `answer` |
 | C→S | `VIOLATION` | `kind` (`APP`/`NET`/`USB`), `detail`, `time` | |
-| C→S | `FEATURES` | `window`, `values` (đúng 6 số) | Mỗi 30 giây, đồng thời là heartbeat |
+| C→S | `FEATURES` | `window`, `values` (đúng 6 số) | Mỗi `featureIntervalSeconds` giây (server cấp trong `LOGIN_OK`, mặc định 30), đồng thời là heartbeat |
 | C→S | `SUBMIT` | `answers` | Khoá = id câu, giá trị = chỉ số lựa chọn từ 0 |
 | S→C | `EXAM_END` | `reason` | Client nhận được thì tự `SUBMIT` |
 | S→C | `RESULT` | `score`, `correct`, `total` | |
@@ -206,7 +206,7 @@ Phần quét tiến trình, mạng, USB chỉ chạy trên Windows nên chưa ki
 - [ ] App micro, app nền (OneDrive, driver âm thanh, Phone Link...) đang chạy: không bị báo vi phạm.
 - [ ] Antigravity mở **trước** lúc đăng nhập: PRECHECK không đạt; mở **trong** giờ thi: vi phạm `APP`.
 - [ ] Calculator vẫn dùng được (không vi phạm, cửa sổ UWP nằm dưới `ApplicationFrameHost`).
-- [ ] Cột **Mẫu** của máy Windows tăng đều 30 giây một lần; có điểm Bất thường sau khi cả phòng đủ 20 mẫu (bật `-Dexam.debug=true` để xem thời gian quét).
+- [ ] Cột **Mẫu** của máy Windows tăng đều mỗi chu kỳ FEATURES (20 giây theo `config/rules.json`) một lần; có điểm Bất thường sau khi cả phòng đủ 20 mẫu (bật `-Dexam.debug=true` để xem thời gian quét).
 - [ ] Giao diện mới hiển thị đúng tiếng Việt có dấu, không vỡ bố cục ở độ phóng to 125%/150% của Windows.
 - [ ] Cắm USB khi đang thi: dòng tô cam, vi phạm `USB`.
 - [ ] Vào chatgpt.com khi đang thi: vi phạm `NET` (và `APP` nếu mở bằng trình duyệt mới).
@@ -226,7 +226,7 @@ Phần quét tiến trình, mạng, USB chỉ chạy trên Windows nên chưa ki
 - **Luật NET không bắt được 100%:** tên miền được phân giải một lần lúc bắt đầu thi; trang dùng CDN đổi IP sẽ lọt. Cột trạng thái của `netstat` không được đọc (để chạy được trên Windows mọi ngôn ngữ) nên cả kết nối đã đóng (`TIME_WAIT`) cũng được tính.
 - **Isolation Forest chỉ phát hiện "khác số đông"**, không biết ai gian lận. Giao diện chỉ ghi "Bất thường"; giám thị quyết định.
 - **Điều kiện `anomaly` khác đặc tả gốc:** `predict() == -1` của Isolation Forest gắn cờ 25-88% sinh viên bình thường khi feature là số đếm nhỏ, nên service chỉ đánh dấu khi điểm chuẩn hoá cũng ≥ 0.7 (`FLAG_MIN_SCORE = 0.7` trong `ml/ml_service.py`; chi tiết và số liệu ở PR Task 8). Điểm chuẩn hoá là tương đối theo phòng, nên phòng không có ai lệch vẫn có thể có vài máy ở dải cao nhất bị đánh dấu.
-- **Điểm Bất thường cần ít nhất 20 mẫu trong cả phòng** (`MIN_SAMPLES` trong `ml/ml_service.py`). Mỗi máy gửi 1 mẫu / 30 giây, nên phòng ít máy phải đợi lâu mới có điểm (4 máy: khoảng 150 giây, điểm đầu tiên xuất hiện ở lần chấm 30 giây kế tiếp). Cột Mẫu và log `ML: chưa đủ dữ liệu` cho biết đang ở đâu. Chạy thêm `simulate_clients.py` để đủ mẫu sớm hơn.
+- **Điểm Bất thường cần ít nhất 20 mẫu trong cả phòng** (`MIN_SAMPLES` trong `ml/ml_service.py`). Mỗi máy gửi 1 mẫu mỗi `featureIntervalSeconds` giây (20 giây theo `config/rules.json`, 10 đến 60, sai hoặc thiếu thì 30), nên phòng ít máy phải đợi lâu mới có điểm (4 máy: khoảng 150 giây, điểm đầu tiên xuất hiện ở lần chấm 30 giây kế tiếp). Cột Mẫu và log `ML: chưa đủ dữ liệu` cho biết đang ở đâu. Chạy thêm `simulate_clients.py` để đủ mẫu sớm hơn.
 - **Kỳ thi mới giữa lúc máy còn "Đang nộp bài...":** máy đó thấy `Mất kết nối` và phải đóng mở lại app (hiếm; hộp xác nhận của giáo viên đã cảnh báo).
 - **Log `ML: chưa đủ dữ liệu (n/20 mẫu)` có thể in `n` lớn hơn số mẫu ML thật sự nhận** (mẫu được chụp trước khi gọi HTTP, số `n` đếm lại sau); chỉ là chữ trong log, điểm vẫn đúng ở lần chấm kế.
 - **Đáp án chỉ lưu trong bộ nhớ client:** rớt mạng mà không tắt app thì vẫn giữ; tắt hẳn app thì mất.

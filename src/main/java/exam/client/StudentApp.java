@@ -114,6 +114,7 @@ public class StudentApp {
     private void onLoginOk(JsonObject m) {
         loggedInOnce = true;
         rules = m.getAsJsonObject("rules");
+        monitor.useIntervalFrom(m);
         if (questions == null) { runPrecheck(); }      // đã có đề (vào lại giữa giờ): server sẽ gửi lại EXAM_START
     }
 

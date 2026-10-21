@@ -8,6 +8,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import exam.client.Monitor;
 import exam.client.WindowsProbe;
+import exam.common.Protocol;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -72,6 +73,18 @@ class MonitorTest {
         snapshot(Set.of("explorer.exe", "calculatorapp.exe"), Set.of("C:\\"), Set.of());
         assertTrue(sent.isEmpty());
         assertEquals(1, values(monitor.buildFeatures())[0]);
+    }
+
+    @Test
+    void monitorUsesIntervalFromServer() {
+        assertEquals(30_000, monitor.featureIntervalMillis(), "chưa nhận LOGIN_OK thì dùng 30 giây");
+        JsonObject loginOk = Protocol.msg(Protocol.LOGIN_OK);
+        loginOk.addProperty("featureIntervalSeconds", 20);
+        monitor.useIntervalFrom(loginOk);
+        assertEquals(20_000, monitor.featureIntervalMillis());
+        loginOk.addProperty("featureIntervalSeconds", 5);
+        monitor.useIntervalFrom(loginOk);
+        assertEquals(30_000, monitor.featureIntervalMillis(), "giá trị sai thì quay về 30 giây");
     }
 
     @Test

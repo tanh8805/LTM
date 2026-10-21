@@ -108,7 +108,9 @@ public class ExamServer {
         serverSocket = new ServerSocket(tcpPort);
         newDaemonThread(this::acceptLoop, "accept").start();
         scheduler.scheduleAtFixedRate(this::checkIdle, 10, 10, TimeUnit.SECONDS);
-        scheduler.scheduleAtFixedRate(this::scoreIfRunning, 30, 30, TimeUnit.SECONDS);
+        // chấm ML cùng chu kỳ với FEATURES của client
+        int scoreSeconds = room.featureIntervalSeconds();
+        scheduler.scheduleAtFixedRate(this::scoreIfRunning, scoreSeconds, scoreSeconds, TimeUnit.SECONDS);
         log("Server lắng nghe TCP cổng " + tcpPort());
     }
 

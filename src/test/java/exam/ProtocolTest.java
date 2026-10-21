@@ -11,6 +11,25 @@ import org.junit.jupiter.api.Test;
 
 class ProtocolTest {
 
+    private static JsonObject withInterval(String json) {
+        return Protocol.parse("{\"featureIntervalSeconds\":" + json + "}");
+    }
+
+    @Test
+    void featureIntervalAcceptsTenToSixty() {
+        assertEquals(20, Protocol.featureInterval(withInterval("20")));
+        assertEquals(10, Protocol.featureInterval(withInterval("10")));
+        assertEquals(60, Protocol.featureInterval(withInterval("60")));
+    }
+
+    @Test
+    void invalidIntervalFallsBackTo30() {
+        assertEquals(30, Protocol.featureInterval(Protocol.parse("{}")));
+        for (String bad : new String[] {"9", "61", "0", "-5", "20.5", "\"20\"", "null", "true"}) {
+            assertEquals(30, Protocol.featureInterval(withInterval(bad)), bad);
+        }
+    }
+
     private static String serialize(JsonObject m) {
         StringWriter sw = new StringWriter();
         Protocol.send(new PrintWriter(sw), m);

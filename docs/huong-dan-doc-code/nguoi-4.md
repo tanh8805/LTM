@@ -26,8 +26,8 @@ Mảng của bạn: phát hiện máy "khác số đông" bằng Isolation Fores
 
 ## 3. Một luồng chạy thật: từ `FEATURES` đến cột "Bất thường"
 
-1. Mỗi 30 giây client gửi `FEATURES` (`window` và 6 số) từ `Monitor.sendFeatures`. Trên server, `ClientHandler.features` kiểm tra đúng 6 số rồi `ExamRoom.features` lưu mẫu vào `Session.samples`.
-2. `ExamServer` có lịch 30 giây gọi `scoreIfRunning`. Bài đang diễn ra nên gọi `scoreRoomNow`: `room.samplesForMl()` gom mẫu của mọi sinh viên (thêm `studentId`).
+1. Mỗi chu kỳ `featureIntervalSeconds` (20 giây trong `config/rules.json`) client gửi `FEATURES` (`window` và 6 số) từ `Monitor.sendFeatures`. Trên server, `ClientHandler.features` kiểm tra đúng 6 số rồi `ExamRoom.features` lưu mẫu vào `Session.samples`.
+2. `ExamServer` có lịch cùng chu kỳ đó gọi `scoreIfRunning`. Bài đang diễn ra nên gọi `scoreRoomNow`: `room.samplesForMl()` gom mẫu của mọi sinh viên (thêm `studentId`).
 3. `MlClient.score` gửi `POST http://localhost:8000/score` với `{"samples": [...]}` (không giữ khoá nào của phòng trong lúc chờ).
 4. `ml_service.score` gọi `score_samples`: dưới 20 mẫu **trong cả phòng** thì trả `not_enough_data` (server log `ML: chưa đủ dữ liệu (n/20 mẫu)`, cột Mẫu của từng máy cho biết đang ở đâu); ngược lại fit `IsolationForest`, tính điểm thô `-model.score_samples(x)`, chuẩn hoá min–max về 0–1, rồi với mỗi sinh viên lấy tối đa trong **3 cửa sổ gần nhất** và đặt `anomaly` theo quy tắc ở mục 4.
 5. Trả `{"status": "ok", "results": [...]}`. `ExamRoom.applyScores` cập nhật `Session` (`status` khác `ok` thì bỏ qua).
