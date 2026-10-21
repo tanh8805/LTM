@@ -76,7 +76,7 @@ Sáu giá trị của `values`: số tiến trình mới, số lần rời cửa
 ## 4. Cài đặt
 
 - **Máy server:** JDK 17+ và Maven; Python 3.10+.
-- **Máy client (Windows):** chỉ cần Java 17+ (JRE là đủ), chép `exam.jar` sang.
+- **Máy client (Windows):** chỉ cần Java 17+ (JRE là đủ) và **2 file** cùng thư mục: `exam.jar` và `chay-thi.bat`. Sinh viên nhấp đúp `chay-thi.bat` để mở bài thi (không có cửa sổ terminal đi kèm). Terminal (cmd, PowerShell, Windows Terminal) mở trong giờ thi bị PRECHECK/giám sát báo vi phạm; `git`, `curl`, `ssh`... và `github.com` cũng bị cấm trong `config/rules.json`.
 - **Thư viện Java** (Maven tự tải, shade plugin gói hết vào `exam.jar` nên client chỉ cần một file): Gson 2.11.0 (JSON) và **FlatLaf 3.7.2** (giao diện Swing hiện đại; `Theme.install()` ở client và `FlatLightLaf.setup()` ở server).
 - **Python:**
   ```bash
@@ -93,7 +93,7 @@ Chạy từ thư mục gốc repo, theo thứ tự ML, server, client:
 mvn -q package                                                   # tạo target/exam.jar (đã gói kèm Gson)
 cd ml && uvicorn ml_service:app --host 127.0.0.1 --port 8000     # 1. service ML
 java -cp target/exam.jar exam.server.ExamServer                  # 2. server (đọc config/rules.json)
-java -cp target/exam.jar exam.client.StudentApp                  # 3. client
+java -Dexam.allowTerminal=true -cp target/exam.jar exam.client.StudentApp   # 3. client (dev: chạy từ terminal nên phải bật cờ này; máy thi dùng chay-thi.bat)
 ```
 
 Chạy test: `mvn -q test` và `cd ml && python -m pytest -q`.
@@ -105,14 +105,14 @@ Trên cửa sổ giám thị, nhấp đúp vào một dòng để xem lịch s�
 ### Kỳ thi mới không cần tắt server
 
 Sau khi bấm **Kết thúc thi**, nút **Kỳ thi mới** (có hộp xác nhận) đóng kết nối các máy còn lại (máy chưa nộp được gửi `EXAM_END` trước), xoá phiên, mẫu ML và bộ đếm, đưa phòng về trạng thái ban đầu nhưng **giữ đề đang nạp**. Nút **Chọn file đề...** dùng được bất cứ lúc nào bài thi chưa bắt đầu (kể cả sau Kỳ thi mới). Kết quả và lịch sử kỳ trước vẫn nằm nguyên trong thư mục `ket-qua/` riêng của nó; kỳ mới tạo thư mục mới khi bấm Bắt đầu.
-Ở client, màn kết quả có nút **Thi lượt mới**: về màn đăng nhập với mã SV và họ tên đã nhập sẵn, đăng nhập lại cho kỳ mới. Cần gửi `exam.jar` mới cho các máy Windows.
+Ở client, màn kết quả có nút **Thi lượt mới**: về màn đăng nhập với mã SV và họ tên đã nhập sẵn, đăng nhập lại cho kỳ mới. Cần gửi `exam.jar` mới (kèm `chay-thi.bat`) cho các máy Windows.
 
 ### Watchdog chỉ tính sau khi nhận đề
 
 Server coi máy `Đang thi` là mất kết nối khi quá 90 giây không nhận tin nào, tính từ `lastSeen`. Trước giờ thi client không gửi gì, nên `lastSeen` được đặt lại đúng lúc server gửi `EXAM_START` (`ExamRoom.trySendExam`); máy chờ lâu trước khi bấm Bắt đầu không bị đá nữa.
 `results.csv` có thêm cột `samples` (số FEATURES server đã nhận từ máy đó) và `flaggedCount` (số lần chấm mà máy bị gắn cờ).
 Bảng giám thị có cột **Mẫu**; log ghi `Bất thường: <mã SV> (<điểm>)` / `Hết bất thường: <mã SV>` khi đổi trạng thái và `ML: chưa đủ dữ liệu (n/20 mẫu)` khi n đổi.
-Debug client: thêm `-Dexam.debug=true` (`java -Dexam.debug=true -cp exam.jar exam.client.StudentApp`) để in thời gian mỗi lần quét và nội dung mỗi FEATURES ra stderr.
+Debug client: nhấp đúp `chay-thi-debug.bat` (hoặc thêm `-Dexam.debug=true`; chạy từ terminal thì thêm cả `-Dexam.allowTerminal=true`) để in thời gian mỗi lần quét và nội dung mỗi FEATURES ra stderr.
 
 ### Luật ứng dụng và khi bị báo vi phạm oan
 
