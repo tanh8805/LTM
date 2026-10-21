@@ -1,6 +1,8 @@
 # Test service ML: logic thuần score_samples qua HTTP (TestClient), không cần chạy uvicorn.
 import random
 
+import pytest
+
 from fastapi.testclient import TestClient
 
 from ml_service import app
@@ -54,6 +56,15 @@ def test_outlier_flagged():
     assert 1 <= len(reasons) <= 3
     assert {r["feature"] for r in reasons} & {1, 2}
     assert all(r["value"] > r["room"] for r in reasons)
+
+    # SV-X có 5 cửa sổ lệch, chỉ 3 mẫu mới nhất được dùng nên total = value * 3
+    for r in reasons:
+        assert r["windows"] == 3
+        assert r["total"] == pytest.approx(r["value"] * 3, abs=0.01)
+        assert r["room_total"] == pytest.approx(r["room"] * 3, abs=0.01)
+    by_feature = {r["feature"]: r for r in reasons}
+    if 1 in by_feature:
+        assert by_feature[1]["total"] == 18
 
 
 def test_normal_student_has_no_strong_reasons():

@@ -51,13 +51,17 @@ class ExamLogTest {
         reason.addProperty("feature", 1);
         reason.addProperty("value", 6.0);
         reason.addProperty("room", 0.3);
+        reason.addProperty("total", 18.0);
+        reason.addProperty("room_total", 0.9);
+        reason.addProperty("windows", 3);
         JsonArray reasons = new JsonArray();
         reasons.add(reason);
         resp.getAsJsonArray("results").get(0).getAsJsonObject().add("reasons", reasons);
         room.applyScores(resp);
         ExamLog.Event on = room.history("S1").get(1);
         assertEquals("ANOMALY_ON", on.type());
-        assertEquals("1.00 – Rời cửa sổ 6 lần (phòng 0.3)", on.detail());
+        assertEquals("Mức bất thường: Rất cao (1.00). Trong 1 phút 30 giây gần nhất, máy này: "
+            + "rời khỏi bài thi 18 lần (các máy khác thường 1 lần)", on.detail());
     }
 
     @Test
