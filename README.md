@@ -27,13 +27,13 @@ Client chỉ phát hiện và báo cáo: không chặn mạng, không kill tiế
 
 ## 2. Phân công
 
-| Người | File | Mảng phụ trách | Cần hiểu |
+| Vai | File | Mảng phụ trách | Cần hiểu |
 |---|---|---|---|
-| Cả nhóm | `exam/common/Protocol.java` | Giao thức chung | - Mỗi tin nhắn là một dòng JSON, luôn có `type`<br>- Gson tự escape ký tự xuống dòng nên không bao giờ vỡ dòng |
-| 1 | `StudentApp`, `StudentScreens` (+ `Theme`, `Look`, `Card`, `TopBar`, `LoginPanel`, `PrecheckPanel`, `ExamPanel`, `NumberButton`, `OptionRow`, `ResultPanel`, `Sheet`), `ServerConnection`, `ServerFinder` | Client sinh viên: kết nối TCP, tìm server UDP, giao diện làm bài (FlatLaf) | - Luồng màn hình: đăng nhập, PRECHECK, chờ, làm bài, kết quả<br>- `StudentApp` chỉ lo logic, `StudentScreens` ghép các panel; vì sao dùng callback<br>- Tự kết nối lại mỗi 5 giây và đăng nhập lại; vì sao chỉ tính "rời cửa sổ" khi `getOppositeWindow() == null`<br>- Tìm server bằng UDP broadcast tới từng card mạng |
-| 2 | `Monitor`, `AppRules`, `WindowsProbe`, `Diagnose`, `TeacherWindow`, `config/rules.json` | Giám sát: phát hiện vi phạm ở client, báo app đang mở, hiển thị và sửa luật ở giám thị (`SideBar`, `RulesDialog`, `ListEditor`, `RulesFile`) | - Baseline lấy ở PRECHECK, so sánh mỗi 3 giây; vì sao chỉ xét app có cửa sổ và cần `SYSTEM_PROCESSES`<br>- 6 feature mỗi 30 giây và cách reset cửa sổ<br>- `WindowsProbe` chạy lệnh Windows; `Monitor` chỉ chứa luật nên test được trên Linux |
-| 3 | `ExamServer`, `ExamRoom`, `Session`, `ExamFile`, `StudentList`, `ExamBank` (+ `ExamBankDialog`, `QuestionDialog`), `ClientHandler` | Server: nhận kết nối, luật phòng thi, chấm điểm, lưu kết quả | - `ExamRoom` giữ mọi trạng thái và mọi phương thức đổi trạng thái đều `synchronized`; `trySendExam` là điểm gửi đề duy nhất<br>- Chống nhầm session cũ và mới (so sánh socket); watchdog 90 giây (chỉ tính từ lúc máy nhận đề)<br>- Chấm điểm, `ket-qua/<kỳ thi>/` gồm `results.csv`, `events.csv`, `server.log` (UTF-8 có BOM cho hai file CSV) |
-| 4 | `ml/ml_service.py`, `ml/simulate_clients.py`, `MlClient` | ML: Isolation Forest, giả lập phòng thi, nối Java với Python | - Isolation Forest không giám sát, fit trên chính dữ liệu buổi thi; điểm chuẩn hoá min-max và 3 cửa sổ gần nhất<br>- Vì sao `anomaly` có thêm điều kiện điểm ≥ 0.7 (xem mục 9)<br>- Gọi HTTP ngoài khối `synchronized` để ML chậm không treo server |
+| Cả nhóm | `common/Protocol.java` (do Server 1 giữ) | Giao thức chung | - Mỗi tin nhắn là một dòng JSON, luôn có `type`<br>- Gson tự escape ký tự xuống dòng nên không bao giờ vỡ dòng |
+| Server 1 (lõi mạng) | `ExamServer`, `ClientHandler`, `ExamRoom`, `Session`, `ExamLog`, `common/Protocol` | Nhận kết nối, luật phòng thi, watchdog, ghi `events.csv`/`server.log` | - `ExamRoom` giữ mọi trạng thái và mọi phương thức đổi trạng thái đều `synchronized`; `trySendExam` là điểm gửi đề duy nhất<br>- Chống nhầm session cũ và mới (so sánh socket); watchdog 90 giây (chỉ tính từ lúc máy nhận đề)<br>- Mỗi client một luồng; TCP cho nghiệp vụ, UDP chỉ để tìm server |
+| Server 2 (giao diện giám thị và dữ liệu) | `TeacherWindow`, `SideBar`, `RosterTable`, `Roster`, `DetailPanel`, `HistoryDialog`, `Pill`, `TabButton`, `LocalAddresses`, `RulesDialog`, `ListEditor`, `RulesFile`, `ExamFile`, `ExamBank` (+ `ExamBankDialog`, `QuestionDialog`), `StudentList`, `common/Icons`, `Palette`, `Format`, `Html`, `Card`, `Look` | Cửa sổ giám thị, soạn đề, danh sách sinh viên, luật, chấm điểm, `results.csv` | - Bảng cập nhật bằng `Timer` 1 giây trên luồng giao diện; `Roster` là logic thuần nên test được<br>- Đáp án chỉ ở server (`ExamFile.questionsForClient`); chấm điểm và `ket-qua/<kỳ thi>/` (CSV UTF-8 có BOM)<br>- Sửa luật giữa giờ: `RulesFile` rồi `RULES_UPDATE` |
+| Client | toàn bộ `client/`: `StudentApp`, `StudentScreens` (+ `Theme`, `TopBar`, `LoginPanel`, `PrecheckPanel`, `ExamPanel`, `NumberButton`, `OptionRow`, `ResultPanel`, `Sheet`), `ServerConnection`, `ServerFinder`, `Monitor`, `AppRules`, `WindowsProbe`, `Diagnose`, `Debug`; `config/rules.json` | Client sinh viên và giám sát: giao diện làm bài (FlatLaf), kết nối, phát hiện vi phạm | - Luồng màn hình: đăng nhập, PRECHECK, chờ, làm bài, kết quả; tự kết nối lại mỗi 5 giây<br>- Baseline lấy ở PRECHECK, so sánh mỗi 3 giây; vì sao chỉ xét app có cửa sổ và cần `SYSTEM_PROCESSES`<br>- 6 feature mỗi chu kỳ server cấp; `WindowsProbe` chạy lệnh Windows, `Monitor` chỉ chứa luật nên test được trên Linux |
+| ML và thực nghiệm | `ml/ml_service.py`, `ml/test_ml_service.py`, `ml/simulate_clients.py`, `MlClient`, `MlScores` | Isolation Forest, lý do bất thường, giả lập phòng thi, nối Java với Python | - Không giám sát, fit trên chính dữ liệu buổi thi; điểm min-max và 3 cửa sổ gần nhất<br>- Vì sao `anomaly` có thêm điều kiện điểm ≥ 0.7 (xem mục 9)<br>- ML chỉ cảnh báo; gọi HTTP ngoài khối `synchronized` để ML chậm không treo server |
 
 Cấu trúc mã nguồn (mỗi file Java trong `src/main` dài khoảng 280 dòng trở xuống; cần thì tách file mới):
 
@@ -243,9 +243,9 @@ Phần quét tiến trình, mạng, USB chỉ chạy trên Windows nên chưa ki
 
 ## 10. Hướng dẫn đọc code
 
-Mỗi người có một file hướng dẫn riêng (phụ trách gì, thứ tự đọc, lần theo một luồng chạy thật, kiến thức để trả lời thầy, 3 câu thầy có thể hỏi và cách sửa):
+Mỗi vai có một file hướng dẫn riêng, gồm bảng file, các luồng chạy, bảng "thầy bảo sửa gì thì mở file nào", và câu hỏi thường gặp:
 
-- [Người 1: client sinh viên](docs/huong-dan-doc-code/nguoi-1.md)
-- [Người 2: giám sát và giao diện giám thị](docs/huong-dan-doc-code/nguoi-2.md)
-- [Người 3: server và phòng thi](docs/huong-dan-doc-code/nguoi-3.md)
-- [Người 4: ML và giả lập](docs/huong-dan-doc-code/nguoi-4.md)
+- [Server 1: lõi mạng và phòng thi](docs/huong-dan-doc-code/server-1.md)
+- [Server 2: giao diện giám thị và dữ liệu](docs/huong-dan-doc-code/server-2.md)
+- [Client: máy sinh viên và giám sát](docs/huong-dan-doc-code/client.md)
+- [ML và thực nghiệm](docs/huong-dan-doc-code/ml.md)
