@@ -108,10 +108,12 @@ Trên cửa sổ giám thị, nhấp đúp vào một dòng để xem lịch s�
 ### Tài khoản sinh viên
 
 Sinh viên đăng nhập bằng **mã SV và mật khẩu** (không còn ô Họ tên; họ tên lấy từ danh sách và server gửi về trong `LOGIN_OK`). Danh sách là file CSV UTF-8 (có hoặc không có BOM), dòng đầu là `studentId,name,password`, mỗi sinh viên một dòng, đúng 3 cột (không dùng dấu phẩy trong giá trị), không trùng mã SV. File mẫu `config/students.csv` có `SIM01`..`SIM30`, `SIM-X` và 4 tài khoản test `SV001`..`SV004`, mật khẩu `123456`.
-- Giám thị bấm **Nhập danh sách SV...** để chọn file; mỗi dòng lỗi được báo `Dòng n: lý do` (tối đa 10 lỗi) và không nạp gì. Nạp được thì lưu thành `config/students.csv`, lần sau mở server tự nạp lại; cửa sổ hiện `Đã nạp n SV`.
+- Giám thị bấm **Sinh viên** ở thanh bên để xem danh sách (mã SV, họ tên, mật khẩu) rồi bấm **Nhập file CSV...** để chọn file; mỗi dòng lỗi được báo `Dòng n: lý do` (tối đa 10 lỗi) và không nạp gì. Nạp được thì lưu thành `config/students.csv`, lần sau mở server tự nạp lại; cửa sổ hiện `Đã nạp n SV`.
 - So khớp mã SV không phân biệt hoa thường và bỏ khoảng trắng. Sai mã SV hoặc mật khẩu: `LOGIN_FAIL` kèm sự kiện `LOGIN_FAIL` trong `events.csv`.
 - Chưa nạp danh sách (dev): ai cũng đăng nhập được, giao diện hiện cảnh báo vàng `Chưa nạp danh sách sinh viên: ai cũng đăng nhập được`.
 - Giả lập: `python simulate_clients.py --password 123456` (mặc định `123456`).
+- Chỉ sinh viên có trong danh sách mới hiện ở tab Giám sát: nạp danh sách mới (chỉ khi chưa bắt đầu thi) thì phiên có mã SV ngoài danh sách bị xoá khỏi phòng và đóng kết nối.
+- Máy giả `simulate_clients.py` cũng phải có tên trong file CSV (SIM01…, SIM-X).
 
 ### Quản lý đề
 

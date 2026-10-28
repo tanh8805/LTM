@@ -4,10 +4,15 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import com.google.gson.JsonObject;
 import exam.common.Protocol;
+import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 class StudentAccountsTest {
     private static final String CSV = "studentId,name,password\nSV001,Nguyễn Văn An,123456\nSIM-X,Máy giả,abc\n";
@@ -54,6 +59,56 @@ class StudentAccountsTest {
         assertNotNull(s);
         assertEquals("BATKY", s.name);
         assertEquals(Protocol.LOGIN_OK, Protocol.type(lastReply()));
+    }
+
+    private List<String> rowIds() {
+        List<String> ids = new ArrayList<>();
+        for (ExamRoom.Row row : room.rows()) {
+            ids.add(row.studentId());
+        }
+        return ids;
+    }
+
+    @Test
+    void newListRemovesSessionsNotInIt() {
+        List<String> log = new ArrayList<>();
+        ExamServer server = new ExamServer(new JsonObject());
+        server.setListener(log::add);
+        ExamRoom own = server.room();
+        for (String id : List.of("SIM01", "SIM02", "SV001")) {
+            own.login(id, "", "", "", null, new PrintWriter(new StringWriter()));
+        }
+        own.setStudents(StudentList.parse("studentId,name,password\nSIM02,Hai,x\nSV001,An,1\n"));
+        List<String> ids = new ArrayList<>();
+        for (ExamRoom.Row row : own.rows()) {
+            ids.add(row.studentId());
+        }
+        assertEquals(List.of("SIM02", "SV001"), ids);
+        assertTrue(log.stream().anyMatch(l -> l.contains("Đã xoá khỏi phòng: SIM01 (không có trong danh sách)")), log.toString());
+    }
+
+    @Test
+    void emptyListDoesNotRemoveAnyone() {
+        login("SIM01", "");
+        room.setStudents(null);
+        assertEquals(List.of("SIM01"), rowIds());
+    }
+
+    @Test
+    void listCanOnlyBeLoadedBeforeStartOrAfterNewSession(@TempDir Path tmp) throws IOException {
+        Path exam = tmp.resolve("exam.json");
+        Files.writeString(exam, "{\"title\":\"De\",\"durationMinutes\":1,\"questions\":["
+            + "{\"id\":1,\"text\":\"Q\",\"options\":[\"a\",\"b\"],\"answer\":1}]}");
+        room.setResultsRoot(tmp.resolve("ket-qua"));
+        room.loadExam(exam);
+        room.setStudents(StudentList.parse(CSV));
+        room.startExam();
+        IllegalStateException e = assertThrows(IllegalStateException.class, () -> room.setStudents(StudentList.parse(CSV)));
+        assertEquals("Chỉ nạp danh sách khi chưa bắt đầu thi", e.getMessage());
+        room.endExam("test");
+        room.newSession();
+        room.setStudents(StudentList.parse(CSV));
+        assertEquals(2, room.studentCount());
     }
 
     @Test
