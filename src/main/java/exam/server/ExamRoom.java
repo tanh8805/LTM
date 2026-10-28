@@ -14,6 +14,7 @@ import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -232,11 +233,29 @@ public class ExamRoom {
         return null;
     }
 
-    /** Giám thị nạp danh sách mới (null hoặc rỗng nghĩa là bỏ danh sách, ai cũng vào được). */
+    /** Giám thị nạp danh sách mới (null hoặc rỗng nghĩa là bỏ danh sách, ai cũng vào được). Chỉ nạp được khi chưa bắt đầu thi. */
     public synchronized void setStudents(StudentList list) {
+        if (started) {
+            throw new IllegalStateException("Chỉ nạp danh sách khi chưa bắt đầu thi");
+        }
         students = list == null ? StudentList.empty() : list;
         log.accept(students.size() == 0 ? "Chưa nạp danh sách sinh viên" : "Đã nạp danh sách: " + students.size() + " sinh viên");
+        if (students.size() == 0) {
+            return;
+        }
+        // phiên có mã SV ngoài danh sách bị xoá; máy đó tự nối lại sẽ nhận LOGIN_FAIL
+        Iterator<Session> it = sessions.values().iterator();
+        while (it.hasNext()) {
+            Session s = it.next();
+            if (students.find(s.id) == null) {
+                s.close();
+                it.remove();
+                log.accept("Đã xoá khỏi phòng: " + s.id + " (không có trong danh sách)");
+            }
+        }
     }
+
+    public synchronized List<StudentList.Account> studentAccounts() { return students.accounts(); }
 
     public synchronized int studentCount() { return students.size(); }
 

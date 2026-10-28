@@ -28,6 +28,8 @@ public final class StudentList {
     /** Mã SV so khớp không phân biệt hoa thường và bỏ mọi khoảng trắng. */
     public static String key(String id) { return id.replaceAll("\\s+", "").toUpperCase(Locale.ROOT); }
 
+    public List<Account> accounts() { return new ArrayList<>(accounts.values()); }
+
     public Account find(String id) { return accounts.get(key(id)); }
 
     /** Đọc cả file; có dòng lỗi thì ném IllegalArgumentException liệt kê "Dòng n: lý do". */

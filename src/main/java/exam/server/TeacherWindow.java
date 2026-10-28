@@ -78,7 +78,7 @@ public class TeacherWindow extends JFrame {
         north.add(noListWarning, BorderLayout.SOUTH);
         add(north, BorderLayout.NORTH);
         sideBar.addItem("monitor", "Giám sát", true, () -> { });
-        sideBar.addItem("students", "Sinh viên", false, this::importStudents);
+        sideBar.addItem("students", "Sinh viên", false, () -> new StudentsDialog(this, room, this::refresh).setVisible(true));
         sideBar.addItem("exams", "Đề thi", false, () -> { new ExamBankDialog(this, room, ExamBank.DIR).setVisible(true); refresh(); });
         sideBar.addItem("rules", "Ứng dụng", false, () -> new RulesDialog(this, server).setVisible(true));
         sideBar.addItem("results", "Kết quả", false, this::openResults);
@@ -294,22 +294,6 @@ public class TeacherWindow extends JFrame {
             refresh();
         } catch (IllegalArgumentException | IllegalStateException | IOException ex) {
             JOptionPane.showMessageDialog(this, ex.getMessage(), "Không nạp được đề", JOptionPane.ERROR_MESSAGE);
-        }
-    }
-
-    /** Chọn file CSV, kiểm tra từng dòng; đạt thì nạp vào phòng và lưu thành config/students.csv. */
-    private void importStudents() {
-        JFileChooser chooser = new JFileChooser(".");
-        if (chooser.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) { return; }
-        try {
-            StudentList list = StudentList.load(chooser.getSelectedFile().toPath());
-            list.save(StudentList.FILE);
-            room.setStudents(list);
-            refresh();
-        } catch (IllegalArgumentException ex) {
-            JOptionPane.showMessageDialog(this, ex.getMessage(), "Danh sách sinh viên có lỗi", JOptionPane.ERROR_MESSAGE);
-        } catch (IOException ex) {
-            JOptionPane.showMessageDialog(this, ex.getMessage(), "Không đọc hoặc ghi được danh sách", JOptionPane.ERROR_MESSAGE);
         }
     }
 
