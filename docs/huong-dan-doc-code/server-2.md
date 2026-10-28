@@ -1,6 +1,6 @@
 # Server 2: giao diện giám thị và dữ liệu
 
-Cửa sổ giám thị (Swing + FlatLaf), các hộp thoại soạn đề/danh sách/luật, và mọi thứ đọc ghi file: đề thi, chấm điểm, `results.csv`, `students.csv`, `rules.json`. Trạng thái phòng thi nằm ở Server 1 (`ExamRoom`); phần này chỉ đọc qua `rows()`, `summary()`, `history()` và gọi lệnh `startExam`, `endExam`, `newSession`.
+Cửa sổ giám thị (Swing + FlatLaf), các hộp thoại soạn đề/danh sách/luật, và mọi thứ đọc ghi file: đề thi, chấm điểm, `results.csv`, `rules.json`, và file CSV danh sách sinh viên do giám thị nạp (server không lưu lại). Trạng thái phòng thi nằm ở Server 1 (`ExamRoom`); phần này chỉ đọc qua `rows()`, `summary()`, `history()` và gọi lệnh `startExam`, `endExam`, `newSession`.
 
 > Mỗi `File.hàm` trong tài liệu này đều có thật trong code. Các đoạn code chỉ để minh hoạ.
 
@@ -17,7 +17,7 @@ Trong `src/main/java/exam/server/` trừ khi ghi khác.
 | `RulesDialog`, `ListEditor`, `RulesFile` | Hộp thoại `Quản lý ứng dụng`; `ListEditor` là danh sách chuỗi có Thêm/Xoá; `RulesFile` sửa các danh sách trong luật và ghi lại `rules.json`, giữ các khoá khác. |
 | `ExamFile` | Nạp và kiểm tra file đề, bỏ đáp án khi gửi cho sinh viên, chấm điểm, ghi `results.csv`. |
 | `ExamBank`, `ExamBankDialog`, `QuestionDialog` | Soạn đề: `build` dựng JSON (đánh số lại `id`), `save` ghi file tạm rồi kiểm tra bằng `ExamFile.load`, `parseCsv` nhập câu hỏi từ CSV. |
-| `StudentList` | Danh sách tài khoản (CSV `studentId,name,password`): `parse` báo `Dòng n: lý do`, `find` không phân biệt hoa thường, `save` ghi `config/students.csv`. |
+| `StudentList` | Danh sách tài khoản (CSV `studentId,name,password`): `parse` báo `Dòng n: lý do`, `find` không phân biệt hoa thường. Chỉ nạp vào bộ nhớ, không ghi file; file mẫu `config/lop-mau.csv`. |
 | `common/Icons`, `Palette`, `Format`, `Html`, `Card`, `Look` | Biểu tượng tự vẽ, màu và khoảng cách, điểm kiểu Việt Nam (dấu phẩy), ngắt dòng HTML, thẻ trắng viền mảnh, cài FlatLaf (cũng dùng ở client). |
 
 ## 2. Luồng chạy

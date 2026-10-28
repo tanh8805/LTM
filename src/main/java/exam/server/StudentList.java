@@ -15,7 +15,6 @@ import java.util.Map;
 public final class StudentList {
     public record Account(String id, String name, String password) {}
 
-    public static final Path FILE = Path.of("config", "students.csv");
     private static final String HEADER = "studentId,name,password";
     private static final int MAX_ERRORS = 10;
 
@@ -80,15 +79,5 @@ public final class StudentList {
         } catch (CharacterCodingException e) {
             throw new IllegalArgumentException("File phải lưu dạng UTF-8");
         }
-    }
-
-    /** Ghi lại thành CSV UTF-8 có BOM để Excel đọc được tiếng Việt. */
-    public void save(Path file) throws IOException {
-        StringBuilder text = new StringBuilder("﻿" + HEADER + "\n");
-        for (Account a : accounts.values()) {
-            text.append(a.id()).append(',').append(a.name()).append(',').append(a.password()).append('\n');
-        }
-        if (file.getParent() != null) { Files.createDirectories(file.getParent()); }
-        Files.writeString(file, text, StandardCharsets.UTF_8);
     }
 }

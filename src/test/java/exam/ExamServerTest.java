@@ -98,6 +98,7 @@ class ExamServerTest {
         black.add("zalo.exe");
         rules.add("blacklistApps", black);
         server = new ExamServer(rules);
+        server.room().setStudents(TestStudents.of("S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8", "S9"));
         server.room().setResultsRoot(tmp.resolve("ket-qua"));
         Path exam = tmp.resolve("exam.json");
         Files.writeString(exam, EXAM_JSON, StandardCharsets.UTF_8);
@@ -123,6 +124,7 @@ class ExamServerTest {
         JsonObject m = Protocol.msg(Protocol.LOGIN);
         m.addProperty("studentId", id);
         m.addProperty("name", name);
+        m.addProperty("password", TestStudents.PASSWORD);
         return m;
     }
 
@@ -192,6 +194,7 @@ class ExamServerTest {
 
     private int loginOkInterval(JsonObject rules) throws IOException {
         ExamServer other = new ExamServer(rules);
+        other.room().setStudents(TestStudents.of("S1"));
         other.start(0);
         try (TestClient c = new TestClient(other.tcpPort())) {
             c.send(loginMsg("S1", "An"));

@@ -240,7 +240,9 @@ public class TeacherWindow extends JFrame {
             timeValue.setText("-");
         }
         actionBtn.setText(ended ? "Kỳ thi mới" : started ? "Kết thúc thi" : "Bắt đầu thi");
-        actionBtn.setEnabled(ended || started || sum != null);
+        boolean needList = !started && !ended && room.studentCount() == 0;
+        actionBtn.setEnabled(ended || started || (sum != null && !needList));
+        actionBtn.setToolTipText(needList ? "Nạp danh sách sinh viên trước" : null);
         actionBtn.setBackground(!actionBtn.isEnabled() ? Palette.DISABLED : started && !ended ? Palette.ERROR : Palette.PRIMARY);
     }
 

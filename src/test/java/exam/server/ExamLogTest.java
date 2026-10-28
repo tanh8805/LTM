@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import exam.TestStudents;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -20,6 +21,7 @@ class ExamLogTest {
 
     private ExamServer serverWithExam() throws IOException {
         ExamServer s = new ExamServer(new JsonObject());
+        s.room().setStudents(TestStudents.of("S1"));
         s.room().setResultsRoot(tmp.resolve("ket-qua"));
         Path exam = tmp.resolve("exam.json");
         Files.writeString(exam, "{\"title\":\"De thu\",\"durationMinutes\":1,\"questions\":["
@@ -48,7 +50,7 @@ class ExamLogTest {
         JsonObject rules = room.rules();
         rules.addProperty("maxViolations", 1);
         room.updateRules(rules);
-        room.login("S1", "An", null, new PrintWriter(new StringWriter()));
+        room.login("S1", "An", TestStudents.PASSWORD, "", null, new PrintWriter(new StringWriter()));
         room.startExam();
         room.applyScores(scores("S1", 1.0, true));
         ExamRoom.Row row = room.rows().get(0);
@@ -62,7 +64,7 @@ class ExamLogTest {
     void anomalyOnDetailListsReasons() throws IOException {
         ExamServer s = serverWithExam();
         ExamRoom room = s.room();
-        room.login("S1", "An", null, new PrintWriter(new StringWriter()));
+        room.login("S1", "An", TestStudents.PASSWORD, "", null, new PrintWriter(new StringWriter()));
         JsonObject resp = scores("S1", 1.0, true);
         JsonObject reason = new JsonObject();
         reason.addProperty("feature", 1);
@@ -85,7 +87,7 @@ class ExamLogTest {
     void anomalyOnAndOffAreRecorded() throws IOException {
         ExamServer s = serverWithExam();
         ExamRoom room = s.room();
-        room.login("S1", "An", null, new PrintWriter(new StringWriter()));
+        room.login("S1", "An", TestStudents.PASSWORD, "", null, new PrintWriter(new StringWriter()));
         room.applyScores(scores("S1", 0.9, true));
         room.applyScores(scores("S1", 0.9, true));     // vẫn bị cờ: không ghi lại lần hai
         room.applyScores(scores("S1", 0.2, false));
@@ -98,9 +100,9 @@ class ExamLogTest {
         ExamServer s = serverWithExam();
         ExamRoom room = s.room();
         java.net.Socket sock = new java.net.Socket();
-        Session a = room.login("S1", "An", sock, new PrintWriter(new StringWriter()));
+        Session a = room.login("S1", "An", TestStudents.PASSWORD, "", sock, new PrintWriter(new StringWriter()));
         room.disconnected(a, sock);
-        room.login("S1", "An", null, new PrintWriter(new StringWriter()));
+        room.login("S1", "An", TestStudents.PASSWORD, "", null, new PrintWriter(new StringWriter()));
         List<String> types = room.history("S1").stream().map(ExamLog.Event::type).toList();
         assertEquals(List.of("LOGIN", "DISCONNECT", "RECONNECT"), types);
     }
@@ -108,7 +110,7 @@ class ExamLogTest {
     @Test
     void loginFailIsRecordedWithReason() throws IOException {
         ExamServer s = serverWithExam();
-        s.room().login("", "An", null, new PrintWriter(new StringWriter()));
+        s.room().login("", "An", "", "", null, new PrintWriter(new StringWriter()));
         ExamLog.Event e = s.room().history("").get(0);
         assertEquals("LOGIN_FAIL", e.type());
         assertTrue(e.detail().contains("Thiếu mã SV"), e.detail());
@@ -118,12 +120,12 @@ class ExamLogTest {
     void staleScoresAreIgnoredAfterNewSession() throws IOException {
         ExamServer s = serverWithExam();
         ExamRoom room = s.room();
-        room.login("S1", "An", null, new PrintWriter(new StringWriter()));
+        room.login("S1", "An", TestStudents.PASSWORD, "", null, new PrintWriter(new StringWriter()));
         room.startExam();
         int epoch = room.epoch();                      // lần chấm ML bắt đầu ở kỳ cũ
         room.endExam("test");
         room.newSession();
-        room.login("S1", "An", null, new PrintWriter(new StringWriter()));
+        room.login("S1", "An", TestStudents.PASSWORD, "", null, new PrintWriter(new StringWriter()));
         room.applyScores(scores("S1", 0.9, true), epoch);   // trả về muộn, sau khi đã sang kỳ mới
         assertNull(room.rows().get(0).anomalyScore());
         assertEquals(List.of("LOGIN"), room.history("S1").stream().map(ExamLog.Event::type).toList());

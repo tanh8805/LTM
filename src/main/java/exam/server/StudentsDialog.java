@@ -71,7 +71,7 @@ class StudentsDialog extends JDialog {
         hint.setVisible(model.getRowCount() == 0);
     }
 
-    /** Chọn file CSV, kiểm tra từng dòng; đạt thì nạp vào phòng và lưu thành config/students.csv. */
+    /** Chọn file CSV, kiểm tra từng dòng; đạt thì chỉ nạp vào phòng (server không lưu danh sách ra file). */
     private void importStudents() {
         if (room.isStarted()) {
             JOptionPane.showMessageDialog(this, "Chỉ nạp danh sách khi chưa bắt đầu thi");
@@ -81,7 +81,6 @@ class StudentsDialog extends JDialog {
         if (chooser.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) { return; }
         try {
             StudentList list = StudentList.load(chooser.getSelectedFile().toPath());
-            list.save(StudentList.FILE);
             room.setStudents(list);
             reload();
             onChanged.run();

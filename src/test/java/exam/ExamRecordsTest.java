@@ -42,6 +42,7 @@ class ExamRecordsTest {
 
     private ExamServer newServer(String title) throws IOException {
         ExamServer s = new ExamServer(new JsonObject());
+        s.room().setStudents(TestStudents.of("S1", "S2"));
         s.room().setResultsRoot(root);
         Path exam = tmp.resolve(title.hashCode() + ".json");
         Files.writeString(exam, ExamServerTest.EXAM_JSON.replace("De thu", title), StandardCharsets.UTF_8);
@@ -56,7 +57,7 @@ class ExamRecordsTest {
         clients.add(c);
         JsonObject m = Protocol.msg(Protocol.LOGIN);
         m.addProperty("studentId", id);
-        m.addProperty("name", "Sinh viên " + id);
+        m.addProperty("password", TestStudents.PASSWORD);
         c.send(m);
         c.next(Protocol.LOGIN_OK, 2000);
         return c;
