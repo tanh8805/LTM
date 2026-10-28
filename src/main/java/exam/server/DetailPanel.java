@@ -57,6 +57,11 @@ class DetailPanel extends JPanel {
         if (row == null) {
             body.add(text("Chọn một thí sinh", 17, true, Palette.TEXT));
             body.add(text(wrap("Bấm vào một dòng trong bảng để xem chi tiết."), 13, false, Palette.MUTED));
+        } else if (row.status().equals(Session.ST_ABSENT)) {
+            body.add(text(wrap(row.name()), 20, true, Palette.TEXT));
+            body.add(text(row.studentId(), 13, false, Palette.MUTED));
+            body.add(Box.createVerticalStrut(16));
+            body.add(text("Chưa đăng nhập vào phòng thi", 14, false, Palette.MUTED));
         } else {
             body.add(text(wrap(row.name()), 20, true, Palette.TEXT));
             body.add(text(row.studentId() + (row.os().isEmpty() ? "" : " · " + row.os()), 13, false, Palette.MUTED));

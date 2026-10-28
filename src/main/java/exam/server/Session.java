@@ -16,6 +16,7 @@ public class Session {
     public static final String ST_SUBMITTED = "Đã nộp";
     public static final String ST_DISCONNECTED = "Mất kết nối";
     public static final String ST_TERMINATED = "Đình chỉ";
+    public static final String ST_ABSENT = "Chưa vào";
 
     final String id;
     final String name;

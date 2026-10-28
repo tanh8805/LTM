@@ -128,10 +128,15 @@ public final class ExamFile {
         return result;
     }
 
-    public static void writeResults(Path file, Collection<Session> sessions, boolean examStarted) throws IOException {
+    public static void writeResults(Path file, Collection<Session> sessions, boolean examStarted,
+            Collection<StudentList.Account> absent) throws IOException {
         StringBuilder sb = new StringBuilder(RESULTS_HEADER);
         for (Session s : sessions) {
             sb.append(resultsRow(s, examStarted));
+        }
+        for (StudentList.Account a : absent) {
+            // vắng: để trống điểm, các số đếm bằng 0
+            sb.append(csv(a.id())).append(',').append(csv(a.name())).append(",,,,0,,Vắng,0,0\n");
         }
         Files.writeString(file, sb.toString(), StandardCharsets.UTF_8);
     }

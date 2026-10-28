@@ -137,7 +137,8 @@ class RosterTable extends JScrollPane {
         public Component getTableCellRendererComponent(JTable t, Object v, boolean sel, boolean focus, int r, int c) {
             super.getTableCellRendererComponent(t, v, false, false, r, c);
             setBackground(background(t, r, sel));
-            setForeground(c == 6 && "-".equals(v) ? Palette.MUTED : Palette.TEXT);
+            boolean absent = ((Model) t.getModel()).rows.get(r).status().equals(Session.ST_ABSENT);
+            setForeground(absent || (c == 6 && "-".equals(v)) ? Palette.MUTED : Palette.TEXT);
             setFont(getFont().deriveFont(c == 2 ? Font.BOLD : Font.PLAIN));
             setBorder(BorderFactory.createEmptyBorder(0, 8, 0, 8));
             setHorizontalAlignment(c == 5 || c == 8 ? SwingConstants.RIGHT : SwingConstants.LEFT);
@@ -191,7 +192,7 @@ class RosterTable extends JScrollPane {
             switch (status) {
                 case Session.ST_IN_EXAM -> style(Palette.SUCCESS_SOFT, Palette.SUCCESS_TEXT);
                 case Session.ST_DISCONNECTED -> style(Palette.WARNING_SOFT, Palette.WARNING_TEXT);
-                case Session.ST_SUBMITTED -> style(Palette.NEUTRAL_SOFT, Palette.NEUTRAL_TEXT);
+                case Session.ST_SUBMITTED, Session.ST_ABSENT -> style(Palette.NEUTRAL_SOFT, Palette.NEUTRAL_TEXT);
                 case Session.ST_PRECHECK_FAIL -> style(Palette.ERROR_SOFT, Palette.ERROR_TEXT);
                 case Session.ST_TERMINATED -> style(Palette.ERROR_TEXT, Color.WHITE);
                 default -> style(Palette.PRIMARY_SOFT, Palette.PRIMARY_TEXT);

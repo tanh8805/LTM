@@ -14,10 +14,13 @@ import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -449,6 +452,31 @@ public class ExamRoom {
         return list;
     }
 
+    /** rows() cộng thêm một dòng "Chưa vào" cho mỗi tài khoản trong danh sách chưa có phiên, để giám thị điểm danh. */
+    public synchronized List<Row> rosterRows() {
+        List<Row> all = rows();
+        for (StudentList.Account a : absentAccounts()) {
+            all.add(new Row(a.id(), a.name(), Session.ST_ABSENT, 0, "", null, false, null, 0, "", 0, ""));
+        }
+        return all;
+    }
+
+    // sắp theo mã SV; so khớp bằng StudentList.key vì phiên có thể đăng nhập khi mã chưa chuẩn hoá
+    private List<StudentList.Account> absentAccounts() {
+        Set<String> present = new HashSet<>();
+        for (Session s : sessions.values()) {
+            present.add(StudentList.key(s.id));
+        }
+        List<StudentList.Account> absent = new ArrayList<>();
+        for (StudentList.Account a : students.accounts()) {
+            if (!present.contains(StudentList.key(a.id()))) {
+                absent.add(a);
+            }
+        }
+        absent.sort(Comparator.comparing(StudentList.Account::id));
+        return absent;
+    }
+
     /** App đang mở của một thí sinh, đã tô loại theo luật hiện tại; null nếu không có thí sinh đó. */
     public synchronized AppsView appsOf(String studentId) {
         Session s = sessions.get(studentId);
@@ -588,7 +616,9 @@ public class ExamRoom {
             return;
         }
         try {
-            ExamFile.writeResults(examDir.resolve("results.csv"), sessions.values(), started);
+            // sinh viên vắng chỉ được ghi khi đã kết thúc thi
+            List<StudentList.Account> absent = ended ? absentAccounts() : List.of();
+            ExamFile.writeResults(examDir.resolve("results.csv"), sessions.values(), started, absent);
         } catch (IOException e) {
             log.accept("Không ghi được results.csv: " + e.getMessage());
         }
