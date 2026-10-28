@@ -8,7 +8,7 @@ import java.util.Set;
 
 final class Roster {
     enum Tab {
-        ALL("Tất cả"), ATTENTION("Cần chú ý"), LOST("Mất kết nối"), SUBMITTED("Đã nộp");
+        ALL("Tất cả"), ATTENTION("Cần chú ý"), LOST("Mất kết nối"), ABSENT("Chưa vào"), SUBMITTED("Đã nộp");
 
         final String label;
         Tab(String label) { this.label = label; }
@@ -27,6 +27,7 @@ final class Roster {
             case ALL -> true;
             case ATTENTION -> needsAttention(r);
             case LOST -> r.status().equals(Session.ST_DISCONNECTED);
+            case ABSENT -> r.status().equals(Session.ST_ABSENT);
             case SUBMITTED -> r.status().equals(Session.ST_SUBMITTED);
         };
     }

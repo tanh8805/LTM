@@ -114,6 +114,7 @@ Sinh viên đăng nhập bằng **mã SV và mật khẩu** (không còn ô Họ
 - Giả lập: `python simulate_clients.py --password 123456` (mặc định `123456`).
 - Chỉ sinh viên có trong danh sách mới hiện ở tab Giám sát: nạp danh sách mới (chỉ khi chưa bắt đầu thi) thì phiên có mã SV ngoài danh sách bị xoá khỏi phòng và đóng kết nối.
 - Máy giả `simulate_clients.py` cũng phải có tên trong file CSV (SIM01…, SIM-X).
+- Mọi sinh viên trong danh sách đều hiện trên bảng Giám sát: ai chưa đăng nhập có trạng thái `Chưa vào` (chữ xám, tab **Chưa vào**, không tính vào Cần chú ý); khi kết thúc thi, `results.csv` thêm một dòng `Vắng` (điểm để trống) cho mỗi người chưa vào.
 
 ### Quản lý đề
 

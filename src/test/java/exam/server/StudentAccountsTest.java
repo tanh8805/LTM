@@ -88,6 +88,43 @@ class StudentAccountsTest {
     }
 
     @Test
+    void rosterRowsAddsAbsentStudentsAfterPresentOnes() {
+        room.setStudents(StudentList.parse("studentId,name,password\nA03,Ba,1\nA01,Một,1\nA02,Hai,1\n"));
+        login("A02", "1");
+        List<ExamRoom.Row> all = room.rosterRows();
+        assertEquals(3, all.size());
+        assertEquals(1, room.rows().size(), "rows() không đổi");
+        assertEquals(List.of("A02", "A01", "A03"), all.stream().map(ExamRoom.Row::studentId).toList());
+        assertEquals(List.of(Session.ST_LOGGED_IN, Session.ST_ABSENT, Session.ST_ABSENT),
+            all.stream().map(ExamRoom.Row::status).toList());
+        ExamRoom.Row absent = all.get(1);
+        assertEquals("Một", absent.name());
+        assertEquals(0, absent.violations());
+        assertNull(absent.score());
+        assertNull(absent.anomalyScore());
+        assertEquals("", absent.os());
+        assertFalse(Roster.needsAttention(absent));
+        assertEquals(2, Roster.count(all, Roster.Tab.ABSENT));
+        assertEquals(3, Roster.count(all, Roster.Tab.ALL));
+    }
+
+    @Test
+    void resultsCsvListsAbsentStudentsOnlyAfterEnd(@TempDir Path tmp) throws IOException {
+        Path exam = tmp.resolve("exam.json");
+        Files.writeString(exam, "{\"title\":\"De\",\"durationMinutes\":1,\"questions\":["
+            + "{\"id\":1,\"text\":\"Q\",\"options\":[\"a\",\"b\"],\"answer\":1}]}");
+        room.setResultsRoot(tmp.resolve("ket-qua"));
+        room.loadExam(exam);
+        room.setStudents(StudentList.parse("studentId,name,password\nA01,Một,1\nA02,Hai,1\n"));
+        login("A01", "1");
+        room.startExam();
+        room.endExam("test");
+        String csv = Files.readString(room.examDir().resolve("results.csv"));
+        assertTrue(csv.contains("\nA02,Hai,,,,0,,Vắng,0,0\n"), csv);
+        assertEquals(1, csv.split("Vắng", -1).length - 1);
+    }
+
+    @Test
     void emptyListDoesNotRemoveAnyone() {
         login("SIM01", "");
         room.setStudents(null);

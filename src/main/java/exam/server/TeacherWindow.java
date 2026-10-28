@@ -222,7 +222,7 @@ public class TeacherWindow extends JFrame {
         subLabel.setText(sum == null ? "Đề thi: chưa chọn (bấm Mở đề... hoặc mục Đề thi)"
             : "Đề thi: " + sum.title() + " · " + sum.questions() + " câu · " + sum.minutes() + " phút · "
             + (started ? "bắt đầu " + sum.startedAt() : "chưa bắt đầu"));
-        List<ExamRoom.Row> all = room.rows();
+        List<ExamRoom.Row> all = room.rosterRows();
         for (Roster.Tab t : Roster.Tab.values()) { tabs.get(t).setText(t.label + " " + Roster.count(all, t)); }
         table.setRows(Roster.filter(all, tab, search.getText()));
         showDetail(table.selected());
@@ -253,7 +253,13 @@ public class TeacherWindow extends JFrame {
         }
     }
 
-    private void showDetail(ExamRoom.Row row) { detail.show(row, row == null ? List.of() : room.history(row.studentId()), row == null ? null : room.appsOf(row.studentId())); }
+    private void showDetail(ExamRoom.Row row) {
+        if (row == null || row.status().equals(Session.ST_ABSENT)) {
+            detail.show(row, List.of(), null);      // chưa vào phòng thì không có lịch sử hay app để xem
+            return;
+        }
+        detail.show(row, room.history(row.studentId()), room.appsOf(row.studentId()));
+    }
 
     private void openHistory(ExamRoom.Row row) {
         if (row != null) { new HistoryDialog(this, row.studentId(), row.name(), room.history(row.studentId())).setVisible(true); }
