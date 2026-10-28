@@ -181,14 +181,15 @@ public class ExamRoom {
     }
 
     synchronized Session login(String id, String name, String password, String os, Socket socket, PrintWriter out) {
+        if (students.size() == 0) {
+            return loginFailed(id, "Giám thị chưa nạp danh sách sinh viên", out);
+        }
         StudentList.Account account = students.find(id);
-        if (students.size() > 0 && account != null && account.password().equals(password)) {
+        if (account != null && account.password().equals(password)) {
             id = account.id();          // mã SV và họ tên lấy từ danh sách
             name = account.name();
-        } else if (students.size() > 0 && !id.isEmpty()) {
+        } else if (!id.isEmpty()) {
             return loginFailed(id, "Sai mã sinh viên hoặc mật khẩu", out);
-        } else if (name.isEmpty()) {
-            name = id;                  // chưa nạp danh sách: client không gửi họ tên
         }
         Session s = sessions.get(id);
         String error = loginError(id, s);

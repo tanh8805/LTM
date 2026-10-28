@@ -85,6 +85,7 @@ class MlClientTest {
     /** Server thi thật, một máy S1 đã vào thi và gửi một FEATURES. */
     private void startExamWithFeatures() throws Exception {
         server = new ExamServer(new JsonObject());
+        server.room().setStudents(TestStudents.of("S1"));
         server.room().setResultsRoot(tmp.resolve("ket-qua"));
         Path exam = tmp.resolve("exam.json");
         Files.writeString(exam, ExamServerTest.EXAM_JSON, StandardCharsets.UTF_8);
@@ -93,7 +94,7 @@ class MlClientTest {
         ExamServerTest.TestClient c = new ExamServerTest.TestClient(server.tcpPort());
         JsonObject login = Protocol.msg(Protocol.LOGIN);
         login.addProperty("studentId", "S1");
-        login.addProperty("name", "An");
+        login.addProperty("password", TestStudents.PASSWORD);
         c.send(login);
         c.next(Protocol.LOGIN_OK, 2000);
         JsonObject pre = Protocol.msg(Protocol.PRECHECK_RESULT);

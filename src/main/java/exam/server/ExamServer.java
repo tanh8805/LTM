@@ -49,21 +49,8 @@ public class ExamServer {
         }
         ExamServer server = new ExamServer(rules);
         server.setRulesFile(Path.of(rulesPath));
-        loadStudents(server);
         server.setMlClient(new MlClient("http://localhost:8000"));
         SwingUtilities.invokeLater(() -> openTeacherWindow(server));
-    }
-
-    /** Tự nạp lại danh sách sinh viên đã lưu lần trước (nếu có). */
-    private static void loadStudents(ExamServer server) {
-        if (!Files.exists(StudentList.FILE)) {
-            return;
-        }
-        try {
-            server.room().setStudents(StudentList.load(StudentList.FILE));
-        } catch (IOException | IllegalArgumentException e) {
-            System.err.println("Không nạp được " + StudentList.FILE + ":\n" + e.getMessage());
-        }
     }
 
     private static void openTeacherWindow(ExamServer server) {

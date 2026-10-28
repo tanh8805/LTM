@@ -53,12 +53,13 @@ class StudentAccountsTest {
     }
 
     @Test
-    void noListAllowsAnyone() {
+    void noListRejectsEveryone() {
         assertEquals(0, room.studentCount());
-        Session s = login("BATKY", "");
-        assertNotNull(s);
-        assertEquals("BATKY", s.name);
-        assertEquals(Protocol.LOGIN_OK, Protocol.type(lastReply()));
+        assertNull(login("BATKY", ""));
+        JsonObject reply = lastReply();
+        assertEquals(Protocol.LOGIN_FAIL, Protocol.type(reply));
+        assertEquals("Giám thị chưa nạp danh sách sinh viên", Protocol.str(reply, "reason"));
+        assertTrue(room.rows().isEmpty());
     }
 
     private List<String> rowIds() {
@@ -75,8 +76,9 @@ class StudentAccountsTest {
         ExamServer server = new ExamServer(new JsonObject());
         server.setListener(log::add);
         ExamRoom own = server.room();
+        own.setStudents(StudentList.parse("studentId,name,password\nSIM01,Một,1\nSIM02,Hai,1\nSV001,An,1\n"));
         for (String id : List.of("SIM01", "SIM02", "SV001")) {
-            own.login(id, "", "", "", null, new PrintWriter(new StringWriter()));
+            own.login(id, "", "1", "", null, new PrintWriter(new StringWriter()));
         }
         own.setStudents(StudentList.parse("studentId,name,password\nSIM02,Hai,x\nSV001,An,1\n"));
         List<String> ids = new ArrayList<>();
@@ -126,9 +128,10 @@ class StudentAccountsTest {
 
     @Test
     void emptyListDoesNotRemoveAnyone() {
-        login("SIM01", "");
+        room.setStudents(StudentList.parse(CSV));
+        login("SV001", "123456");
         room.setStudents(null);
-        assertEquals(List.of("SIM01"), rowIds());
+        assertEquals(List.of("SV001"), rowIds());
     }
 
     @Test

@@ -45,7 +45,7 @@ src/main/java/exam/
   server/   ExamServer  ExamRoom  ExamLog  Session  ExamFile  StudentList  RulesFile  RulesDialog  ListEditor  ExamBank  ExamBankDialog  QuestionDialog  ClientHandler  TeacherWindow  RosterTable  Roster  DetailPanel  HistoryDialog  MlClient
             Pill  TabButton  SideBar  LocalAddresses
 ml/         ml_service.py  simulate_clients.py  test_ml_service.py
-config/     rules.json  students.csv        exams/   sample_exam.json        src/main/resources/exam/theme/FlatLaf.properties
+config/     rules.json  lop-mau.csv        exams/   sample_exam.json        src/main/resources/exam/theme/FlatLaf.properties
 ```
 
 ## 3. Giao thức
@@ -107,13 +107,13 @@ Trên cửa sổ giám thị, nhấp đúp vào một dòng để xem lịch s�
 
 ### Tài khoản sinh viên
 
-Sinh viên đăng nhập bằng **mã SV và mật khẩu** (không còn ô Họ tên; họ tên lấy từ danh sách và server gửi về trong `LOGIN_OK`). Danh sách là file CSV UTF-8 (có hoặc không có BOM), dòng đầu là `studentId,name,password`, mỗi sinh viên một dòng, đúng 3 cột (không dùng dấu phẩy trong giá trị), không trùng mã SV. File mẫu `config/students.csv` có `SIM01`..`SIM30`, `SIM-X` và 4 tài khoản test `SV001`..`SV004`, mật khẩu `123456`.
-- Giám thị bấm **Sinh viên** ở thanh bên để xem danh sách (mã SV, họ tên, mật khẩu) rồi bấm **Nhập file CSV...** để chọn file; mỗi dòng lỗi được báo `Dòng n: lý do` (tối đa 10 lỗi) và không nạp gì. Nạp được thì lưu thành `config/students.csv`, lần sau mở server tự nạp lại; cửa sổ hiện `Đã nạp n SV`.
+Sinh viên đăng nhập bằng **mã SV và mật khẩu** (không còn ô Họ tên; họ tên lấy từ danh sách và server gửi về trong `LOGIN_OK`). Danh sách là file CSV UTF-8 (có hoặc không có BOM), dòng đầu là `studentId,name,password`, mỗi sinh viên một dòng, đúng 3 cột (không dùng dấu phẩy trong giá trị), không trùng mã SV. File mẫu `config/lop-mau.csv` có `SIM01`..`SIM30`, `SIM-X` và 4 tài khoản test `SV001`..`SV004`, mật khẩu `123456`.
+- Giám thị bấm **Sinh viên** ở thanh bên để xem danh sách (mã SV, họ tên, mật khẩu) rồi bấm **Nhập file CSV...** để chọn file; mỗi dòng lỗi được báo `Dòng n: lý do` (tối đa 10 lỗi) và không nạp gì. Nạp được thì danh sách chỉ nằm trong bộ nhớ của server, **không lưu ra file**: mỗi lần mở server phải nạp lại CSV (ví dụ `config/lop-mau.csv`). Nút **Bắt đầu thi** bị khoá (tooltip `Nạp danh sách sinh viên trước`) khi chưa có danh sách.
 - So khớp mã SV không phân biệt hoa thường và bỏ khoảng trắng. Sai mã SV hoặc mật khẩu: `LOGIN_FAIL` kèm sự kiện `LOGIN_FAIL` trong `events.csv`.
-- Chưa nạp danh sách (dev): ai cũng đăng nhập được, giao diện hiện cảnh báo vàng `Chưa nạp danh sách sinh viên: ai cũng đăng nhập được`.
+- Chưa nạp danh sách: mọi `LOGIN` bị từ chối bằng `LOGIN_FAIL` lý do `Giám thị chưa nạp danh sách sinh viên`, giao diện hiện dải cảnh báo vàng.
 - Giả lập: `python simulate_clients.py --password 123456` (mặc định `123456`).
 - Chỉ sinh viên có trong danh sách mới hiện ở tab Giám sát: nạp danh sách mới (chỉ khi chưa bắt đầu thi) thì phiên có mã SV ngoài danh sách bị xoá khỏi phòng và đóng kết nối.
-- Máy giả `simulate_clients.py` cũng phải có tên trong file CSV (SIM01…, SIM-X).
+- Máy giả `simulate_clients.py` cũng phải có tên trong file CSV nạp vào (SIM01…, SIM-X; `config/lop-mau.csv` đã có sẵn).
 - Mọi sinh viên trong danh sách đều hiện trên bảng Giám sát: ai chưa đăng nhập có trạng thái `Chưa vào` (chữ xám, tab **Chưa vào**, không tính vào Cần chú ý); khi kết thúc thi, `results.csv` thêm một dòng `Vắng` (điểm để trống) cho mỗi người chưa vào.
 
 ### Quản lý đề
@@ -251,7 +251,7 @@ Phần quét tiến trình, mạng, USB chỉ chạy trên Windows nên chưa ki
 - **Kỳ thi mới giữa lúc máy còn "Đang nộp bài...":** máy đó thấy `Mất kết nối` và phải đóng mở lại app (hiếm; hộp xác nhận của giáo viên đã cảnh báo).
 - **Log `ML: chưa đủ dữ liệu (n/20 mẫu)` có thể in `n` lớn hơn số mẫu ML thật sự nhận** (mẫu được chụp trước khi gọi HTTP, số `n` đếm lại sau); chỉ là chữ trong log, điểm vẫn đúng ở lần chấm kế.
 - **Đáp án chỉ lưu trong bộ nhớ client:** rớt mạng mà không tắt app thì vẫn giữ; tắt hẳn app thì mất.
-- **Mật khẩu truyền dạng chữ thường:** mật khẩu đi trong tin `LOGIN` qua mạng LAN, chưa mã hoá (và lưu thô trong `config/students.csv`); kết nối TCP/UDP không mã hoá. Chỉ dùng trong mạng tin cậy.
+- **Mật khẩu truyền dạng chữ thường:** mật khẩu đi trong tin `LOGIN` qua mạng LAN, chưa mã hoá (và nằm thô trong file CSV giám thị nạp); kết nối TCP/UDP không mã hoá. Chỉ dùng trong mạng tin cậy.
 - **Phụ thuộc cấu hình Windows:** cần PowerShell và `tasklist`/`netstat` có sẵn (mặc định đều có).
 
 ## 10. Hướng dẫn đọc code
