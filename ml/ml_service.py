@@ -10,6 +10,7 @@ RECENT = 3        # chỉ xét 3 cửa sổ gần nhất của mỗi sinh viên
 # nhỏ nên chỉ đánh dấu anomaly khi điểm chuẩn hoá cũng thuộc dải cao nhất phòng. Đo trên dữ liệu giả lập:
 # không có điều kiện này 25-88% sinh viên bình thường bị đánh dấu, có thì ~0-1%, vẫn bắt được 97-100% máy lệch.
 FLAG_MIN_SCORE = 0.7
+MIN_HIGH_WINDOWS = 2  # máy chỉ bị anomaly khi có ít nhất 2 trong 3 chu kỳ gần nhất đều "cao"
 MAX_REASONS = 3   # mỗi máy chỉ nêu tối đa 3 feature lệch nhất
 MIN_DEVIATION = 1  # feature phải lệch hơn 1 độ lệch chuẩn của phòng mới được nêu
 
@@ -69,11 +70,14 @@ def score_samples(samples: list[Sample]) -> dict:
     results = []
     for student_id, indexes in by_student.items():
         latest = sorted(indexes, key=lambda i: samples[i].window)[-RECENT:]
+        # một chu kỳ "cao" khi bị gắn cờ và điểm đủ lớn; một chu kỳ lẻ là nhiễu nên không đủ để kết luận
+        high_windows = sum(1 for i in latest if flagged[i] and scores[i] >= FLAG_MIN_SCORE)
+        reasons = find_reasons(x, latest)
         results.append({
             "studentId": student_id,
             "score": round(float(max(scores[i] for i in latest)), 3),
-            "anomaly": bool(any(flagged[i] and scores[i] >= FLAG_MIN_SCORE for i in latest)),
-            "reasons": find_reasons(x, latest),
+            "anomaly": high_windows >= MIN_HIGH_WINDOWS and len(reasons) > 0,   # không có lý do thì không gắn cờ
+            "reasons": reasons,
         })
     return {"status": "ok", "results": results}
 

@@ -5,7 +5,8 @@ import pytest
 
 from fastapi.testclient import TestClient
 
-from ml_service import app
+import simulate_clients as sim
+from ml_service import FLAG_MIN_SCORE, app
 
 client = TestClient(app)
 
@@ -87,3 +88,38 @@ def test_uses_three_latest_windows():
 def test_wrong_length_rejected():
     resp = client.post("/score", json={"samples": [sample("SV1", 1, [0, 0, 0, 0, 0])]})
     assert resp.status_code == 422
+
+
+def sim_room(normal_students=30, windows=6, seed=1):
+    """Phòng máy giả như simulate_clients.py (feature là số đếm nhỏ, nhiều mẫu trùng nhau)."""
+    random.seed(seed)
+    return [sample(f"SIM{i:02d}", w, sim.normal_values()) for i in range(1, normal_students + 1) for w in range(1, windows + 1)]
+
+
+def test_normal_room_has_almost_no_anomaly():
+    body = score(sim_room())
+    flagged = [r["studentId"] for r in body["results"] if r["anomaly"]]
+    assert len(flagged) <= 2, flagged
+
+
+def test_cheater_in_normal_room_is_flagged():
+    samples = sim_room()
+    samples += [sample("SIM-X", w, sim.cheater_values()) for w in range(1, 7)]
+    results = by_student(score(samples))
+    assert results["SIM-X"]["anomaly"] is True
+    assert results["SIM-X"]["reasons"]
+
+
+def test_single_high_window_is_not_anomaly():
+    samples = sim_room(normal_students=6)
+    samples += [sample("SIM-X", w, sim.normal_values()) for w in range(1, 6)]
+    samples.append(sample("SIM-X", 6, [0, 6, 20, 0, 0, 8]))   # chỉ chu kỳ cuối lệch
+    result = by_student(score(samples))["SIM-X"]
+    assert result["score"] >= FLAG_MIN_SCORE, "chu kỳ lệch phải thật sự cao thì test mới có nghĩa"
+    assert result["anomaly"] is False
+
+
+def test_anomaly_needs_at_least_one_reason():
+    # mọi máy giống nhau thì không có lý do nào; anomaly luôn false dù điểm có thế nào
+    body = score([sample(f"SV{i}", w, [0, 0, 1, 0, 0, 2]) for i in range(5) for w in range(1, 6)])
+    assert all(r["reasons"] == [] and r["anomaly"] is False for r in body["results"])
